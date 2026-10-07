@@ -21,7 +21,7 @@ Pravidlá práce sú v `CLAUDE.md` a v skilloch `.claude/skills/` — tu je len 
    schéma vrátane každého zvýšenia `CONFIG_SCHEMA`, BuildPlan `SCHEMA` alebo STD, migrácia, observer/undo lifecycle, nový modul), výrobná
    alebo cenová (jediná definícia v CLAUDE.md), má nad 300 zmenených riadkov kódu pluginu (bez testov a dokumentácie) alebo nový ovládací
    prvok v UI? **Áno → po pushi vetvy STOP:** PR neotváraj a vráť report orchestrátorovi (vetva, plný SHA, ktorá hranica platí).
-   Predrecenziu spúšťa orchestrátor — subagent ďalších subagentov nespúšťa. Nálezy P1/P2 z nej opravíš, keď ťa osloví, a PR otvoríš
+   Predrecenziu spúšťa orchestrátor — subagent ďalších subagentov nespúšťa. Nálezy P2/P3 z nej opravíš, keď ťa osloví (P1 nie — viď „Opravy z predrecenzie a review"), a PR otvoríš
    **až na jeho pokyn** podľa kroku 7 (sekciu „Predrecenzia" do PR popisu podľa výsledku, ktorý ti pošle). **Nie →** rovno krok 7.
 7. Pred `gh pr create` kvótová brána (skill `usage`, `-Gate codex`; exit 3 = PR ako draft). PR popis po slovensky: čo sa mení pre používateľa
    a ako je to otestované. Hneď po vytvorení PR doplň číslo PR samostatným commitom, ktorý mení len číslo.
@@ -29,8 +29,9 @@ Pravidlá práce sú v `CLAUDE.md` a v skilloch `.claude/skills/` — tu je len 
 
 ## Opravy z predrecenzie a review
 
-Keď ťa orchestrátor osloví znova (pokračovanie tej istej dávky), opravíš nálezy vo svojej vetve, zopakuješ testy a pushneš. Do reportu daj
-hash opravy ku každému nálezu.
+Keď ťa orchestrátor osloví znova (pokračovanie tej istej dávky), opravíš **len nálezy P2/P3** vo svojej vetve, zopakuješ testy a pushneš.
+Do reportu daj hash opravy ku každému nálezu. **Pri P1 (a P0) opravu nerob** — vráť ju orchestrátorovi v reporte (vetva, SHA, nález);
+oprava ide na profil Ť (`implementator`, Opus) s novým zadaním podľa Matice výberu vo WORKFLOW § 2.
 
 ## Kedy zastaviť
 

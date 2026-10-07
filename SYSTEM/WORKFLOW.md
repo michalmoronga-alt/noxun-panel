@@ -87,22 +87,26 @@ pri volaní prepíše model, effort nie (zdroj: code.claude.com/docs/en/sub-agen
 
 **Triedy dávok** (hranice sú v CLAUDE.md — tu sa neopakujú; triedu určuje orchestrátor pri zadaní dávky):
 
-| Trieda | Čo spadá | Profil (typ agenta) | Model a effort |
-|---|---|---|---|
-| **Ľ ľahká** | docs, texty, preklady, ikony, rozloženie, mechanické presuny, testy, presné zadanie bez vlastného rozhodovania | `implementator-lahky` ([definícia](../.claude/agents/implementator-lahky.md)) | Sonnet `medium` |
-| **S stredná** | bežná kódová dávka bez zmeny kontraktu (nová logika, bugfix mimo výroby, nový ovládací prvok UI), do ~300 riadkov kódu pluginu | `implementator-stredny` ([definícia](../.claude/agents/implementator-stredny.md)) | Sonnet `high` |
-| **Ť ťažká** | audit-povinná dávka (trieda `codex-audit`), výrobná/cenová (obe definície v CLAUDE.md, Git workflow), nad 300 riadkov kódu pluginu, oprava P0/P1 | `implementator` ([definícia](../.claude/agents/implementator.md)) | Opus `high` |
+| Trieda | Čo spadá | Profil (typ agenta) |
+|---|---|---|
+| **Ľ ľahká** | docs, texty, preklady, ikony, rozloženie, mechanické presuny, testy, presné zadanie bez vlastného rozhodovania | `implementator-lahky` ([definícia](../.claude/agents/implementator-lahky.md)) |
+| **S stredná** | bežná kódová dávka bez zmeny kontraktu (nová logika, bugfix mimo výroby, nový ovládací prvok UI), do ~300 riadkov kódu pluginu | `implementator-stredny` ([definícia](../.claude/agents/implementator-stredny.md)) |
+| **Ť ťažká** | audit-povinná dávka (trieda `codex-audit`), výrobná/cenová (obe definície v CLAUDE.md, Git workflow), nad 300 riadkov kódu pluginu, oprava P0/P1 | `implementator` ([definícia](../.claude/agents/implementator.md)) |
 
-- **Ostatné roly bez zmeny:** slepý recenzent Opus `high` (`slepy-recenzent`); náhradník implementátora Codex podľa tabuľky Náhradníci
+**Prednosť tried:** triedu určuje najvyššia, do ktorej dávka spadá — **ktorékoľvek kritérium Ť prebíja S aj Ľ, kritérium S prebíja Ľ**
+(napr. presne zadaná migrácia schémy alebo oprava výrobnej ceny je Ť, aj keď zadanie nevyžaduje vlastné rozhodovanie). Model a effort
+profilov: tabuľka Obsadenie rolí (časť 2) a frontmatter typu agenta — tu sa neopakujú.
+
+- **Ostatné roly bez zmeny:** slepý recenzent (`slepy-recenzent`); náhradník implementátora Codex podľa tabuľky Náhradníci
   (len bežné dávky, predrecenzia vždy slepým recenzentom Claude).
 - **Postup výberu:** trieda dávky → profil z tabuľky → kontrola kvót podľa existujúcich pravidiel (CLAUDE.md, Kvóty a štart okna;
   časť 6; tabuľka Náhradníci). Matica nemení hranice predrecenzie ani auditu — tie platia podľa CLAUDE.md pre každý profil rovnako.
-- **Eskalácia:** keď predrecenzia alebo review nájde v dávke Sonnetu P1, opravu robí `implementator` (Opus) s novým zadaním
+- **Eskalácia:** keď predrecenzia alebo review nájde v dávke Sonnetu P1, opravu robí profil Ť (`implementator`) s novým zadaním
   (nie pokračovanie Sonnet implementátora).
 - **Shadow (benchmark):** beží **len pri voľných limitoch** — Claude session < 50 % a týždeň < 70 %, Grok týždeň < 70 % a prihlásený
   (`grok models`). Rovnaké zadanie ako hlavná dávka, vlastná vetva `bench/<úloha>-<model>`, **nikdy sa nemerguje a nebrzdí merge**
-  hlavnej dávky. Rozsah: **Ľ** bez shadow (pokiaľ orchestrátor nenavrhne inak) · **S** → Grok vždy + Opus každá 3. dávka ·
-  **Ť** → Sonnet `high` + Grok. Hodnotia dvaja slepí recenzenti (Claude Opus + Codex), diffy zamaskované ako A/B/C. Zápis do
+  hlavnej dávky. Rozsah: **Ľ** bez shadow (pokiaľ orchestrátor nenavrhne inak) · **S** → Grok vždy + profil Ť (`implementator`) každá 3. dávka ·
+  **Ť** → profil S (`implementator-stredny`) + Grok. Hodnotia dvaja slepí recenzenti (Claude + Codex), diffy zamaskované ako A/B/C. Zápis do
   benchmarku: repo `noxun-mods`, `benchmark/behy.jsonl` a `benchmark/vysledky/<Uxxx>.md`.
 - **Povýšenie:** po 5 behoch na kombináciu model × trieda; keď priemer skóre je najviac 0,3 pod hlavným profilom a bez P1, orchestrátor
   navrhne presun v matici — **rozhoduje Michal**.
