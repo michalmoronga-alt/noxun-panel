@@ -36,7 +36,8 @@ Keď zásah spadá do viacerých riadkov, platia VŠETKY. **Súbor nad ~50 kB sa
   (typ agenta) podľa nej. **Ľ ľahká** = docs, texty, preklady, ikony, rozloženie, mechanické presuny, testy, presné zadanie bez vlastného
   rozhodovania · **S stredná** = bežná kódová dávka bez zmeny kontraktu (nová logika, bugfix mimo výroby, nový ovládací prvok UI) do ~300 riadkov
   kódu pluginu · **Ť ťažká** = audit-povinná dávka (trieda `codex-audit`), výrobná/cenová, nad 300 riadkov kódu pluginu, oprava P0/P1.
-  **Prednosť Ť > S > Ľ:** platí najvyššia trieda, do ktorej dávka spadá. **Eskalácia:** P1 alebo zmena konceptu v dávke profilu Ľ/S → opravu
+  **Prednosť Ť > S > Ľ:** platí najvyššia trieda, do ktorej dávka spadá; hranica 300 riadkov pri zadaní je odhad — implementátor Ľ/S pred
+  návratom zmeria skutočný diff kódu pluginu a keď je nad 300, **ohlási to** a dávka sa reklasifikuje na Ť. **Eskalácia:** P1 alebo zmena konceptu v dávke profilu Ľ/S → opravu
   robí profil Ť s novým zadaním (nie pokračovanie). Tabuľka profilov, shadow a povýšenie: [SYSTEM/WORKFLOW.md](SYSTEM/WORKFLOW.md) § 2
   „Matica výberu“; **zmenu matice či model mimo nej navrhuje orchestrátor len na potvrdenie Michala**. Model sa tu neopakuje (len v tabuľke
   Obsadenie rolí).

@@ -27,6 +27,12 @@ Pravidlá práce sú v `CLAUDE.md` a v skilloch `.claude/skills/` — tu je len 
    a ako je to otestované. Hneď po vytvorení PR doplň číslo PR samostatným commitom, ktorý mení len číslo.
 8. **Nikdy nemerguj** — merge robí orchestrátor po bránach.
 
+## Shadow beh (benchmark)
+
+Keď zadanie **začína slovom SHADOW**, ide o benchmarkový beh (WORKFLOW § 2, Matica výberu) a namiesto krokov 2, 6, 7 a uzáveru platí: vetva
+`bench/<úloha>-<model>` presne podľa zadania, **žiadny PR**, žiadna predrecenzia, STAV, KRONIKA a PLAN sa nemenia, in-SU runner sa nespúšťa.
+Urobíš len implementáciu a testy, commit + push bench vetvy a vrátiš SHA, čas behu a výsledky testov. Nikdy nemerguješ.
+
 ## Opravy z predrecenzie a review
 
 Keď ťa orchestrátor osloví znova (pokračovanie tej istej dávky), opravíš nálezy vo svojej vetve, zopakuješ testy a pushneš. Do reportu daj

@@ -101,14 +101,17 @@ profilov: tabuľka Obsadenie rolí (časť 2) a frontmatter typu agenta — tu s
   (len bežné dávky, predrecenzia vždy slepým recenzentom Claude).
 - **Postup výberu:** trieda dávky → profil z tabuľky → kontrola kvót podľa existujúcich pravidiel (CLAUDE.md, Kvóty a štart okna;
   časť 6; tabuľka Náhradníci). Matica nemení hranice predrecenzie ani auditu — tie platia podľa CLAUDE.md pre každý profil rovnako.
+- **Reklasifikácia:** hranica 300 riadkov pri zadaní je odhad; implementátor profilu Ľ/S pred návratom zmeria skutočný diff kódu pluginu
+  (bez testov a dokumentácie) a keď je nad 300, ohlási to orchestrátorovi — dávka sa reklasifikuje na Ť (povinná predrecenzia; opravy P1
+  a zmeny konceptu profil Ť).
 - **Eskalácia:** keď predrecenzia alebo review nájde v dávke Sonnetu P1 (alebo oprava mení koncept), opravu robí profil Ť (`implementator`)
   s novým zadaním (nie pokračovanie Sonnet implementátora); pokračovaním sa opravujú len P2/P3, ktoré nemenia koncept.
 - **Shadow (benchmark):** beží **len pri voľných limitoch** — Claude session < 50 % a týždeň < 70 %, Grok týždeň < 70 % a prihlásený
-  (`grok models`), **Codex weekly zostatok ≥ 30 %** (hodnotí Codex recenzent; keď nie je, shadow sa nespúšťa). Rovnaké zadanie ako hlavná dávka, vlastná vetva `bench/<úloha>-<model>`, **nikdy sa nemerguje a nebrzdí merge**
+  (`grok models`), **Codex weekly zostatok ≥ 30 %** (hodnotí Codex recenzent; keď nie je, shadow sa nespúšťa). Rovnaké zadanie ako hlavná dávka (zadanie shadow behu začína slovom „SHADOW“ — implementátor ide režimom „Shadow beh“ bez PR, predrecenzie a zásahu do STAV/KRONIKA/PLAN), vlastná vetva `bench/<úloha>-<model>`, **nikdy sa nemerguje a nebrzdí merge**
   hlavnej dávky. Rozsah: **Ľ** bez shadow (pokiaľ orchestrátor nenavrhne inak) · **S** → Grok vždy + profil Ť (`implementator`) každá 3. dávka ·
   **Ť** → profil S (`implementator-stredny`) + Grok. Hodnotia dvaja slepí recenzenti (Claude + Codex), diffy zamaskované ako A/B/C. Zápis do
   benchmarku: repo `noxun-mods`, `benchmark/behy.jsonl` a `benchmark/vysledky/<Uxxx>.md`.
-- **Povýšenie:** po 5 behoch na kombináciu model × trieda; keď priemer skóre je najviac 0,3 pod hlavným profilom a bez P1, orchestrátor
+- **Povýšenie:** po 5 behoch na kombináciu model × trieda; keď priemer skóre je najviac 0,3 pod hlavným profilom a bez P0 aj P1 v týchto 5 behoch, orchestrátor
   navrhne presun v matici — **rozhoduje Michal**.
 - **Návrhy orchestrátora:** orchestrátor smie navrhnúť zmenu matice alebo si vyžiadať model či nástroj mimo nej (napr. „ľahká úloha —
   shadow Antigravity/Gemini + Sonnet `low`") — **vždy na potvrdenie Michala**; bez potvrdenia platí matica.
