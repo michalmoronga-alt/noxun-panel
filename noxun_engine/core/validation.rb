@@ -941,10 +941,10 @@ module Noxun
       # spravu neposlal. Vetu bezne sklada ZBER (pozna sirku, vysku sokla aj
       # oba pocty), Kontrola k nej doplni len to, ze export bezi dalej — inak
       # by pouzivatel cakal branu.
-      #   leg_stale         — skrinka postavena pred pravidlom „4/6 podla sirky"
+      #   leg_stale         — skrinka postavena pred pravidlom „2/4/6 podla sirky"
       #   plinth_clip_check — pocet prichytov nesedi s poctom noh (Codex #338 N2)
       HW_ORANGE_NOTES = {
-        BuildPlan::LEG_STALE => 'Nohy sú spočítané ešte pred pravidlom 4/6.',
+        BuildPlan::LEG_STALE => 'Nohy sú spočítané ešte pred pravidlom 2/4/6.',
         BuildPlan::PLINTH_CLIP_CHECK =>
           'Počet príchytov sokla nesedí s počtom nôh.'
       }.freeze
@@ -1909,7 +1909,10 @@ module Noxun
       # hustotu materialu cela), nie nalez — pocet zavesov je legitimne len
       # podla vysky a pouzivatel nema co opravovat. ORANGE na kazdych dvierkach
       # zakazky bez hustot by bol hluk, ktory prekryje skutocne nalezy.
-      BUILD_INFO_ONLY = %w[legacy_slide_suppressed hinge_weight_unknown].freeze
+      # SIRKA 50 (audit FIX 2): `legs_drawn_merged` len KONSTATUJE, ze proxy
+      # noh sa pod uzku/plytku skrinku nakreslila s MENEJ valcami (prekryte by
+      # boli nezmysel) — pocet v nakupe je spravny a pouzivatel nema co opravit.
+      BUILD_INFO_ONLY = %w[legacy_slide_suppressed hinge_weight_unknown legs_drawn_merged].freeze
 
       def check_build(w, items, uni_parts = {})
         return unless w.is_a?(Hash)

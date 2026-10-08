@@ -16,14 +16,15 @@ module Noxun
       SCALE_TOL = 0.001  # tolerancia: dlzka osi != 1.0 => scale
       DEBOUNCE  = 0.2    # s — cakanie na ustalenie po poslednej zmene
       # S1-E0: spodna hranica absorbovaneho rozmeru. VYSKA je od 80 mm (korpus
-      # na dorovnanie nad umyvackou) — hodnoty su ZRKADLOM `CabinetBuilder::MIN`
+      # na dorovnanie nad umyvackou), SIRKA od 50 mm (uzka skrinka, Michal
+      # 7.10.2026, `CONFIG_SCHEMA` 23) — hodnoty su ZRKADLOM `CabinetBuilder::MIN`
       # (string kluce, lebo sem chodi kluc z uloženeho configu). Priama
       # referencia sa pouzit NEDA: `scale_observer` sa nacitava PRED
       # `cabinet_builder` (main.rb), takze konstanta by pri boote neexistovala —
       # zhodu preto strazi guard test `tests/pure/test_s1e0_min_vyska.rb`.
-      MIN = { 'width' => 200.0, 'height' => 80.0, 'depth' => 150.0 }.freeze
+      MIN = { 'width' => 50.0, 'height' => 80.0, 'depth' => 150.0 }.freeze
       # S1-E: SLOT UMYVACKY ma VLASTNE minima — nema vnutro, takze sa neriadi
-      # korpusovymi hranicami, a zaroven nema zmysel pustat 200 mm „umyvacku".
+      # korpusovymi hranicami, a zaroven nema zmysel pustat 50 mm „umyvacku".
       # Su to TIE ISTE cisla ako spodne hranice v `CabinetBuilder::DW_WIDTH_RANGE`
       # / `DW_HEIGHT_RANGE` (Astra S1-E BLOCKER E1: jedna hranica na oboch
       # miestach). H12a: odvodene z `limits` registra `CabinetTypes` (spodne
@@ -503,10 +504,13 @@ module Noxun
           th = CabinetBuilder.aux_part_thicknesses(params, model)
           # ROH-A1 (krizovy audit G9): sirka ROHOVEJ sa pri ZMENSENI klampuje
           # CONFIG-AWARE (rohova zostava sa musi zmestit pred slepu cast) —
-          # sondou cez cely plan, PRED skusanim hlbky a vysky. Ine typy ostavaju
-          # na holom typovom minime (dnesne spravanie).
+          # sondou cez cely plan, PRED skusanim hlbky a vysky.
+          # SIRKA 50 (7.10.2026): to iste pre KAZDY korpus — od 50 mm uz holé
+          # minimum NIE JE vzdy nad hranicou `validate!` (`w <= 2t + 10`): pri
+          # hrubke 25 by 50 mm prestavba odmietla a `reject_scale` by vratil
+          # POVODNU skrinku. Slot (bez korpusu) ostava na typovom minime.
           width_note = nil
-          if new_w < base_w && Construction.corner?(cfg)
+          if new_w < base_w && CabinetTypes.carcass?(type)
             new_w, width_note = clamp_corner_width(params, new_w, cid, th)
           end
           params['width']  = new_w
@@ -522,8 +526,8 @@ module Noxun
           # Hole `MIN['height']` nestaci: pri sokli 100 by 80 mm vyrobilo config
           # bez vnutra, `Construction.validate!` by prestavbu odmietol a
           # pouzivatel by po tiahnuti uchopu dostal reject + POVODNY rozmer
-          # namiesto najnizsej platnej skrinky. Sirka a hlbka taky problem
-          # nemaju (ich MIN je vzdy nad hranicou validacie).
+          # namiesto najnizsej platnej skrinky. Sirku a hlbku pri zmenseni
+          # klampuju sondy vyssie (`clamp_corner_width`, `clamp_depth`).
           params['height'] = clamp_height(params, (base_h * sz).round.to_f, cid, th)
           new_h = params['height']
 
@@ -637,10 +641,12 @@ module Noxun
             "#{Construction.fmt_mm(depth)}."
         end
 
-        # ROH-A1 (krizovy audit G9 / Codex Q5): spodna hranica SIRKY rohovej
+        # ROH-A1 (krizovy audit G9 / Codex Q5): spodna hranica SIRKY KORPUSU
         # = prisnejsie z typoveho minima a `Construction.min_valid_width` (sonda
         # cez cely plan s ucinnymi hrubkami CR). -> [sirka, hlaska | nil];
-        # hlaska len ked sirku zdvihla ROHOVA ZOSTAVA (vzor `clamp_depth`).
+        # hlaska len ked sirku zdvihla KONSTRUKCIA (vzor `clamp_depth`).
+        # Od SIRKY 50 (7.10.2026) pre kazdy korpus, nie len rohovy — meno
+        # metody ostava (zhoda s golden H12 a testami ROH-A1).
         def clamp_corner_width(params, val, cid, part_thicknesses = nil)
           norm = CabinetBuilder.normalize(params)
           floor = Construction.min_valid_width(norm, part_thicknesses: part_thicknesses)
@@ -648,14 +654,20 @@ module Noxun
           m = [base, floor].max
           return [val, nil] if val >= m
 
-          Engine.log("scale absorb #{cid}: width #{val.round} < min #{m.round} (rohova zostava) — clampujem na #{m.round}")
-          note = floor > base ? width_clamp_message(cid, m) : nil
+          why = Construction.corner?(norm) ? 'rohova zostava' : 'konstrukcia'
+          Engine.log("scale absorb #{cid}: width #{val.round} < min #{m.round} (#{why}) — clampujem na #{m.round}")
+          note = floor > base ? width_clamp_message(cid, m, norm) : nil
           [m, note]
         end
 
-        def width_clamp_message(cid, width)
-          "Šírka rohovej skrinky #{cid} je pri tejto rohovej zostave najmenej " \
-            "#{Construction.fmt_mm(width)} mm — nastavená na #{Construction.fmt_mm(width)}."
+        def width_clamp_message(cid, width, norm = nil)
+          mm = Construction.fmt_mm(width)
+          if norm.nil? || Construction.corner?(norm)
+            return "Šírka rohovej skrinky #{cid} je pri tejto rohovej zostave najmenej #{mm} mm — nastavená na #{mm}."
+          end
+
+          "Šírka skrinky #{cid} je pri hrúbke #{Construction.fmt_mm(norm[:thickness])} mm a tejto konštrukcii " \
+            "najmenej #{mm} mm — nastavená na #{mm}."
         end
 
         def clamp_slot_height(params, val, cid)

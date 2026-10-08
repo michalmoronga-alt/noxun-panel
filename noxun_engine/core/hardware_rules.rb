@@ -90,7 +90,7 @@ module Noxun
       # na KAZDE celo `flap` (aj na vyklop) — a prave preto sa dokument so
       # std 3 do starsieho pluginu uz NEZAPISUJE (dopredna brana nizsie).
       STD          = 3 # verzia formatu suboru pravidiel (doc: std/seed_version/rules)
-      SEED_VERSION = 7 # v2 (D1): +zavesenie hornej skrinky, +podperky policove,
+      SEED_VERSION = 8 # v2 (D1): +zavesenie hornej skrinky, +podperky policove,
                        # seria vysuvov zladena s realnym radom Atira (GH #125 P2)
                        # v3 (D-90): +uchytkovy profil na dvierkach a zasuvkovych celach
                        # v4 (KOV-F1): NOXUN tabulka zavesov + door guardy
@@ -102,6 +102,11 @@ module Noxun
                        # 4 nohy, len pri samostatnej soklovej liste).
                        # v7 (D-120): +profily vyklopu, sklopu a blendy;
                        # vlastne pravidlo sa posudzuje aj podla flap_dir.
+                       # v8 (SIRKA 50, Michal 7.-8.10.2026): `nohy-zakladne`
+                       # dostal pasmo UZKEJ skrinky — sirka < 200 mm -> 2 nohy
+                       # (v strede sirky vpredu + vzadu), 200-999 -> 4, od
+                       # 1000 -> 6. Nedotknuty tvar v6/v7 sa obnovi
+                       # (`LEGACY_SEED_SHAPES`), upraveny ostava.
                        # BEZ tohto bumpu by `merge_seed` migraciu preskocil
                        # (`from_version >= SEED_VERSION`) a existujuca kniznica
                        # by nove seed pravidla nedala ani NOVYM projektom.
@@ -144,6 +149,17 @@ module Noxun
       # (`bands` porovnava `v <= max`). Konstanta je autoritou HLASOK a brany
       # `Bom.leg_stale_issue`, nie samotneho vypoctu (ten drzia pasma).
       LEG_WIDE_FROM_MM = 1000.0
+      # SIRKA 50 (Michal 8.10.2026): sirka, POD ktorou ma UZKA skrinka 2 nohy
+      # (v strede sirky, vpredu + vzadu). Rovnaka rola ako `LEG_WIDE_FROM_MM`:
+      # autorita hlasok a brany `leg_stale`, vypocet drzi pasmo.
+      LEG_NARROW_BELOW_MM = 200.0
+      # Horna hranica pasma uzkej skrinky v `bands` (`v <= max`). Audit FIX 4:
+      # `max 199` by sirke 199,5 dal 4 nohy — `bands` necelociselnu hodnotu
+      # medzi 199 a 200 pusta do DALSIEHO pasma. 199,999 pokryje kazdu sirku
+      # pod 200 zadanu na tri desatinne miesta (panel aj Mierka pracuju na
+      # cele mm alebo desatiny); ZIADNY novy kluc pasma (`min`, `max_exclusive`)
+      # — starsi plugin by ho ignoroval a ratal inak (dopredna brana `STD`).
+      LEG_NARROW_MAX_MM = 199.999
       # Vyska sokla, OD ktorej existuje soklova lista na nohach AXILO.
       PLINTH_CLIP_MIN_MM = 55.0
       # KOV-G1b: VOLITELNY filter `applies_to`. Pravidlo s nim plati LEN na
@@ -157,6 +173,12 @@ module Noxun
       # ho `Bom.leg_stale_issue` (ORANGE „prestav skrinku"). PEVNE CISLO ako
       # `LIFT_SEED_VERSION`: buduci bump seedu na tomto nic nemeni.
       LEG_WIDTH_SEED_VERSION = 6
+      # SIRKA 50: verzia SEEDU, OD KTOREJ pravidla davaju UZKEJ skrinke
+      # (< 200 mm) 2 nohy. Snapshot POD tymto cislom ma pasmo `< 1000 -> 4`,
+      # takze uzka skrinka postavena s nim nesie 4 nohy — `Bom.leg_stale_issue`
+      # ju prizna ORANGE („Doplniť nové predvoľby" + prestavba). PEVNE CISLO
+      # ako `LEG_WIDTH_SEED_VERSION`: buduci bump seedu na tomto nic nemeni.
+      LEG_NARROW_SEED_VERSION = 8
 
       FILE         = 'hardware_rules.json'
       MODEL_KEY    = 'hardware_rules' # kluc snapshotu v NOXUN dict na modeli
@@ -249,16 +271,20 @@ module Noxun
         # `params['height']` (vyska sokla) dalej vybera KOD, sirka riesi POCET.
         # Filter `support` je nezmeneny — nohy su pod skrinkou aj vtedy, ked je
         # sokel vpredu sucastou korpusu (`plinth`).
+        # SIRKA 50 (v8): uzka skrinka < 200 mm -> 2 nohy (`LEG_NARROW_MAX_MM`).
         { 'rule_id' => LEG_RULE_ID, 'enabled' => true,
           'applies_to' => { 'role' => 'cabinet', 'support' => %w[legs plinth] },
           'output' => LEG_OUTPUT, 'kind' => 'bands', 'input' => 'width',
           'bands' => [
+            { 'max' => LEG_NARROW_MAX_MM, 'quantity' => 2 },
             { 'max' => 999.0, 'quantity' => 4 },
             { 'max' => nil,   'quantity' => 6 }
           ],
           'params_from_context' => { 'height' => 'floor_height' } },
         # KOV-G1b: PRICHYT soklovej listy — 1 ks na zacate 4 nohy, teda ta ista
         # sirkova hranica ako pri nohach (ziadny pomerovy clen; D-109 po V1).
+        # SIRKA 50: uzka skrinka s 2 nohami ma tiez 1 prichyt (zacate 4) —
+        # pravidlo sa NEMENI.
         # Filter `support legs` = LEN samostatna soklova lista (sokel vpredu
         # `plinth` je sucast korpusu a prichyt nema co drzat), filter
         # `floor_height_min` = LEN vyska, v ktorej lista na nohach AXILO
@@ -430,6 +456,17 @@ module Noxun
           { 'rule_id' => LEG_RULE_ID, 'enabled' => true,
             'applies_to' => { 'role' => 'cabinet', 'support' => %w[legs plinth] },
             'output' => LEG_OUTPUT, 'kind' => 'fixed', 'quantity' => 4,
+            'params_from_context' => { 'height' => 'floor_height' } },
+          # SIRKA 50: v6..v7 tvar (4/6 podla sirky, bez pasma uzkej skrinky).
+          # Nedotknuty dostane pasmo < 200 -> 2; upraveny (napr. ine pasma)
+          # sa NIKDY neprepisuje.
+          { 'rule_id' => LEG_RULE_ID, 'enabled' => true,
+            'applies_to' => { 'role' => 'cabinet', 'support' => %w[legs plinth] },
+            'output' => LEG_OUTPUT, 'kind' => 'bands', 'input' => 'width',
+            'bands' => [
+              { 'max' => 999.0, 'quantity' => 4 },
+              { 'max' => nil,   'quantity' => 6 }
+            ],
             'params_from_context' => { 'height' => 'floor_height' } }
         ],
         # KOV-F1: v1..v3 tvar tabulky zavesov (900/1400/1900 -> 2/3/4/5).

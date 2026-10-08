@@ -59,7 +59,10 @@ module Noxun
           # umyvacky overoval celo proti VYSKE LINKY a legitimny presah cela
           # nad linku by zahlasil ako chybu, ktora chybou nie je.
           # H12b: „slot" = typ BEZ KORPUSU (`builder`), rozsahy = vlastne
-          # `limits` typu z registra (inak korpusove 200–3000).
+          # `limits` typu z registra (inak korpusove `CabinetBuilder::MIN` –
+          # 3000). SIRKA 50: spodne hranice sa uz NEOPISUJU — do 7.10.2026 tu
+          # stalo 200 pre sirku AJ vysku, takze preflight odmietal korpus
+          # na dorovnanie (vyska 80-199, S1-E0) aj uzku skrinku.
           slot = !CabinetTypes.carcass?(data['type'])
           limits = CabinetTypes.prop(data['type'], :limits)
           dims = %w[width height floor_height].map do |key|
@@ -70,8 +73,8 @@ module Noxun
             v.to_f
           end
           dims[2] = 0.0 if slot # slot sokel v zmysle korpusu NEMA
-          wr = limits ? limits[:width] : [200.0, 3000.0]
-          hr = limits ? limits[:height] : [200.0, 3000.0]
+          wr = limits ? limits[:width] : [CabinetBuilder::MIN[:width], 3000.0]
+          hr = limits ? limits[:height] : [CabinetBuilder::MIN[:height], 3000.0]
           unless (wr[0]..wr[1]).cover?(dims[0]) && (hr[0]..hr[1]).cover?(dims[1]) &&
                  (0.0..500.0).cover?(dims[2])
             raise 'Rozmery skrinky sú mimo povoleného rozsahu.'
