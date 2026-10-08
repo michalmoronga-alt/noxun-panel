@@ -561,13 +561,13 @@ prestavbe ticho klampol späť na 200, teda zmenil výrobnú geometriu (dno, str
 šablóny, kópia) a exportná brána. Aktivačné konštanty (5/9/11/19/20) sa nehýbu; žiadna migrácia netreba, config nemá nové pole. Úzku skrinku z hrubého materiálu
 zastaví `Construction.validate!` (`w <= 2t + 10` → „Sirka je prilis mala vzhladom na hrubku materialu."), panel tú istú vetu ukáže červenou šírkou a hrúbkou ešte
 pred apply (`form.js` `cabinetWidthError`, [ui-lifecycle.md](ui-lifecycle.md)); Mierka pod túto hranicu sa odmietne (`reject_scale` s tou vetou, vzor D-120).
-**NOHY POD SKRINKOU — `Construction.leg_layout` (šírka 50, audit FIX 2).** Polohy valcov proxy nôh počíta **čistá** `Construction.leg_layout(cfg, qty)` → `{positions, wanted}`
-(jediná autorita; `draw_legs` ich len kreslí, `LEG_DIAMETER`/`LEG_INSET`/`LEG_RENDER_MAX` sú v builderi aliasy). Dva rady s odsadením `LEG_INSET` 60 (predný pri soklu
-vpredu za doskou sokla, zadný pred `back_stop`); **2 nohy úzkej skrinky stoja v strede šírky, vpredu + vzadu**; pri plytkej skrinke (dva rady sa nezmestia) sa 2 nohy
-skúsia na krajoch prípustnej hĺbky. Valce sa **nikdy nekreslia prekryté**: v rade najviac toľko, koľko sa zmestí s rozostupom ≥ priemer (`leg_row_xs`), takže pri
-úzkej/plytkej skrinke môže vzniknúť **menej valcov**, než je kusov v nákupe — počet v nákupe ostáva z pravidla a plán to prizná info warningom
-**`legs_drawn_merged`** („Nohy: v nákupe 2 ks, v modeli sa kreslí 1 …"), ktorý Kontrola nehlási ako nález (`Validation::BUILD_INFO_ONLY`). Vedomý dôsledok: plytká
-skrinka 200–269 mm so 4 nohami sa už nekreslí so štyrmi prekrytými valcami, ale s dvoma.
+**NOHY POD SKRINKOU — `Construction.leg_layout` (šírka 50, audit FIX 2, Codex P2-1–P2-3).** Polohy valcov proxy nôh počíta **čistá** `Construction.leg_layout(cfg, qty)`
+→ `{positions, wanted}` (jediná autorita; `draw_legs` ich len kreslí, `LEG_DIAMETER`/`LEG_INSET`/`LEG_RENDER_MAX` sú v builderi aliasy). **Skrinka od 200 mm** sa
+kreslí **presne ako predtým** (dva rady s odsadením `LEG_INSET` 60, predný pri soklu vpredu za doskou sokla, plytká = jeden rad v strede hĺbky — aj ručne zamknutý
+počet nôh ostáva tam, kde bol). **Úzka skrinka** (`HardwareRules.narrow_leg_width?`) má **všetky valce v strede šírky**, najviac dva (`narrow_leg_ys`): predný
+a zadný s odsadením `LEG_INSET`, na plytkej skrinke na krajoch prípustnej hĺbky (za doskou sokla, celý valec na nosnom dne `y + r ≤ back_stop`); keď sa nezmestia
+dva, jeden; keď ani ten (napr. sokel zapustený 100 mm pri hĺbke 150), **žiadny** — `render_hardware` vtedy proxy nekreslí. Počet v nákupe ostáva z pravidla a plán
+menej valcov prizná info warningom **`legs_drawn_merged`** („Nohy: v nákupe 2 ks, v modeli sa kreslí 1 …"), ktorý Kontrola nehlási ako nález (`Validation::BUILD_INFO_ONLY`).
 
 **Tú istú hodnotu držia TRI miesta:** `MIN` tu, `ScaleWatch::MIN` (absorpcia scale) a `LIMITS` v `ui/js/form.js` (červené pole panela). Priama referencia možná nie je
 (`scale_observer` sa načítava PRED `cabinet_builder`, JS Ruby konštantu nevidí), takže zhodu — rovnako ako pri `DRAWER_ROLES` — stráži guard `tests/pure/test_s1e0_min_vyska.rb`.

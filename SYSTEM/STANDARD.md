@@ -678,21 +678,21 @@ Príklad (počet závesov podľa výšky krídla):
 vzniknúť ručný zámok) a k nej vznikne RED `door_height_out_of_table`, ktorý blokuje nákup, rozpočet aj cenovú ponuku (VEPO nie). Náprava = ručný zámok
 počtu. **Kontrakt validátora sa nemení** — pásmo „všetko nad" je stále povinné.
 
-**NOHY A PRÍCHYT SOKLA (KOV-G1b, v0.9.59) — počet z pásiem podľa ŠÍRKY korpusu.** Seed `nohy-zakladne` je `bands` s `input: "width"`
-(`max 999 → 4`, catch-all `→ 6`), platí pre **všetky** sety nôh (set rozhoduje len o produkte — kód podľa výšky sokla ostáva cez
-`params_from_context {height: floor_height}`). Seed `prichyt-sokla` vydáva `plinth_clip` tými istými pásmami (`999 → 1`, catch-all `→ 2`)
-= **1 ks na začaté 4 nohy**. Príchyt vzniká **len pri samostatnej soklovej lište**: `applies_to.support ["legs"]` (sokel vpredu je súčasť
+**NOHY A PRÍCHYT SOKLA (KOV-G1b v0.9.59, úzka skrinka v0.17.28) — počet z pásiem podľa ŠÍRKY korpusu: 2 / 4 / 6.** Seed `nohy-zakladne` je `bands`
+s `input: "width"`: **`max 199,999 → 2`** (skrinka užšia než 200 mm, nohy v strede šírky vpredu + vzadu; nie `max 199` — pásma porovnávajú `v <= max`,
+takže 199,5 by dostalo 4, a nový kľúč pásma by starší plugin ignoroval), `max 999 → 4`, catch-all `→ 6`. Platí pre **všetky** sety nôh (set rozhoduje
+len o produkte — kód podľa výšky sokla ostáva cez `params_from_context {height: floor_height}`). Hranicu úzkej skrinky drží jediná
+`HardwareRules.narrow_leg_width?`. Seed `prichyt-sokla` vydáva `plinth_clip` pásmami `999 → 1`, catch-all `→ 2` = **1 ks na začaté 4 nohy**
+(aj pri 2 nohách 1). Príchyt vzniká **len pri samostatnej soklovej lište**: `applies_to.support ["legs"]` (sokel vpredu je súčasť
 korpusu) a nový **VOLITEĽNÝ filter `applies_to.floor_height_min` (Float, mm)** — pravidlo platí len na korpus s aspoň takým soklom (55 mm,
 odkiaľ existuje lišta na nohách AXILO). Kontext bez použiteľnej výšky filtru **nevyhovie** (hádať sa nesmie). **Žiadny nový `kind`** (vzor
 `flap_dir`): starší plugin kľúč `normalize_rules` zachová, ale **neuplatní** — vedomá hranica downgrade, rovnaká ako pri smere výklopu.
-Zóna výšky sokla 20–55 mm ostáva vedome nepokrytá **setom** (ORANGE „doplň pásmo"), nie pravidlom. `SEED_VERSION` 5 → 6; migračná brána
-`leg_stale` je **ORANGE bez exportnej brány** (nohy nezastavujú výrobu) a pýta sa `rules_seed_version` < 6 (§2.5).
-**ŠÍRKA 50 (v0.17.28, seed v8):** skrinka **užšia než 200 mm má 2 nohy** v strede šírky (vpredu + vzadu) — seed `nohy-zakladne` má navrch pásmo
-`max 199,999 → 2` (nie `max 199`: pásma porovnávajú `v <= max`, takže 199,5 by dostalo 4; žiadny nový kľúč pásma), potom `999 → 4`, catch-all `→ 6`.
-Príchyt sa nemení (1 ks na začaté 4 nohy, aj pri 2 nohách 1). Nedotknuté pravidlo v6/v7 sa obnoví (knižnica sama, snapshot cez „Doplniť nové predvoľby"),
-upravené nikdy. `leg_stale` má **druhú, vlastnú** vetvu: úzka skrinka so snapshotom pod `LEG_NARROW_SEED_VERSION` (8) a 4 nohami z pravidla; hranice v6
-sa nemenia. Proxy nôh sa **nikdy nekreslí prekrytá** — keď sa valce pod úzku/plytkú skrinku nezmestia, kreslí sa ich menej a plán to prizná info warningom
-`legs_drawn_merged` (počet v nákupe ostáva z pravidla).
+Zóna výšky sokla 20–55 mm ostáva vedome nepokrytá **setom** (ORANGE „doplň pásmo"), nie pravidlom. `SEED_VERSION` 5 → 6 (4/6) a 7 → 8 (pásmo 2);
+nedotknuté pravidlo staršieho tvaru sa obnoví (knižnica sama, snapshot cez „Doplniť nové predvoľby"), upravené nikdy. Migračná brána `leg_stale` je
+**ORANGE bez exportnej brány** (nohy nezastavujú výrobu) a má dve vlastné vetvy: `rules_seed_version` < 6 (§2.5) a úzka skrinka so snapshotom pod
+`LEG_NARROW_SEED_VERSION` (8) so 4 nohami z pravidla. **Proxy nôh úzkej skrinky** stojí v strede šírky, za doskou sokla a na nosnom dne; keď sa
+pod ňu valce nezmestia, kreslí sa ich menej (aj žiadny) a plán to prizná info warningom `legs_drawn_merged` (počet v nákupe ostáva z pravidla).
+Skrinka od 200 mm sa kreslí ako pred touto zmenou.
 
 **BRÁNY VÝKLOPU (KOV-E1b, v0.9.54) — jeden register, jeden výklad.** Kódy žijú v `BuildPlan::HW_LIFT_BLOCKERS` a zastavujú **nákupné CSV, rozpočet a cenovú ponuku;
 VEPO nikdy** (geometria čela je správna). Štyri z nich vydáva PRAVIDLO do **uloženého nosiča** `hardware_conflicts` (rovnaký kontrakt ako `door_height_out_of_table`):

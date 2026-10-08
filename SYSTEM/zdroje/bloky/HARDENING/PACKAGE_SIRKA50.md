@@ -118,9 +118,10 @@ Predrecenzia povinná (Ť). Codex-po-pr.
   vzhladom na hrubku materialu." (vzor D-120: neplatný Scale = rollback). Config-aware klamp šírky ostáva len pri rohovej. Pokus rozšíriť sondu
   na každý korpus (klamp na 61 mm) zmenil existujúce správanie in-SU scenára CELA-B (neplatný Scale s úzkymi dvierkami sa namiesto rollbacku
   klampol), preto sa nezaviedol — otázka pre Michala, či ho chce ako samostatnú dávku.
-- **Polohy nôh = `Construction.leg_layout`** (čistá funkcia, builder len kreslí). Keď sa valce nezmestia (plytká úzka skrinka so soklom vpredu),
-  kreslí sa ich menej a plán pridá info warning `legs_drawn_merged` (Kontrola ho nehlási — `BUILD_INFO_ONLY`); **počet v nákupe ostáva podľa
-  pravidla**. Vedľajší dôsledok: plytká skrinka 200–269 mm so 4 nohami sa už nekreslí so štyrmi prekrytými valcami, ale s dvoma.
+- **Polohy nôh = `Construction.leg_layout`** (čistá funkcia, builder len kreslí). Nové rozloženie platí **len pre úzku skrinku** (< 200 mm): valce
+  v strede šírky, najviac dva, za doskou sokla a na nosnom dne; keď sa nezmestia, menej (aj žiadny) a plán pridá info warning `legs_drawn_merged`
+  (Kontrola ho nehlási — `BUILD_INFO_ONLY`); **počet v nákupe ostáva podľa pravidla**. Skrinka od 200 mm sa kreslí bajtovo ako predtým (Codex P2-3).
+- **Editor Pravidiel:** pásmo s desatinnou hranicou (199,999) má pole `step="any"`, aby ho prehliadač neoznačil ako neplatné.
 - **Golden H12 a H16 regenerované vedome** — rozdiel je výlučne `config_schema` 22 → 23, minimum šírky 200 → 50 (H12) a SHA `hardware_rules.json`
   (seed v8) a `templates.json` (schéma v šablónach) v oboch formátoch H16 (kompaktný variant odvodený transformáciou prázdnych kontajnerov, overenou
   na pôvodných SHA všetkých troch rozdielnych súborov).

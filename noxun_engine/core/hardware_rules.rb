@@ -160,6 +160,13 @@ module Noxun
       # cele mm alebo desatiny); ZIADNY novy kluc pasma (`min`, `max_exclusive`)
       # — starsi plugin by ho ignoroval a ratal inak (dopredna brana `STD`).
       LEG_NARROW_MAX_MM = 199.999
+
+      # Je skrinka tejto sirky UZKA (2 nohy)? JEDINA definicia pre pasmo
+      # pravidla, vetvu `Bom.leg_stale_issue`, hlasku aj kreslenie noh
+      # (`Construction.leg_layout`) — predrecenzia P3-5: jedna hranica.
+      def self.narrow_leg_width?(width)
+        width.to_f <= LEG_NARROW_MAX_MM
+      end
       # Vyska sokla, OD ktorej existuje soklova lista na nohach AXILO.
       PLINTH_CLIP_MIN_MM = 55.0
       # KOV-G1b: VOLITELNY filter `applies_to`. Pravidlo s nim plati LEN na

@@ -15,16 +15,18 @@
 #      „Doplniť nové predvoľby"), upraveny sa NIKDY neprepise,
 #   3) `leg_stale` v8 — uzka skrinka so snapshotom < v8 a 4 nohami z pravidla
 #      = ORANGE „prestav"; hranice v6 sa nepohli (audit FIX 3),
-#   4) POLOHY NOH (`Construction.leg_layout`) — x v strede, dve rozne y,
-#      plytka skrinka bez prekrytia, a ked sa nezmestia, menej valcov + info
-#      warning planu (audit FIX 2), ktory Kontrola neukazuje ako nalez.
+#   4) POLOHY NOH (`Construction.leg_layout`) — uzka skrinka: x v strede, dve
+#      rozne y, plytka bez prekrytia, za doskou sokla a na nosnom dne; ked sa
+#      nezmestia, menej (aj 0) valcov + info warning planu (audit FIX 2, Codex
+#      P2-1/P2-2), ktory Kontrola neukazuje ako nalez. Skrinka od 200 mm
+#      kresli presne povodne polohy (Codex P2-3).
 #
 # MUTACNE OVERENIE (rucne pred commitom): kazda z mutacii nizsie zhodi
 # aspon jeden test tejto sady:
 #   M1 pasmo uzkej skrinky `max 199.0` namiesto 199,999 -> „(1) 199,5"
 #   M2 `LEGACY_SEED_SHAPES` bez tvaru v6/v7 -> „(2) kniznica v7"
 #   M3 `narrow4` bez kontroly sirky -> „(3) sirka 200 so starym snapshotom"
-#   M4 `leg_layout` bez vetvy plytkej skrinky -> „(4) plytka skrinka"
+#   M4 `narrow_leg_ys` bez vetvy plytkej skrinky -> „(4) plytka skrinka"
 #   M5 `legs_drawn_merged` mimo `BUILD_INFO_ONLY` -> „(4) Kontrola"
 require_relative '../helper' unless defined?(NxTest)
 require 'json'
@@ -273,20 +275,100 @@ NxTest.test('SIRKA 50 (4): plytka skrinka — 2 nohy sa NEPREKRYJU (audit FIX 2)
   NxTest.assert(pos.all? { |_, y| y >= r - 0.001 && y <= d - r + 0.001 }, 'a nevycnievaju spod dna')
 end
 
-NxTest.test('SIRKA 50 (4): ziadna kombinacia nekresli prekryte valce') do
+NxTest.test('SIRKA 50 (4): uzka skrinka — ziadna kombinacia nekresli prekryte ani bocne valce') do
   c = NxSirka50
-  [50.0, 120.0, 150.0, 199.0, 200.0, 260.0, 600.0].each do |w|
+  r = c::CN::LEG_DIAMETER / 2.0
+  [50.0, 120.0, 150.0, 199.0, 199.5].each do |w|
     [150.0, 200.0, 560.0].each do |dep|
-      [{}, { 'plinth_mode' => 'front' }].each do |pl|
+      [{}, { 'plinth_mode' => 'front' }, { 'plinth_mode' => 'front', 'plinth_recess' => 100.0 }].each do |pl|
         [1, 2, 4, 6].each do |q|
-          pos = c.layout({ 'width' => w, 'depth' => dep }.merge(pl), q)
-          NxTest.assert(pos.length.between?(1, q), "#{w}x#{dep} #{pl} q#{q}: #{pos.length} valcov")
-          NxTest.assert(c.min_gap(pos) >= c::CN::LEG_DIAMETER - 0.001,
-                        "#{w}x#{dep} #{pl} q#{q}: prekryv #{c.min_gap(pos).round(1)} mm #{pos.inspect}")
+          cfg = c.lower({ 'width' => w, 'depth' => dep }.merge(pl))
+          pos = c::CN.leg_layout(cfg, q)[:positions]
+          tag = "#{w}x#{dep} #{pl} q#{q}"
+          NxTest.assert(pos.length <= [q, 2].min, "#{tag}: najviac 2 valce (#{pos.length})")
+          NxTest.assert(pos.all? { |x, _| (x - w / 2.0).abs < 0.001 }, "#{tag}: vzdy v strede sirky #{pos.inspect}")
+          NxTest.assert(c.min_gap(pos) >= c::CN::LEG_DIAMETER - 0.001, "#{tag}: prekryv #{pos.inspect}")
+          d = c::CN.back_stop(cfg)
+          lo = pl.empty? ? r : cfg[:plinth_recess] + cfg[:thickness] + r + c::CN::LEG_PLINTH_CLEAR
+          NxTest.assert(pos.all? { |_, y| y >= lo - 0.001 && y + r <= d + 0.001 },
+                        "#{tag}: za doskou sokla a na nosnom dne #{pos.inspect}")
         end
       end
     end
   end
+end
+
+NxTest.test('SIRKA 50 (4) Codex P2-1: 199 x 150 so soklom vpredu — jeden valec v STREDE, nie dve bocne') do
+  c = NxSirka50
+  over = { 'width' => 199.0, 'depth' => 150.0, 'plinth_mode' => 'front' }
+  pos = c.layout(over, 2)
+  NxTest.assert_equal([[99.5, 88.0]], pos, 'jeden valec v strede sirky za doskou sokla')
+  w = c.plan(over)[:warnings].find { |x| x['code'] == c::CN::LEGS_DRAWN_MERGED }
+  NxTest.assert(w && w['message'].include?('v nákupe 2 ks, v modeli sa kreslí 1'), 'a plan to prizna')
+end
+
+NxTest.test('SIRKA 50 (4) Codex P2-2: sokel zapusteny 100 pri hlbke 150 — ziadny valec v doske sokla') do
+  c = NxSirka50
+  over = { 'width' => 150.0, 'depth' => 150.0, 'plinth_mode' => 'front', 'plinth_recess' => 100.0 }
+  NxTest.assert_equal([], c.layout(over, 2), 'za soklom (100-118) na nosnom dne nie je miesto ani pre jeden')
+  pl = c.plan(over)
+  NxTest.assert_equal(2, pl[:hardware].find { |h| h['generic_type'] == 'leg' }['quantity'], 'nakup: 2 nohy')
+  w = pl[:warnings].find { |x| x['code'] == c::CN::LEGS_DRAWN_MERGED }
+  NxTest.assert(w && w['message'].include?('v modeli sa kreslí 0'), 'plan prizna 0 valcov')
+  src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'cabinet_builder.rb'), encoding: 'UTF-8')
+  NxTest.assert(src.include?('return if Construction.leg_layout(cfg, qty)[:positions].empty?'),
+                'render_hardware prazdnu definiciu noh nekresli')
+end
+
+module NxSirka50
+  module_function
+
+  # Povodny algoritmus `CabinetBuilder.draw_legs` + `leg_xs` (main pred sirkou
+  # 50) — referencia pre skrinku od 200 mm, ktora sa nesmie zmenit ani o bajt.
+  def legacy_positions(cfg, qty)
+    w = cfg[:width]; d = CN.back_stop(cfg)
+    r = 25.0
+    count = [qty, 16].min
+    front_y = 60.0
+    front_y = [front_y, cfg[:plinth_recess].to_f + cfg[:thickness].to_f + r + 5.0].max if cfg[:plinth_mode] == 'front'
+    two_rows = count > 1 && d > front_y + 60.0 + 2 * r
+    rows = if two_rows
+             front = (count / 2.0).ceil
+             [[front_y, front], [d - 60.0, count - front]].reject { |_, n| n < 1 }
+           else
+             [[d / 2.0, count]]
+           end
+    rows.flat_map do |y, n|
+      xs = if n == 1
+             [w / 2.0]
+           else
+             inset = [60.0, w / 2.0].min
+             span = w - 2 * inset
+             (0...n).map { |i| inset + span * i / (n - 1.0) }
+           end
+      xs.map { |x| [x, y] }
+    end
+  end
+end
+
+NxTest.test('SIRKA 50 (4) Codex P2-3: skrinka od 200 mm = POVODNE polohy bajtovo (aj 600 x 150 s 2 nohami)') do
+  c = NxSirka50
+  [200.0, 260.0, 600.0, 1200.0].each do |w|
+    [150.0, 200.0, 560.0].each do |dep|
+      [{}, { 'plinth_mode' => 'front' }].each do |pl|
+        [1, 2, 4, 5, 6, 20].each do |q|
+          cfg = c.lower({ 'width' => w, 'depth' => dep }.merge(pl))
+          NxTest.assert_equal(c.legacy_positions(cfg, q), c::CN.leg_layout(cfg, q)[:positions],
+                              "#{w}x#{dep} #{pl} q#{q}: polohy ako pred sirkou 50")
+        end
+      end
+    end
+  end
+  # Ručne zamknuté 2 nohy na plytkej sirokej skrinke: jeden rad v strede hlbky
+  # (60 / 540), nie nove predne + zadne rozlozenie uzkej skrinky.
+  NxTest.assert_equal([[60.0, 73.5], [540.0, 73.5]], c.layout({ 'depth' => 150.0 }, 2))
+  NxTest.refute(c.plan('depth' => 150.0)[:warnings].any? { |x| x['code'] == c::CN::LEGS_DRAWN_MERGED },
+                'siroka skrinka info warning nema')
 end
 
 NxTest.test('SIRKA 50 (4): ked sa nezmestia — menej valcov + info warning, pocet v nakupe ostava') do

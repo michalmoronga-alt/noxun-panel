@@ -742,9 +742,12 @@
         html += '<div class="rbands">';
         rdArr(r.bands).forEach(function(b, bi){
           var last = (b.max === null || b.max === undefined);
+          // ŠÍRKA 50: seed nôh má hranicu úzkej skrinky 199,999 — pri desatinnej
+          // hranici `step="any"`, inak by ju prehliadač označil za neplatnú.
+          var bstep = (!last && Number(b.max) % 1 !== 0) ? 'any' : '1';
           html += '<div class="rrow rband" data-bi="'+bi+'">'
                 + (last ? '<label>všetko nad</label><span class="bmaxfill"></span>'
-                        : '<label>do</label><input class="bmax rnum" type="number" min="1" step="1" value="'+rdEsc(b.max)+'"><span class="unit">mm</span>')
+                        : '<label>do</label><input class="bmax rnum" type="number" min="1" step="'+bstep+'" value="'+rdEsc(b.max)+'"><span class="unit">mm</span>')
                 + '<span class="arrow">→</span><input class="bqty rnum" type="number" min="1" max="999" step="1" value="'+rdEsc(b.quantity)+'"><span class="unit">ks</span>'
                 + (last ? '<span class="bdel"></span>' : '<button class="ghostbtn bdel" title="Odstrániť pásmo" aria-label="Odstrániť pásmo" onclick="rdDelBand(this)">' + rdDelIco() + '</button>')
                 + '</div>';

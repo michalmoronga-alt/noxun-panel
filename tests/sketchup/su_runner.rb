@@ -3657,8 +3657,8 @@ module NoxunSuRunner
   # (`CONFIG_SCHEMA` 23) a skrinka uzsia nez 200 mm ma 2 nohy v strede sirky
   # (vpredu + vzadu), v nakupe 2 ks (seed pravidiel 8). Headless sada overuje
   # PLAN a pravidla; tu sa overuje MODEL: stavba bez degenerovaneho dielca,
-  # proxy noh (pocet valcov a ich polohy), Mierka sirky na 50 (aj
-  # config-aware klamp pri hrubke 25) a jedno Spat.
+  # proxy noh (pocet valcov a ich polohy), Mierka sirky na 50 a jedno Spat;
+  # Mierka pri hrubke 25 sa ODMIETNE (reject_scale s hlaskou, vzor D-120).
 
   # Valce proxy noh skrinky: stredy SPODNYCH podstav (z = 0) v mm lokalnych
   # osi korpusu. Prekryte valce by sa zliali do jednej plochy — preto sa
@@ -3837,6 +3837,23 @@ module NoxunSuRunner
          items.none? { |i| i['message_sk'].to_s.include?('v modeli sa kreslí') })
     else
       ok('SIRKA50 (g): vlozenie plytkej skrinky', false)
+    end
+
+    # (h) Codex P2-2: sokel vpredu ZAPUSTENY 100 mm pri hlbke 150 — za doskou
+    #     sokla (100-118) uz na nosnom dne nie je miesto ani pre jeden valec.
+    #     Proxy noh sa nekresli vobec (ziadny valec v doske sokla), nakup ma
+    #     dalej 2 nohy a plan to prizna.
+    h = e::CabinetBuilder.build(model, sirka50_lower(150.0, 'depth' => 150.0, 'plinth_mode' => 'front',
+                                                            'plinth_recess' => 100.0))
+    if h
+      proxy = h.definition.entities.grep(Sketchup::ComponentInstance)
+               .select { |i| e::Store.kind(i) == 'hardware' && e::Store.get(i, 'role') == 'leg' }
+      warns = Array((e::Store.config(h) || {})['warnings'])
+      ok("SIRKA50 (h): sokel zapusteny 100 — ziadny valec noh v modeli, v nakupe 2 (#{sirka50_hw(h).inspect}, proxy #{proxy.length})",
+         sirka50_hw(h)['leg'] == 2 && proxy.empty? &&
+         warns.any? { |w| w.is_a?(Hash) && w['code'] == e::Construction::LEGS_DRAWN_MERGED })
+    else
+      ok('SIRKA50 (h): vlozenie skrinky so zapustenym soklom', false)
     end
 
     cleanup(model)

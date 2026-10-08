@@ -451,8 +451,9 @@ module Noxun
       # (dorovnanie medzi skrinkami, uzky regal) — dolna aj horna. Konstrukciu
       # pri hrubom materiali strazi `Construction.validate!` (`w <= 2t + 10`
       # = odmietnutie), panel to iste pravidlo zrkadli (form.js
-      # `cabinetWidthError`) a absorpcia scale klampuje sirku CONFIG-AWARE
-      # (`Construction.min_valid_width`).
+      # `cabinetWidthError`) a Mierku pod tu hranicu absorpcia ODMIETNE
+      # (`ScaleWatch.reject_scale` s hlaskou, vzor D-120) — config-aware klamp
+      # sirky ma len rohova.
       # Tri miesta musia drzat TU ISTU hodnotu (normalize tu, absorpcia scale
       # v `ScaleWatch::MIN`, validacia panela v `ui/js/form.js` LIMITS) —
       # priamu referenciu brani poradie requirov (`scale_observer` sa nacitava
@@ -2399,6 +2400,10 @@ module Noxun
           legs = Array(hardware).select { |h| h['generic_type'] == 'leg' }
           qty = legs.sum { |h| h['quantity'].to_i }
           return if qty < 1 || cfg[:floor_height].to_f <= 0
+          # SIRKA 50 (Codex P2-2): pod uzku plytku skrinku so zapustenym soklom
+          # sa nemusi zmestit ani jeden valec — prazdnu definiciu nekreslime
+          # (pocet v nakupe ostava v `config.hardware[]`, plan to prizna).
+          return if Construction.leg_layout(cfg, qty)[:positions].empty?
 
           dname = "NOXUN #{cid} LEGS"
           ldef = model.definitions[dname]

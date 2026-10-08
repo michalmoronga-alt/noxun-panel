@@ -891,7 +891,7 @@ module Noxun
       # teda jej prichyt) pri sokli vpredu neexistuje.
       #
       # SIRKA 50 (seed v8): DRUHA, nezavisla proveniencia. Uzka skrinka
-      # (sirka < `LEG_NARROW_BELOW_MM`) postavena so snapshotom pravidiel
+      # (`HardwareRules.narrow_leg_width?`) postavena so snapshotom pravidiel
       # POD `LEG_NARROW_SEED_VERSION` ma z pasma `< 1000` 4 nohy namiesto 2.
       # Symptom (c) = uzka skrinka + ulozene 4 nohy z PRAVIDLA. Hranice v6
       # (symptomy a/b a ich proveniencia) sa NEMENIA (audit FIX 3) — kazda
@@ -916,7 +916,7 @@ module Noxun
         clip_missing = pre_width && clips_expected?(sup, fh) &&
                        hw.none? { |h| h.is_a?(Hash) && h['generic_type'].to_s == 'plinth_clip' }
         narrow4 = marker < HardwareRules::LEG_NARROW_SEED_VERSION &&
-                  w < HardwareRules::LEG_NARROW_BELOW_MM && legs4_rule
+                  HardwareRules.narrow_leg_width?(w) && legs4_rule
         return nil unless legs4 || clip_missing || narrow4
 
         { 'code' => BuildPlan::LEG_STALE, 'severity' => 'orange',
@@ -950,7 +950,7 @@ module Noxun
       # Pocet noh podla SEED pravidla pre sirku (len pre HLASKU — vypocet drzia
       # pasma pravidla; hranice su konstanty `HardwareRules`).
       def leg_count_for_width(width)
-        return 2 if width < HardwareRules::LEG_NARROW_BELOW_MM
+        return 2 if HardwareRules.narrow_leg_width?(width)
         return 6 if width >= HardwareRules::LEG_WIDE_FROM_MM
 
         4
