@@ -225,9 +225,10 @@ end
 # 1 — POCET NOH A PRICHYTOV PODLA SIRKY
 # ============================================================================
 
-NxTest.test('KOV-G1b (1): počet nôh podľa šírky korpusu — < 1000 mm 4, od 1000 mm 6') do
+NxTest.test('KOV-G1b (1): počet nôh podľa šírky korpusu — < 200 mm 2, do 999 mm 4, od 1000 mm 6') do
   c = NxKovG1b
-  { 600.0 => 4, 999.0 => 4, 1000.0 => 6, 1200.0 => 6, 2400.0 => 6 }
+  { 50.0 => 2, 150.0 => 2, 199.0 => 2, 199.5 => 2, 199.999 => 2,
+    200.0 => 4, 600.0 => 4, 999.0 => 4, 1000.0 => 6, 1200.0 => 6, 2400.0 => 6 }
     .each do |w, want|
     NxTest.assert_equal(want, c.legs(c.evaluate('width' => w)), "šírka #{w} -> #{want} nôh")
   end
@@ -236,11 +237,14 @@ NxTest.test('KOV-G1b (1): počet nôh podľa šírky korpusu — < 1000 mm 4, od
   # korpusov su v praxi cele milimetre; radsej o nohu VIAC nez o menej.
   NxTest.assert_equal(6, c.legs(c.evaluate('width' => 999.5)),
                       'šírka 999,5 mm padne do horného pásma (konvencia „max 999")')
+  # To iste pri uzkom pasme: max 199.999, takze 199.9995 uz ide do 4.
+  NxTest.assert_equal(4, c.legs(c.evaluate('width' => 199.9995)),
+                      'šírka 199,9995 mm padne do pásma 4 (konvencia inkluzívneho max)')
 end
 
 NxTest.test('KOV-G1b (1): príchyt sokla — 1 ks na začaté 4 nohy (tá istá hranica)') do
   c = NxKovG1b
-  { 600.0 => 1, 999.0 => 1, 1000.0 => 2, 1200.0 => 2 }.each do |w, want|
+  { 150.0 => 1, 200.0 => 1, 600.0 => 1, 999.0 => 1, 1000.0 => 2, 1200.0 => 2 }.each do |w, want|
     NxTest.assert_equal(want, c.clips(c.evaluate('width' => w)), "šírka #{w} -> #{want} príchytov")
   end
 end
@@ -367,8 +371,9 @@ NxTest.test('KOV-G1b (5): `SEED_VERSION` je 6 a seed nesie obe pravidlá v novom
   leg = c.rule_of(c::LEG_RULE)
   NxTest.assert_equal('bands', leg['kind'])
   NxTest.assert_equal('width', leg['input'])
-  NxTest.assert_equal([[999.0, 4], [nil, 6]], leg['bands'].map { |b| [b['max'], b['quantity']] },
-                      'konvencia „< 1000" = max 999,0 (ako 849,0 pri závesoch)')
+  NxTest.assert_equal([[c::HR::LEG_NARROW_BAND_MAX, 2], [999.0, 4], [nil, 6]],
+                      leg['bands'].map { |b| [b['max'], b['quantity']] },
+                      'pod 200 mm 2 nohy (max 199,999), do 999 mm 4, inak 6')
   NxTest.assert_equal(%w[legs plinth], leg['applies_to']['support'], 'filter podopretia ostáva')
   clip = c.rule_of(c::CLIP_RULE)
   NxTest.assert_equal(c::CLIP_TYPE, clip['output'])
@@ -732,7 +737,7 @@ NxTest.test('KOV-G1b (7): `leg_stale` je ORANGE a NEZASTAVUJE výrobu ani nákup
     NxTest.assert_equal([], c::PC.hardware_blockers(collected, nil, scope: scope),
                         "nákup ani VEPO (#{scope}) sa nezastavia")
   end
-  item = c.run_items([iss]).find { |i| i['message_sk'].include?('pred pravidlom 4/6') }
+  item = c.run_items([iss]).find { |i| i['message_sk'].include?('pred pravidlom 2/4/6') }
   NxTest.assert(item, 'Kontrola nález ukáže')
   NxTest.assert_equal('orange', item['severity'])
   NxTest.assert_equal('S1', item['owner_id'], 'so skrinkou, ktorej sa týka (klik-select)')

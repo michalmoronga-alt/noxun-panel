@@ -201,10 +201,10 @@ module Noxun
             # (schema configu), nie pritomnost pravidiel (delta audit Sol FIX 4).
             fs = flap_stale_issue(cid, inst.persistent_id, ccfg, flap_codes)
             hardware_issues << fs if fs
-            # KOV-G1b: STVRTY vzor, prvy ORANGE — skrinka na nohach postavena
-            # pred pravidlom „4/6 podla sirky". Nakup by mal o dve nohy a o
-            # prichyty menej; vyrobu to ale nezastavuje (kod nie je v registri
-            # blokerov), preto len upozornenie s napravou.
+            # KOV-G1b + uzka skrinka: STVRTY vzor, prvy ORANGE — skrinka na
+            # nohach postavena pred pravidlom „2/4/6 podla sirky". Nakup by
+            # mal o nohy a o prichyty menej; vyrobu to ale nezastavuje (kod
+            # nie je v registri blokerov), preto len upozornenie s napravou.
             ls = leg_stale_issue(cid, inst.persistent_id, ccfg)
             hardware_issues << ls if ls
             # KOV-G1b (Codex #338 kolo 1 N2): pocet prichytov sokla je zo SIRKY
@@ -867,20 +867,27 @@ module Noxun
       # Kod preto ZAMERNE NIE JE v `BuildPlan::HW_ISSUE_BLOCKERS`, takze nakup,
       # rozpocet ani ponuku nezastavi.
       #
-      # PROVENIENCIA je JEDNA a je NUTNA (na rozdiel od `flap_stale`, kde staci
-      # jedna z dvoch): `rules_seed_version` < `LEG_WIDTH_SEED_VERSION`. ZIADNY
-      # novy kluc configu sa NEZAKLADA — marker uz zapisuje kazda stavba
-      # (KOV-E1b) a `CONFIG_SCHEMA` sa tu NEBUMPUJE (nic noveho sa neuklada).
-      # Po „Doplniť nové predvoľby" + prestavbe je marker >= 6 a veta zhasne.
+      # PROVENIENCIA je DVOJITA a obe hranice su NUTNE (na rozdiel od
+      # `flap_stale`, kde staci jedna z dvoch):
+      #   * siroka skrinka a chybajuci prichyt: `rules_seed_version` <
+      #     `LEG_WIDTH_SEED_VERSION` (6) — tato hranica sa NEHYBE,
+      #   * uzka skrinka (< 200 mm) so 4 nohami z pravidla: seed <
+      #     `LEG_NARROW_SEED_VERSION` (8).
+      # ZIADNY novy kluc configu sa NEZAKLADA — marker uz zapisuje kazda stavba
+      # (KOV-E1b). Po „Doplniť nové predvoľby" + prestavbe je marker >= 8 a
+      # veta zhasne; skrinka prestavana pod seedom 6/7 (4/6 noh) uzku vetu
+      # este VIDI, siroku a prichyt uz nie.
       #
       # SYMPTOM musi byt aspon jeden (inak by veta strasila aj tam, kde sa
-      # NIC nezmeni — uzka skrinka so soklom 30 mm dostane 4 nohy a ziadny
+      # NIC nezmeni — skrinka 600 mm so soklom 30 mm dostane 4 nohy a ziadny
       # prichyt aj podla novych pravidiel):
-      #   (a) sirka >= `LEG_WIDE_FROM_MM` a ulozena polozka `leg` ma este
-      #       4 kusy z PRAVIDLA (`source: 'rule'` — rucny zamok nesie 'manual'
-      #       a je to vedome rozhodnutie pouzivatela),
-      #   (b) vyska sokla >= `PLINTH_CLIP_MIN_MM` a ulozene kovanie nema ANI
-      #       JEDEN `plinth_clip`.
+      #   (a) seed < 6 A sirka >= `LEG_WIDE_FROM_MM` a ulozena polozka `leg`
+      #       ma este 4 kusy z PRAVIDLA (`source: 'rule'` — rucny zamok nesie
+      #       'manual' a je to vedome rozhodnutie pouzivatela),
+      #   (b) seed < 6 A vyska sokla >= `PLINTH_CLIP_MIN_MM` a ulozene kovanie
+      #       nema ANI JEDEN `plinth_clip`,
+      #   (c) seed < 8 A sirka < `LEG_NARROW_BELOW_MM` a ulozena polozka `leg`
+      #       ma este 4 kusy z PRAVIDLA.
       #
       # PODOPRETIE (Codex #338 kolo 1 N1): symptom (a) plati pre OBA typy,
       # pri ktorych nohy vobec vznikaju — `legs` aj `plinth`. Seed
@@ -896,16 +903,20 @@ module Noxun
         cfg = ccfg.is_a?(Hash) ? cfg_hash(ccfg) : {}
         sup = support_type_of(cfg)
         return nil unless LEG_SUPPORTS.include?(sup)
-        return nil if provenance_marker(cfg['rules_seed_version']) >=
-                      HardwareRules::LEG_WIDTH_SEED_VERSION
 
-        wide = num_of(cfg['width']).to_f >= HardwareRules::LEG_WIDE_FROM_MM
+        seed = provenance_marker(cfg['rules_seed_version'])
+        wide_era = seed < HardwareRules::LEG_WIDTH_SEED_VERSION
+        narrow_era = seed < HardwareRules::LEG_NARROW_SEED_VERSION
+        return nil unless wide_era || narrow_era
+
+        w = num_of(cfg['width']).to_f
         fh = num_of(cfg['floor_height']).to_f
         hw = Array(cfg['hardware'])
-        legs4 = wide && hw.any? { |h| rule_leg_four?(h) }
+        legs4 = w >= HardwareRules::LEG_WIDE_FROM_MM && hw.any? { |h| rule_leg_four?(h) }
         clip_missing = clips_expected?(sup, fh) &&
                        hw.none? { |h| h.is_a?(Hash) && h['generic_type'].to_s == 'plinth_clip' }
-        return nil unless legs4 || clip_missing
+        narrow = w < HardwareRules::LEG_NARROW_BELOW_MM && hw.any? { |h| rule_leg_four?(h) }
+        return nil unless (wide_era && (legs4 || clip_missing)) || (narrow_era && narrow)
 
         { 'code' => BuildPlan::LEG_STALE, 'severity' => 'orange',
           'owner_id' => owner_id.to_s, 'owner_pid' => owner_pid,
@@ -924,11 +935,17 @@ module Noxun
       # Veta hovori KONKRETNE cislami tejto skrinky, aby bolo jasne, co sa zmeni.
       def leg_stale_message(owner_id, width, floor_height, support)
         w = num_of(width).to_f
-        legs = w >= HardwareRules::LEG_WIDE_FROM_MM ? 6 : 4
+        legs = if w < HardwareRules::LEG_NARROW_BELOW_MM
+                 2
+               elsif w >= HardwareRules::LEG_WIDE_FROM_MM
+                 6
+               else
+                 4
+               end
         clips = clips_expected?(support, floor_height) ? (legs / 4.0).ceil : 0
         want = "#{legs} nôh"
         want += " + #{clips} #{clips == 1 ? 'príchyt' : 'príchyty'} sokla" if clips.positive?
-        "Skrinka #{owner_id} má nohy spočítané ešte pred pravidlom 4/6 (šírka " \
+        "Skrinka #{owner_id} má nohy spočítané ešte pred pravidlom 2/4/6 (šírka " \
           "#{fmt_mm(w)} → #{want}) — v Pravidlách spusti „Doplniť nové predvoľby“ " \
           'a skrinku prestav.'
       end

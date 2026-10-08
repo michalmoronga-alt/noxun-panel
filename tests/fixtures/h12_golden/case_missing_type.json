@@ -390,7 +390,7 @@
     ]
   },
   "config": {
-    "config_schema": 22,
+    "config_schema": 23,
     "rules_seed_version": 7,
     "part_key_schema": 1,
     "plan_schema": 7,
@@ -664,7 +664,7 @@
   "min_valid": {
     "height": 147.0,
     "depth": 150.0,
-    "width": 200.0
+    "width": 50.0
   },
   "names": {
     "default": "Spodná skrinka 500",
@@ -704,7 +704,7 @@
   "direction_blind": "cross",
   "scale": {
     "min": {
-      "width": 200.0,
+      "width": 50.0,
       "height": 80.0,
       "depth": 150.0
     },

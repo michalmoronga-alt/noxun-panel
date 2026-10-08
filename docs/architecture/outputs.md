@@ -385,14 +385,14 @@ podľa otvárania čela. `BUILD_INFO_ONLY` má navyše `hinge_weight_unknown` �
 s pravidlami spred „4/6 podľa šírky" nesie v `config.hardware[]` 4 nohy aj pri šírke 1200 a žiadny príchyt soklovej lišty — nákup je teda o dve nohy
 a o príchyty chudobnejší, ale **rezanie ani montáž na tom nestoja** a chýbajúce kusy sa dajú dokúpiť. Kód `BuildPlan::LEG_STALE` preto **NIE JE** v `HW_ISSUE_BLOCKERS` ani v `BuildPlan.hw_blockers`;
 Kontrola z neho robí ORANGE riadok kategórie `CAT_HARDWARE` (`hardware_note_item`, klik-select mieri na skrinku) s vetou zo zberu + „Nákup ani výroba sa tým
-nezastavujú.". **Proveniencia je JEDNA a je NUTNÁ:** `rules_seed_version` < `HardwareRules::LEG_WIDTH_SEED_VERSION` (6) — marker už zapisuje každá stavba
-(E1b), takže sa **nezakladá žiadny nový kľúč configu** a `CONFIG_SCHEMA` sa nebumpuje. K nej musí sedieť aspoň jeden **symptóm**, inak by veta strašila aj
-tam, kde sa nič nezmení: (a) šírka ≥ 1000 mm a uložená položka `leg` má ešte 4 kusy zo `source: 'rule'` (ručný zámok nesie `manual` a je to vedomé
-rozhodnutie), alebo (b) výška sokla ≥ 55 mm a v kovaní **nie je ani jeden** `plinth_clip`. **Podopretie rozlišuje symptómy (Codex #338 kolo 1 N1):**
-(a) platí pre `legs` aj `plinth` — seed `nohy-zakladne` má filter `support legs plinth`, takže široká skrinka so **soklom vpredu** dostane po prestavbe
-tiež 6 nôh a kontrola len na `legs` by jej migračnú vetu potichu zhasla; (b) ostáva LEN pri `legs` (`clips_expected?` = jediná autorita otázky v zbere),
-lebo samostatná soklová lišta pri sokli vpredu neexistuje — a tá istá funkcia drží vetu, takže skrinke s `plinth` sa v nej príchyty nespomenú. Náprava je tá istá ako pri `flap_stale`: „Doplniť nové
-predvoľby" + prestavba (po nej je marker 6 a nález zhasne). Príchyt **bez setu** ostáva bežná ORANGE `hardware_unmapped` — `HW_LABELS['plinth_clip']`
+nezastavujú.". **Proveniencia je DVOJITÁ a obe hranice sú nutné.** Marker `rules_seed_version` už zapisuje každá stavba (E1b), takže `leg_stale` **nezakladá nový kľúč**
+(schéma 23 patrí rozsahu šírky, nie tejto vete). (a) a (b) platia len pri seede < `LEG_WIDTH_SEED_VERSION` (6): (a) šírka ≥ 1000 mm a uložená položka `leg` má ešte
+4 kusy zo `source: 'rule'` (ručný zámok nesie `manual` a je to vedomé rozhodnutie), (b) výška sokla ≥ 55 mm a v kovaní **nie je ani jeden** `plinth_clip`.
+(c) platí pri seede < `LEG_NARROW_SEED_VERSION` (8): šírka < 200 mm a uložené nohy z pravidla sú ešte 4. Seed 6/7 teda širokú vetu ani chýbajúci príchyt **nehlási**
+a úzku ešte áno; seed ≥ 8 mlčí. **Podopretie rozlišuje symptómy (Codex #338 kolo 1 N1):** (a) a (c) platia pre `legs` aj `plinth` — seed `nohy-zakladne` má filter
+`support legs plinth`; (b) ostáva LEN pri `legs` (`clips_expected?` = jediná autorita otázky v zbere), lebo samostatná soklová lišta pri sokli vpredu neexistuje.
+Veta počíta očakávaný počet z šírky (< 200 → 2, ≥ 1000 → 6, inak 4) a príchyty ako `ceil(nohy / 4)`, takže dve nohy chcú jeden príchyt. Náprava je tá istá ako pri
+`flap_stale`: „Doplniť nové predvoľby" + prestavba (po nej je marker 8 a nález zhasne). Príchyt **bez setu** ostáva bežná ORANGE `hardware_unmapped` — `HW_LABELS['plinth_clip']`
 (z G1a) z nej zloží „Príchyt sokla (S1) nemá priradený set…".
 
 **KOV-G1b (Codex #338 kolo 1 N2) — `plinth_clip_check`: DRUHÝ ORANGE nález kovania.** Príchyt sa počíta **zo šírky korpusu**, nie z počtu nôh (rozhodnutie

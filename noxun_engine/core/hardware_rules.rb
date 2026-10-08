@@ -90,7 +90,7 @@ module Noxun
       # na KAZDE celo `flap` (aj na vyklop) — a prave preto sa dokument so
       # std 3 do starsieho pluginu uz NEZAPISUJE (dopredna brana nizsie).
       STD          = 3 # verzia formatu suboru pravidiel (doc: std/seed_version/rules)
-      SEED_VERSION = 7 # v2 (D1): +zavesenie hornej skrinky, +podperky policove,
+      SEED_VERSION = 8 # v2 (D1): +zavesenie hornej skrinky, +podperky policove,
                        # seria vysuvov zladena s realnym radom Atira (GH #125 P2)
                        # v3 (D-90): +uchytkovy profil na dvierkach a zasuvkovych celach
                        # v4 (KOV-F1): NOXUN tabulka zavesov + door guardy
@@ -102,9 +102,11 @@ module Noxun
                        # 4 nohy, len pri samostatnej soklovej liste).
                        # v7 (D-120): +profily vyklopu, sklopu a blendy;
                        # vlastne pravidlo sa posudzuje aj podla flap_dir.
-                       # BEZ tohto bumpu by `merge_seed` migraciu preskocil
-                       # (`from_version >= SEED_VERSION`) a existujuca kniznica
-                       # by nove seed pravidla nedala ani NOVYM projektom.
+                       # v8: `nohy-zakladne` dostalo pasmo sirky < 200 mm -> 2
+                       # nohy (200-999 ostava 4, od 1000 ostava 6). Bez bumpu by
+                       # `merge_seed` migraciu preskocil (`from_version >=
+                       # SEED_VERSION`) a existujuca kniznica by uzku skrinku
+                       # dalej radila na 4 nohy.
       # KOV-F1 (Codex #329 kolo 3 P1): verzia formatu, OD KTOREJ seed pravidlo
       # zavesov nesie door guardy (Noxun tabulka). Snapshot POD tymto cislom =
       # pravidla este spred tabulky, takze skrinka so zavesmi nesie stare pocty
@@ -125,8 +127,9 @@ module Noxun
 
       # === KOV-G1b: NOHY PODLA SIRKY + PRICHYT SOKLA =========================
       #
-      # Rozhodnutia Michala (8.-9.9.2026):
-      #   * pocet NOH sa riadi SIRKOU korpusu — < 1000 mm 4 nohy, od 1000 mm 6.
+      # Rozhodnutia Michala (8.-9.9.2026, uzka skrinka 8.10.2026):
+      #   * pocet NOH sa riadi SIRKOU korpusu — < 200 mm 2 nohy (v strede
+      #     sirky, predna + zadna), 200-999 mm 4, od 1000 mm 6.
       #     Plati pre VSETKY sety noh (klzak aj AXILO); set rozhoduje LEN
       #     o produkte (kod podla vysky sokla).
       #   * PRICHYT soklovej listy je 1 ks na ZACATE 4 nohy (4 nohy -> 1,
@@ -144,6 +147,14 @@ module Noxun
       # (`bands` porovnava `v <= max`). Konstanta je autoritou HLASOK a brany
       # `Bom.leg_stale_issue`, nie samotneho vypoctu (ten drzia pasma).
       LEG_WIDE_FROM_MM = 1000.0
+      # Sirka, POD ktorou idu 2 nohy. Autorita HLASOK a `leg_stale` (nie pasma).
+      LEG_NARROW_BELOW_MM = 200.0
+      # Pasma quantity maju IBA `v <= max` a `normalize_bands` necha len `max`
+      # a `quantity` — kluc `min` alebo `max_exclusive` by editor pri ulozeni
+      # zahodil a skrinka 200 mm by TICHO dostala 2 nohy. 199.999 je preto
+      # inkluzivny zastupca „< 200": 199, 199.5 aj 199.999 -> 2, 200 -> 4.
+      # 199.9995 spadne do 4 — ta ista hranica inkluzivnych pasiem ako 999.5 -> 6.
+      LEG_NARROW_BAND_MAX = 199.999
       # Vyska sokla, OD ktorej existuje soklova lista na nohach AXILO.
       PLINTH_CLIP_MIN_MM = 55.0
       # KOV-G1b: VOLITELNY filter `applies_to`. Pravidlo s nim plati LEN na
@@ -157,6 +168,12 @@ module Noxun
       # ho `Bom.leg_stale_issue` (ORANGE „prestav skrinku"). PEVNE CISLO ako
       # `LIFT_SEED_VERSION`: buduci bump seedu na tomto nic nemeni.
       LEG_WIDTH_SEED_VERSION = 6
+      # Verzia SEEDU, OD KTOREJ uzka skrinka (< 200 mm) dostane 2 nohy namiesto
+      # 4. Snapshot POD tymto cislom s ulozenymi 4 nohami z pravidla je
+      # „prestav skrinku" (ORANGE `leg_stale`). PEVNE CISLO ako
+      # `LEG_WIDTH_SEED_VERSION`: buduci bump seedu tuto branu neposunie
+      # a hranicu v6 (siroka skrinka, chybajuci prichyt) NEMENI.
+      LEG_NARROW_SEED_VERSION = 8
 
       FILE         = 'hardware_rules.json'
       MODEL_KEY    = 'hardware_rules' # kluc snapshotu v NOXUN dict na modeli
@@ -244,15 +261,17 @@ module Noxun
       DOOR_OUT_OF_TABLE = 'door_height_out_of_table'
 
       SEED_RULES = [
-        # KOV-G1b: pocet noh podla SIRKY korpusu (Michal 8.9.2026) — < 1000 mm
-        # 4 nohy, od 1000 mm 6. `params_from_context` OSTAVA: set nohy si podla
-        # `params['height']` (vyska sokla) dalej vybera KOD, sirka riesi POCET.
+        # Pocet noh podla SIRKY korpusu — < 200 mm 2, do 999 mm 4, od 1000 mm 6.
+        # `params_from_context` OSTAVA: set nohy si podla `params['height']`
+        # (vyska sokla) dalej vybera KOD, sirka riesi POCET.
         # Filter `support` je nezmeneny — nohy su pod skrinkou aj vtedy, ked je
         # sokel vpredu sucastou korpusu (`plinth`).
+        # Pasmo 199.999 je inkluzivny zastupca „< 200" (vid `LEG_NARROW_BAND_MAX`).
         { 'rule_id' => LEG_RULE_ID, 'enabled' => true,
           'applies_to' => { 'role' => 'cabinet', 'support' => %w[legs plinth] },
           'output' => LEG_OUTPUT, 'kind' => 'bands', 'input' => 'width',
           'bands' => [
+            { 'max' => LEG_NARROW_BAND_MAX, 'quantity' => 2 },
             { 'max' => 999.0, 'quantity' => 4 },
             { 'max' => nil,   'quantity' => 6 }
           ],
@@ -427,9 +446,22 @@ module Noxun
         # „Doplniť nové predvoľby" (snapshot projektu) novy tvar `bands`;
         # pouzivatelom upravene (napr. 5 noh) sa NIKDY neprepisuje.
         LEG_RULE_ID => [
+          # [0] v1..v5: pevne 4 nohy. Index [0] ostava — testy aj starsie
+          # kniznice sa na tento tvar pytaju.
           { 'rule_id' => LEG_RULE_ID, 'enabled' => true,
             'applies_to' => { 'role' => 'cabinet', 'support' => %w[legs plinth] },
             'output' => LEG_OUTPUT, 'kind' => 'fixed', 'quantity' => 4,
+            'params_from_context' => { 'height' => 'floor_height' } },
+          # [1] v6..v7: pasma 4/6 bez uzkeho pasma. Nedotknute pravidlo
+          # (knižnica aj „Doplniť nové predvoľby") dostane pasmo 2 noh.
+          # Upravene pasma (iny pocet) sa NIKDY neprepisuju.
+          { 'rule_id' => LEG_RULE_ID, 'enabled' => true,
+            'applies_to' => { 'role' => 'cabinet', 'support' => %w[legs plinth] },
+            'output' => LEG_OUTPUT, 'kind' => 'bands', 'input' => 'width',
+            'bands' => [
+              { 'max' => 999.0, 'quantity' => 4 },
+              { 'max' => nil,   'quantity' => 6 }
+            ],
             'params_from_context' => { 'height' => 'floor_height' } }
         ],
         # KOV-F1: v1..v3 tvar tabulky zavesov (900/1400/1900 -> 2/3/4/5).

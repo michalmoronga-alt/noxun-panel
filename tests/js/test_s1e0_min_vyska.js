@@ -93,7 +93,7 @@ function reset(){
 // `Array.from` je nutne: pole vzniklo VNUTRI vm kontextu, takze nie je
 // instanciou Array tohto realmu a deepEqual by ho odmietol aj pri zhode.
 assert.deepEqual(Array.from(ctx.LIMITS.height), [80, 3000], 'vyska ide od 80 mm (S1-E0)');
-assert.deepEqual(Array.from(ctx.LIMITS.width), [200, 3000], 'sirka sa NEMENI');
+assert.deepEqual(Array.from(ctx.LIMITS.width), [50, 3000], 'sirka ide od 50 mm');
 assert.deepEqual(Array.from(ctx.LIMITS.depth), [150, 2000], 'hlbka sa NEMENI');
 n += 3;
 
@@ -112,14 +112,37 @@ fields.height = '3001';
 assert.equal(valid(), false, 'horna hranica 3000 plati dalej');
 n += 6;
 
-// --- 3) sirka sa NEODOMKLA ---------------------------------------------------
+// --- 3) sirka od 50 mm -------------------------------------------------------
 reset();
-fields.width = '199';
-assert.equal(valid(), false, 'sirka 199 je dalej chyba');
+fields.width = '49';
+assert.equal(valid(), false, 'sirka 49 je pod limitom');
 assert.equal(bad('width'), true, 'a sirka zocervenie');
-fields.width = '200';
-assert.equal(valid(), true, 'sirka 200 je dalej platna');
-n += 3;
+fields.width = '50';
+assert.equal(valid(), true, 'sirka 50 je platna');
+fields.width = '199';
+assert.equal(valid(), true, 'sirka 199 uz chyba nie je');
+n += 4;
+
+// --- 3b) sirka × hrubka: ta ista veta ako Ruby validate! ---------------------
+reset();
+fields.width = '50';
+fields.thickness = '18';
+assert.equal(valid(), true, '50/18 prejde (2*18+10 = 46)');
+assert.equal(bad('width'), false, 'sirka nie je cervena');
+fields.thickness = '20';
+assert.equal(valid(), false, '50/20 odmietne (50 <= 2*20+10)');
+assert.equal(bad('width'), true, 'cervena je sirka');
+assert.equal(bad('thickness'), true, 'aj hrubka');
+assert.equal(node('width').title, 'Sirka je prilis mala vzhladom na hrubku materialu.',
+             'veta je doslova ta ista ako v Ruby');
+fields.width = '60';
+fields.thickness = '25';
+assert.equal(valid(), false, '60/25 odmietne (rovnost)');
+assert.equal(node('width').title, 'Sirka je prilis mala vzhladom na hrubku materialu.');
+fields.thickness = '';
+fields.width = '50';
+assert.equal(valid(), true, 'prazdna hrubka = predvolba 18, 50 mm prejde');
+n += 8;
 
 // --- 4) krizova kontrola: vyska je CELKOVA vratane sokla ---------------------
 reset();

@@ -407,6 +407,9 @@ teda iný mechanizmus, iné ramená a iná tyč v objednávke; nové dôvody by 
 `height` z 200 na 80 mm. Povinný je napriek tomu, lebo strata je výrobná a tichá: starší plugin (schéma 14) má `MIN[:height]` = 200, takže by skrinku 80–199 mm pri
 prvej prestavbe **klampol na 200** a zmenil výšku bokov, chrbta aj čiel — nikto by si to nevšimol, kým by dielce neprišli z píly (Codex #374 P1). Disciplína bumpu
 (STANDARD §2.5) hovorí o TICHEJ ZMENE VÝROBY, nie o novom poli. Brány sú tie isté ako pri 5–14.
+· **`23` = šírka od 50 mm** (dolná aj horná, typy bez vlastných limitov): druhý bump bez nového poľa — prípustný rozsah `width` išiel z 200 na 50 mm. Starší plugin (schéma 22) má `MIN[:width]` = 200, takže by skrinku 50–199 mm pri
+prvej prestavbe **klampol na 200** a zmenil šírku bokov, dna, stropu aj čiel. Brány sú tie isté (`newer_config?`, `ProductionCore.export_blockers`). Aktivačné konštanty ostávajú 5 / 9 / 11 / 19 / 20 — skrinky schémy 22 sa nesmú
+zrazu tváriť ako nemigrované. Umývačka a rohová majú vlastné limity a tento rozsah ich neposúva.
 **`DRAWER_ACTIVATION_SCHEMA` ostáva 5** — je to VLASTNÁ konštanta práve preto, aby bump na 6 až 15 nespravil z každej skrinky schémy 5 „nemigrovanú" (`drawer_stale`).
 **`HINGE_ACTIVATION_SCHEMA` = 9** je jej dvojička pre závesy (Codex #329 kolo 2 P1): skrinka uložená pod nižšou schémou nesie staré počty závesov, takže ju
 zber priznáva RED `hinge_stale` a brána zastaví nákup, rozpočet aj ponuku (VEPO nie) — detail v [outputs.md](outputs.md). **Sama o sebe schéma 9 RED
@@ -429,7 +432,7 @@ istom registri** ako D-143 a hromadná prestavba ju vezme cez **spoločný predi
 **KON-A · K1 — polia `back_setback` / `top_front_setback` (`SETBACK_KEYS`).** `normalize` ich číta **prísne** (`norm_setback`: Numeric alebo reťazec, ktorý je celý
 číslom podľa `SETBACK_NUM_RE`, inak 0; klamp 0–300; slot 0), `cabinet_config` ich zapisuje **len keď sú > 0** (config existujúcich skriniek sa nemení; vnorené
 `top`/`back` bez zmeny) a `config_to_params` pri chýbajúcom kľúči dá 0.0 — ním idú všetky round-tripy (prestavba, absorpcia, kópie, dedup, „Nahradiť UNI", hromadné
-zmeny). Nohy (`draw_legs`) stoja podľa `Construction.back_stop`.
+zmeny). Nohy (`draw_legs`) stoja podľa `Construction.back_stop`. Dve nohy (šírka pod 200 mm) sú v **strede šírky**, predná a zadná. Keď medzi nimi nezostane aspoň priemer valca (50 mm) ani po posune zadnej na okraj dna, kreslí sa **jeden** valec a plán dostane `legs_drawn_collapsed` — nákupný počet ostáva. Pri hĺbke 150 mm bez sokla sa dva valce ešte zmestia; sokel vpredu ich zloží.
 **KON-B · K2 — chrbát z líšt (`back_mode 'rails'`, pole `back_rail_height`, `BACK_RAIL_KEY`).** `normalize` pozná `rails` v enume chrbta (bez neho by ho ticho
 zmenil na predvolený chrbát typu) a výšku líšt číta **prísne** (`norm_rail_height`: vzor `norm_setback`, neplatné → 100, klamp 20–300, slot 100). `cabinet_config`
 zapisuje H **len pri H ≠ 100** (aj pri inom type chrbta — hodnota sa pamätá), `config_to_params` pri chýbajúcom kľúči dá 100. `LOWER_DEFAULTS`/`UPPER_DEFAULTS`
@@ -552,11 +555,13 @@ false — zdroj pravdy súpisu je VÝHRADNE `config.hardware[]` korpusu). Profil
 neschová** — patrí k čelu, nie k nohám (tie na `hardware_tag` ostávajú). Dáta proxy sa tým NEMENIA (súpis, nákup ani dĺžka rezu sa tagu nedotýkajú) a staré zákazky sa preznačia pri
 najbližšej prestavbe — proxy vzniká pri každom rebuilde nanovo, takže žiadna migrácia netreba. Stráži in-SU sekcia `run_d116`.
 
-**ROZMEROVÉ HRANICE (`MIN`, S1-E0, v0.12.9).** `normalize` klampuje obálku korpusu na `MIN` = šírka **200**, výška **80**, hĺbka **150** (horné hranice 3000/3000/2000).
-Výška ide od 80 mm od S1-E0 (Michal 20.9.2026): nad umývačkou ostáva po líniu linky často len 80–110 mm a vypĺňa sa **nízkym korpusom na dorovnanie**. Šírka ani hĺbka sa
-neodomkli — užší či plytší korpus nemá konštrukčný zmysel. **`CONFIG_SCHEMA` sa bumpuje na 15**, hoci nepribudlo pole: starší plugin (schéma 14) by skrinku 80–199 mm
-pri prestavbe ticho klampol späť na 200, teda zmenil výrobnú geometriu — a presne pred tým chráni dopredný guard `newer_config?` (prestavba, šablóny, kópia) a exportná
-brána. Detail je v histórii čísel vyššie; žiadna migrácia netreba, config nemá nové pole.
+**ROZMEROVÉ HRANICE (`MIN`, S1-E0 a šírka od 50 mm).** `normalize` klampuje obálku korpusu na `MIN` = šírka **50**, výška **80**, hĺbka **150** (horné hranice 3000/3000/2000).
+Výška ide od 80 mm od S1-E0 (Michal 20.9.2026): nad umývačkou ostáva po líniu linky často len 80–110 mm a vypĺňa sa **nízkym korpusom na dorovnanie**. Šírka ide od 50 mm
+(dolná aj horná, typy bez vlastných limitov): úzka skrinka na výplň medzery. Hĺbka ostáva 150. Umývačka (300–1200) a rohová (sonda `min_valid_width`) majú vlastné limity.
+**`CONFIG_SCHEMA` je 23.** Bump na 15 odomkol výšku a bump na 23 odomkol šírku — oba bez nového poľa, lebo starší plugin by hodnotu pri prestavbe ticho klampol (výšku 80–199
+na 200, šírku 50–199 na 200). Pred tým chráni dopredný guard `newer_config?` (prestavba, šablóny, kópia) a exportná brána. Detail je v histórii čísel vyššie; žiadna migrácia
+netreba, config nemá nové pole. Šírka 50 mm pri predvolenej hrúbke 18 prejde (`2×18+10 = 46`). Pri hrúbke 20 mm a viac ju `validate!` odmietne vetou
+`Sirka je prilis mala vzhladom na hrubku materialu.` a panel ju zrkadlí na poli šírky (aj keď rohová kontrola medzitým title zmaže — veta sa dopíše znova).
 **Tú istú hodnotu držia TRI miesta:** `MIN` tu, `ScaleWatch::MIN` (absorpcia scale) a `LIMITS` v `ui/js/form.js` (červené pole panela). Priama referencia možná nie je
 (`scale_observer` sa načítava PRED `cabinet_builder`, JS Ruby konštantu nevidí), takže zhodu — rovnako ako pri `DRAWER_ROLES` — stráži guard `tests/pure/test_s1e0_min_vyska.rb`.
 Geometriu nízkeho korpusu ďalej chráni **`Construction.validate!` ako posledná brána** (sokel ≥ výška, svetlé vnútro ≤ `MIN_AVAIL_H` = 10 mm, rezerva `MIN_INTERIOR_H` pod dvoma
@@ -605,7 +610,7 @@ servera (`NXTypes.get(t).limits`, H12c — šírka a výška linky). **Šírka s
 (Astra S1-E, BLOCKER E1): užší slot sa postaví a nedostatočnú šírku hlási Kontrola ORANGE `dw_body_fit` — semafor varuje, nikdy neblokuje prestavbu.
 
 **Podpora `none` je invariant** (Codex #376 kolo 1 P1): `floor_height` slotu je **vždy 0** a `dw_front_bottom` doň **nikdy netečie**; `plinth_mode` je `none`. Bez toho by
-pravidlá kovania vydali 4/6 nôh, príchyty sokla a proxy nôh — slot má v Kovaní len úchytku.
+pravidlá kovania vydali 2/4/6 nôh, príchyty sokla a proxy nôh — slot má v Kovaní len úchytku.
 
 **Jedno pevné čelo je SERVEROVÝ invariant** (FIX E9): `normalize` pre slot vždy vyrobí `fronts.items = [F1 · type blind · mode fixed · height = odvodená · wings 1]`
 (z prichádzajúceho F1 preberá len profil a jeho hranu) a nastaví `gap`/`gap_bottom` na 0 — **`gap_top` ZACHOVÁ** (D-139: je to skutočné pole schémy medzier).
@@ -1260,7 +1265,7 @@ aj `clamp_height` sa pýtajú `min_for(key, type)`, takže typové minimum má p
 `scaletool`=120 aj na definícii = čisté osi. Mapovanie je **lokálne**, takže platí aj pre otočenú dosku (UI-C1c) — používateľov scale v globálnom Z stojacej dosky skončí v jej
 ŠÍRKE.
 
-**SPODNÉ HRANICE ABSORPCIE (`MIN`, S1-E0, v0.12.9).** `clamp_min` neprepustí šírku ani hĺbku pod `MIN` = **200** / **150** (mm, string kľúče — chodí sem kľúč z uloženého
+**SPODNÉ HRANICE ABSORPCIE (`MIN`, S1-E0 a šírka od 50 mm).** `clamp_min` neprepustí šírku ani hĺbku pod `MIN` = **50** / **150** (mm, string kľúče — chodí sem kľúč z uloženého
 configu) a klamp **loguje**, nikdy ho nerobí ticho. Čísla sú **zrkadlom `CabinetBuilder::MIN`** — priama referencia sa použiť nedá (`scale_observer` sa načítava PRED
 `cabinet_builder`), preto zhodu stráži guard `tests/pure/test_s1e0_min_vyska.rb`; keby sa rozišli, ten istý korpus by po ťahaní myšou a po zápise do poľa skončil na inom
 rozmere.
@@ -1269,7 +1274,7 @@ rozmere.
 s policou by geometria prešla, ale stavba padla na `validate_shelves!` — rebuild by zlyhal, `reject_scale` by vrátil PÔVODNÚ skrinku a používateľ by po ťahaní úchopu nedostal
 nič (720 mm späť namiesto 94). Hranica je preto **prísnejšia z dvoch**: `MIN['height']` a `Construction.min_valid_height` nad **kompletným** configom, ktorý o chvíľu pôjde do
 `rebuild`u (normalizuje sa **tou istou cestou**, takže pri hornej skrinke sokel korektne vypadne na 0).
-Šírka taký problém nemá — jej `MIN` je vždy nad hranicou validácie. Lifecycle absorpcie sa tým **nemení**: klamp žije vnútri tej istej transparentnej operácie, takže
+Šírka ostáva na holom typovom minime (rohová ide cez `clamp_corner_width`). Pri predvolenej hrúbke 18 mm šírka 50 prejde; pri hrúbke 20 mm a viac ju odmietne `validate!` aj červené pole panela — absorpcia sa o hrúbku nerozširuje. Lifecycle absorpcie sa tým **nemení**: klamp žije vnútri tej istej transparentnej operácie, takže
 jedno Späť ďalej vráti scale AJ absorpciu (in-SU `run_s1e0` body c, e a f, reálny debounce tik `async S1`).
 
 **HĹBKA sa pri ZMENŠENÍ klampuje CONFIG-AWARE (`clamp_depth`, KON-A · Codex FIX 10, Grok 9).** Komín, zapustenie a výstuhy robia z hĺbky konštrukčnú hranicu
@@ -1279,7 +1284,7 @@ normalizovaným configom (sonda cez celý plán, dedí aj minimum vnútra 40 pri
 `reject_scale` sa pri hĺbke týmto nedosiahne; pre iné príčiny ostáva. Jedno Späť vráti scale aj absorpciu (in-SU `run_kona` bod c).
 
 **ROH-A1 — ŠÍRKA ROHOVEJ sa pri ZMENŠENÍ klampuje CONFIG-AWARE (`clamp_corner_width`, krížový audit G9 / Codex Q5).** Rohová zostava sa musí zmestiť pred slepú
-časť, takže holé `MIN['width']` 200 by pri zúžení vyrobilo neplatnú konštrukciu a tichý `reject_scale`. Keď `new_w < base_w` **a** skrinka je rohová
+časť, takže holé `MIN['width']` 50 by pri zúžení vyrobilo neplatnú konštrukciu a tichý `reject_scale`. Keď `new_w < base_w` **a** skrinka je rohová
 (`Construction.corner?`), hranica je prísnejšia z `min_for('width')` a `Construction.min_valid_width` (sonda cez celý plán); klamp beží **pred** skúšaním hĺbky
 a výšky (tie už počítajú s novou šírkou) a keď šírku zdvihla zostava, po `refresh_panel` príde nemodálna veta („Šírka rohovej skrinky CAB-009 je pri tejto rohovej
 zostave najmenej 584 mm — nastavená na 584."; pri súčasnom klampe hĺbky obe vety v jednej hláške). Ostatné typy ostávajú na holom minime. **Všetky tri sondy

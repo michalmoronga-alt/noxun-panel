@@ -218,6 +218,9 @@ module Noxun
                                                         suppress_slide_owners: drawer[:suppress],
                                                         manual_flap_owners: manual_flap_owners)
         warnings.concat(hw[:warnings])
+        # Uzka skrinka (2 nohy) na plytkej hlbke: dva valce sa nezmestia.
+        # Nakup ostava podla pravidla, kresba zoberie jeden a plan to povie.
+        append_leg_draw_warning!(warnings, cfg, hw[:items])
 
         plan = {
           schema: BuildPlan::SCHEMA,
@@ -1772,7 +1775,11 @@ module Noxun
       MAX_WIDTH = 3000.0
 
       def min_valid_width(cfg, hardware_rules: nil, part_thicknesses: nil)
-        lo = defined?(CabinetBuilder) ? CabinetBuilder::MIN[:width] : 200.0
+        # Fallback 50 je zrkadlo `CabinetBuilder::MIN[:width]` pre pripad, ze
+        # modul buildera este nie je nacitany. Straz `defined?` OSTAVA —
+        # construction sa nacitava skor a priama referencia pri boote by
+        # neexistovala. Vetva sa cita az pri VOLANI, nie pri nacitani.
+        lo = defined?(CabinetBuilder) ? CabinetBuilder::MIN[:width] : 50.0
         return lo unless corner?(cfg)
 
         rules = hardware_rules || HardwareRules.load
@@ -2102,6 +2109,26 @@ module Noxun
                                       "Vystuha: odsadenie od vrchu orezane z #{wanted.to_f.round(1)} na " \
                                       "#{used.to_f.round(1)} mm (vnutro korpusu).",
                                       data: { 'wanted' => wanted.to_f, 'used' => used.to_f })
+      end
+
+      # Kresba dvoch noh sa na plytkej hlbke zlozi do jedneho valca. Nakupny
+      # pocet (pravidlo) sa NEMENI — veta je v plane, aby to clovek videl.
+      def append_leg_draw_warning!(warnings, cfg, items)
+        return unless defined?(CabinetBuilder) && CabinetBuilder.respond_to?(:leg_layout)
+
+        legs = Array(items).select { |h| h.is_a?(Hash) && h['generic_type'].to_s == 'leg' }
+        qty = legs.sum { |h| h['quantity'].to_i }
+        return if qty < 1
+
+        lay = CabinetBuilder.leg_layout(cfg, qty)
+        return unless lay[:collapsed]
+
+        warnings << BuildPlan.warning(
+          'legs_drawn_collapsed',
+          "Skrinka má v nákupe #{qty} nohy, ale hĺbka zmestí len jeden valec — " \
+          "kreslí sa jeden, objednáva sa #{qty}.",
+          severity: 'warn'
+        )
       end
 
       def validate!(cfg, interior, part_thicknesses = nil)

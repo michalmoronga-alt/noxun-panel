@@ -49,7 +49,7 @@ const R = require(path.join(JS, 'rules.js'));
 function legRule(){
   return { rule_id: 'nohy-zakladne', kind: 'bands', output: 'leg', enabled: true,
            input: 'width', applies_to: { role: 'cabinet', support: ['legs', 'plinth'] },
-           bands: [{ max: 999, quantity: 4 }, { max: null, quantity: 6 }],
+           bands: [{ max: 199.999, quantity: 2 }, { max: 999, quantity: 4 }, { max: null, quantity: 6 }],
            params_from_context: { height: 'floor_height' } };
 }
 function clipRule(){
@@ -96,7 +96,7 @@ eq(R.rdWidthHint({ kind: 'bands', input: 'height', applies_to: { role: 'cabinet'
 show([legRule(), clipRule(), hingeRule()]);
 const rules = box().querySelectorAll('.rrule');
 eq(rules.length, 3, 'G3: tri pravidlá, tri bloky');
-eq(box().querySelectorAll('.rband').length, 6, 'G3: každé pásmo má riadok');
+eq(box().querySelectorAll('.rband').length, 7, 'G3: každé pásmo má riadok');
 const html = box().innerHTML;
 ok(html.indexOf('Pásma podľa šírky korpusu.') >= 0, 'G3: veta sa naozaj vykreslí');
 eq(html.split('Pásma podľa šírky korpusu.').length - 1, 2,

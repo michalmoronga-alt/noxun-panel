@@ -120,7 +120,7 @@ if NxTest.headless?
     end
   end
 
-  NxTest.test('H12b R2.5: preflight ciel — rozsahy z limits typu (slot 300–1200 / 500–1200, inak 200–3000)') do
+  NxTest.test('H12b R2.5: preflight ciel — rozsahy z limits typu (slot 300–1200 / 500–1200, inak 50–3000 / 80–3000)') do
     pan = NxH12b::E::Panel
     gaps = { 'gap' => 3.0, 'gap_top' => 3.0, 'gap_bottom' => 3.0, 'gap_left' => 3.0, 'gap_right' => 3.0 }
     fronts = gaps.merge('items' => [{ 'id' => 'F1', 'type' => 'door', 'mode' => 'auto', 'wings' => '1' }])
@@ -135,9 +135,12 @@ if NxTest.headless?
     NxTest.assert(pf.call('dishwasher', 600.0, 1300.0), 'slot vyska linky nad 1200 = mimo rozsahu')
     NxTest.refute(pf.call('dishwasher', 600.0, 820.0), 'slot 600 x 820 v rozsahu')
     %w[lower upper corner_blind tall].each do |t|
-      NxTest.refute(pf.call(t, 1250.0, 1300.0), "#{t}: korpusovy rozsah 200–3000")
+      NxTest.refute(pf.call(t, 1250.0, 1300.0), "#{t}: korpusovy rozsah 50–3000 / 80–3000")
       NxTest.assert(pf.call(t, 3100.0, 720.0), "#{t}: nad 3000 = mimo rozsahu")
     end
+    NxTest.assert(pf.call('lower', 40.0, 720.0), 'sirka pod 50 = mimo rozsahu')
+    NxTest.refute(pf.call('lower', 50.0, 720.0), 'sirka 50 je v rozsahu')
+    NxTest.assert(pf.call('lower', 600.0, 70.0), 'vyska pod 80 = mimo rozsahu')
   end
 
   # --- R2.6 · aditivne kluce payloadu -------------------------------------------

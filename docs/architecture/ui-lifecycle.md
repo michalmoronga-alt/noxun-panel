@@ -1207,7 +1207,7 @@ odseky „Kontext Korpus" a „Vkladacia karta". **Poradie guardov: identita dok
 
 - **Typ cez register `CabinetTypes` (H12b, [construction.md](construction.md), odsek `cabinet_types.rb`):** „slot" = typ bez korpusu (`!carcass?` — preflight:
   sokel 0, `slot_preflight_opening`, kanonizácia riadku slotu; `slot_params?` bez tela a chrbta; typ zo šablóny sa prevezme), rozsahy preflightu = `limits` typu
-  (inak 200–3000), „rohová" = `corner?` (zdroj preflightu, šablóna, prepínač strany), čelá = `fronts` (`slot_fixed` → `slot_fronts_refusal`, `corner_one_door` →
+  (inak šírka 50–3000 a výška 80–3000), „rohová" = `corner?` (zdroj preflightu, šablóna, prepínač strany), čelá = `fronts` (`slot_fixed` → `slot_fronts_refusal`, `corner_one_door` →
   `corner_fronts_refusal`), zmena typu = identita surová a zámok `type_locked` aspoň jedného (`corner_change_refusal`). `TEMPLATE_TYPE_WORDS` je odvodené z `word`
   (poradie `IDS`). Výsledky bajtovo ako pred H12b (golden `panel.json`, matica H12a).
 - **Kópia** (`handle_insert_copy`) prenáša overenú zdrojovú skrinku samostatným `appearance_source:` do buildera (zachová živé materiály a ABS, vlastná identita

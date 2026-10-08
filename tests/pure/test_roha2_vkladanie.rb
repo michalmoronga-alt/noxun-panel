@@ -96,7 +96,7 @@ NxTest.test('ROH-A2: otvor ide aj s odmietnutim (medzera pri rohu mimo rozsahu)'
   NxTest.assert_equal(false, res['valid'], 'medzera pri rohu 0 = odmietnutie')
   NxTest.assert_equal(450.0, res.dig('opening', 'w'), 'otvor je v odpovedi aj tak (nahlad sa nevrati na celu sirku)')
   # Rozmer mimo rozsahu: otvor sa este nepocital — kluc chyba, panel drzi posledny.
-  res = NxRohA2.pan.front_preflight_result(NxRohA2.data('width' => 50.0))
+  res = NxRohA2.pan.front_preflight_result(NxRohA2.data('width' => 40.0))
   NxTest.assert_equal(false, res['valid'])
   NxTest.refute(res.key?('opening'), 'nepocitany otvor sa nevymysla')
 end

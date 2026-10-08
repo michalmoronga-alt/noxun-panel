@@ -3652,6 +3652,96 @@ module NoxunSuRunner
     cleanup(model)
   end
 
+  # --- sirka od 50 mm: UZKA SPODNA MA 2 NOHY V STREDE, HORNA ZIADNE ---------
+  #
+  # Headless sada overuje plan a migraciu pravidla. Tu ide o model: dolna
+  # 50 a 150 mm ma v ulozenom kovani 2 nohy a dva valce v strede sirky,
+  # horna 50 mm sa postavi bez noh a scale pod hranicu klampne na 50
+  # (jedno Spat vrati sirku aj pocty). Snapshot projektu sa nemerguje sam
+  # a `run_kovg` ide az neskor, preto si scena predvolby doplni sama.
+  def sirka50_leg_points(model, inst)
+    cid = e::Store.get(inst, 'cabinet_id').to_s
+    dfn = model.definitions["NOXUN #{cid} LEGS"]
+    return nil unless dfn
+
+    pts = []
+    dfn.entities.grep(Sketchup::Edge).each do |edge|
+      curve = edge.curve
+      next unless curve && curve.respond_to?(:center)
+
+      c = curve.center
+      pts << [mm(c.x).round(1), mm(c.y).round(1)]
+    end
+    pts.uniq
+  end
+
+  def sirka50_two_legs?(model, inst, width)
+    pts = sirka50_leg_points(model, inst)
+    return false unless pts && pts.length == 2
+
+    xs = pts.map(&:first)
+    ys = pts.map(&:last)
+    xs.all? { |x| (x - width / 2.0).abs < TOL } && (ys[0] - ys[1]).abs >= 50.0 - TOL
+  end
+
+  def run_sirka50(model)
+    cleanup(model)
+    hr = e::HardwareRules
+    model.start_operation('SU-TEST sirka50 predvolby', true)
+    hr.merge_project_seed!(model)
+    model.commit_operation
+    rules = hr.project_rules(model) || hr.load
+    leg = Array(rules).find { |r| r['rule_id'].to_s == KOVG_LEG_RULE }
+    ok('sirka 50: predvolby noh su 2/4/6',
+       leg.is_a?(Hash) && Array(leg['bands']).map { |b| b['quantity'] } == [2, 4, 6])
+
+    [50.0, 150.0].each do |width|
+      inst = e::CabinetBuilder.build(model, 'type' => 'lower', 'width' => width,
+                                             'height' => 720.0, 'depth' => 510.0,
+                                             'thickness' => 18.0, 'floor_height' => 100.0)
+      hw = inst ? kovg_hw(inst) : {}
+      ok("sirka 50: dolna #{width.to_i} mm kupuje 2 nohy (#{hw.inspect})",
+         hw['leg'].to_i == 2)
+      ok("sirka 50: dolna #{width.to_i} mm kresli dva valce v strede sirky",
+         inst && sirka50_two_legs?(model, inst, width))
+    end
+
+    upper = e::CabinetBuilder.build(model, 'type' => 'upper', 'width' => 50.0,
+                                            'height' => 720.0, 'depth' => 320.0,
+                                            'thickness' => 18.0, 'floor_height' => 0.0)
+    ok('sirka 50: horna 50 mm sa postavi a nema nohy',
+       upper && s1e0_parts(upper).length.positive? && !kovg_hw(upper).key?('leg') &&
+       model.definitions["NOXUN #{e::Store.get(upper, 'cabinet_id')} LEGS"].nil?)
+
+    wide = e::CabinetBuilder.build(model, 'type' => 'lower', 'width' => 600.0,
+                                          'height' => 720.0, 'depth' => 510.0,
+                                          'thickness' => 18.0, 'floor_height' => 100.0)
+    if wide
+      before_tr = wide.transformation.to_a
+      model.start_operation('SU-TEST sirka50 user scale', true)
+      wide.transformation = wide.transformation *
+                            Geom::Transformation.scaling(ORIGIN, 0.05, 1.0, 1.0)
+      model.commit_operation
+      e::ScaleWatch.absorb(wide)
+      cfg_sc = e::Store.config(wide) || {}
+      ok("sirka 50: absorpcia scale klampla sirku na 50 (config #{cfg_sc['width']})",
+         (cfg_sc['width'].to_f - 50.0).abs < 0.01 && kovg_hw(wide)['leg'].to_i == 2)
+      Sketchup.undo
+      cfg_undo = e::Store.config(wide) || {}
+      ok("sirka 50: 1x Spat vratil sirku aj nohy (#{cfg_undo['width']}, #{kovg_hw(wide).inspect})",
+         wide.valid? && (cfg_undo['width'].to_f - 600.0).abs < 0.01 &&
+         kovg_hw(wide)['leg'].to_i == 4 && wide.transformation.to_a == before_tr)
+    else
+      ok('sirka 50: vlozenie skrinky 600 mm', false)
+    end
+
+    cleanup(model)
+    ok('sirka 50: cleanup (0 korpusov)', cabinets(model).empty?)
+  rescue StandardError => ex
+    log_line("FAIL: run_sirka50 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    cleanup(model)
+  end
+
   # --- S1-E: SLOT UMYVACKY -------------------------------------------------
   #
   # Headless sada overuje PLAN a KONTRAKT; tu sa overuje MODEL a to, co sa mimo
@@ -27061,7 +27151,7 @@ module NoxunSuRunner
     ok("KOV-G predvolby: pravidlo noh je `bands` podla SIRKY (#{rstatus}, " \
        "obnovene #{Array(rrefreshed).inspect})",
        leg.is_a?(Hash) && leg['kind'].to_s == 'bands' && leg['input'].to_s == 'width' &&
-       Array(leg['bands']).map { |b| b['quantity'] } == [4, 6])
+       Array(leg['bands']).map { |b| b['quantity'] } == [2, 4, 6])
     ok("KOV-G predvolby: projekt pozna pravidlo prichytu (doplnene #{Array(radded).inspect})",
        clip.is_a?(Hash) && clip['output'].to_s == 'plinth_clip' &&
        (clip['applies_to'] || {})['floor_height_min'].to_f == 55.0)
@@ -28971,6 +29061,7 @@ module NoxunSuRunner
     run_sync_back(model)     # davka Chrbat: D-37 hlbka, D-31 none, D-38 pevny 18
     run_sync_rails(model)    # H3/D-80: vnutro pod vystuhami (odsadenie, upright, chrbat, odmietnutie)
     run_s1e0(model)          # S1-E0: minimalna vyska korpusu 80 mm — nizka skrinka na dorovnanie sa postavi bez degenerovaneho dielca a kusovnik ju vidi, cesta Inspectora klampne 60 na 80, absorpcia scale pod hranicu tiez (a 1x Spat vrati scale aj absorpciu), horna 600 x 80 x 320
+    run_sirka50(model)       # sirka od 50 mm: dolna 50 a 150 ma v nakupe 2 nohy a dva valce v strede sirky, horna 50 stoji bez noh, scale pod 50 klampne na 50 a 1x Spat vrati sirku aj nohy
     run_s1e(model)           # S1-E: SLOT UMYVACKY — zo sablony 1 vyrobny dielec + telo ako referencia (kind reference, v kusovniku nikde), zmena vysky cela = 1 Spat, prisunutie na NOMINALNU hranu (aj pri presahujucom cele a vypnutom tagu referencie), zmena triedy prestavi telo, absorpcia scale na typove minimum, sablona so slotom, Kontrola dw_body_fit/dw_height_fit cez realny zber
     run_s1b1(model)          # S1-B1: SPOTREBIC V ZAKAZKE — priradenie z katalogu, presun, odpojenie a zmazanie ako JEDEN krok Spat (polozka + `appliance_refs[]` vlastnika + prestavba naraz), sirota po Delete (nalez BEZ `owner_id`) a jej naprava, trieda umyvacky vs slot, „dodáva zákazník" (medzisucet 0 + stitok v ponuke), legacy zakazka na kanonicke kody, ROLLBACK po riadenych zlyhaniach a bariera observera
     run_s1b2(model)          # S1-B2: POHLAD V ZAKAZKE + riadok Spotrebica ? ocakavanie zo sablony a ponuka filtrovana podla niky, priradenie AKCIOU PANELA (ciel z oznacenej entity) a 1x Spat, telo slotu prekreslene z katalogu (448 x 550) a spat na genericke, doska bez prestavby, tabulka pohladu nad realnym zberom, Delete vlastnika -> sirota -> odpojenie -> Spat vrati oboje

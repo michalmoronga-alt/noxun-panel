@@ -21,7 +21,7 @@ module Noxun
       # referencia sa pouzit NEDA: `scale_observer` sa nacitava PRED
       # `cabinet_builder` (main.rb), takze konstanta by pri boote neexistovala —
       # zhodu preto strazi guard test `tests/pure/test_s1e0_min_vyska.rb`.
-      MIN = { 'width' => 200.0, 'height' => 80.0, 'depth' => 150.0 }.freeze
+      MIN = { 'width' => 50.0, 'height' => 80.0, 'depth' => 150.0 }.freeze
       # S1-E: SLOT UMYVACKY ma VLASTNE minima — nema vnutro, takze sa neriadi
       # korpusovymi hranicami, a zaroven nema zmysel pustat 200 mm „umyvacku".
       # Su to TIE ISTE cisla ako spodne hranice v `CabinetBuilder::DW_WIDTH_RANGE`
@@ -522,8 +522,10 @@ module Noxun
           # Hole `MIN['height']` nestaci: pri sokli 100 by 80 mm vyrobilo config
           # bez vnutra, `Construction.validate!` by prestavbu odmietol a
           # pouzivatel by po tiahnuti uchopu dostal reject + POVODNY rozmer
-          # namiesto najnizsej platnej skrinky. Sirka a hlbka taky problem
-          # nemaju (ich MIN je vzdy nad hranicou validacie).
+          # namiesto najnizsej platnej skrinky. Hlbka taky problem nema.
+          # Sirka pri predvolenej hrubke 18 mm prejde (2*18+10 = 46 < 50), ale
+          # pri hrubke >= 20 mm uz `MIN` sirky nestaci (`w <= 2*t+10`) — to
+          # kryje panel a `validate!`, absorpcia ostava na holom typovom minime.
           params['height'] = clamp_height(params, (base_h * sz).round.to_f, cid, th)
           new_h = params['height']
 

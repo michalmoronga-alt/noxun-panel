@@ -123,7 +123,7 @@ module Noxun
         dw_front_height: [300.0, 1200.0]
       }.freeze
       # Sirka a vyska slotu maju VLASTNE (sirsie) hranice nez korpus: slot
-      # nema vnutro, takze `MIN[:width]` 200 by ho zbytocne zvazoval, a
+      # nema vnutro, takze korpusove minimum sirky by ho zbytocne zvazovalo, a
       # naopak nema zmysel pustat 3000 mm „umyvacku".
       # H12a: hodnoty su `limits` slotu v registri (jedna hranica pre
       # `normalize`, absorpciu scale aj panel).
@@ -377,7 +377,20 @@ module Noxun
       #       kovanie bez hlasky — a polia rohovej by whitelistom zahodil. Brany
       #       su tie iste ako pri 5-21 (`newer_config?`,
       #       `ProductionCore.export_blockers`).
-      CONFIG_SCHEMA = 22
+      #  23 = SIRKA OD 50 mm (dolna aj horna skrinka, typy bez vlastnych limitov).
+      #       Tu NEPRIBUDLO ziadne pole: zmenil sa PRIPUSTNY ROZSAH hodnoty
+      #       `width` z 200 na 50 mm. Bump je napriek tomu povinny, lebo strata
+      #       je VYROBNA a TICHA: starsi plugin (schema 22) ma `MIN[:width]` =
+      #       200, takze by skrinku 50-199 mm pri prvej prestavbe KLAMPOL na
+      #       200 — zmenil by sirku bokov, dna, stropu aj ciel a nikto by to
+      #       nezbadal, kym by dielce neprisli z pily. Disciplina bumpu
+      #       (STANDARD 2.5) hovori o TICHEJ ZMENE VYROBY, nie o novom poli
+      #       (vzor schemy 15 pri vyske). Brany su tie iste ako pri 5-22:
+      #       dopredny guard prestavby/sablon/kopie (`newer_config?`) a exportna
+      #       brana (`ProductionCore.export_blockers`). Aktivacne konstanty
+      #       ostavaju (5 / 9 / 11 / 19 / 20) — skrinky schemy 22 sa nesmu zrazu
+      #       tvarit ako nemigrovane.
+      CONFIG_SCHEMA = 23
 
       # KOV-C2b: schema, OD KTOREJ stavba emituje dielce zasuviek z receptu.
       # VLASTNA konstanta (nie `CONFIG_SCHEMA`), lebo pri bumpe na 6 (KOV-D1a)
@@ -435,15 +448,16 @@ module Noxun
 
       # S1-E0 (Michal 20.9.2026): VYSKA ide od 80 mm, nie od 200. Nad umyvackou
       # (a pod linkou) ostava casto len 80-110 mm a stolar tam kladie NIZKY
-      # korpus na dorovnanie — plugin ho do teraz nepustil. Sirka (200) a hlbka
-      # (150) sa NEMENIA: uzsi korpus nez 200 nema konstrukcny zmysel.
+      # korpus na dorovnanie. SIRKA ide od 50 mm (dolna aj horna, typy bez
+      # vlastnych limitov): uzka skrinka na doraz linky. Hlbka ostava 150.
+      # Umývačka, rohová, výška 80 a hĺbka 150 sa NEMENIA.
       # Tri miesta musia drzat TU ISTU hodnotu (normalize tu, absorpcia scale
       # v `ScaleWatch::MIN`, validacia panela v `ui/js/form.js` LIMITS) —
       # priamu referenciu brani poradie requirov (`scale_observer` sa nacitava
       # PRED `cabinet_builder`) a JS ju mat ani nemoze, preto zhodu vsetkych
       # troch strazi guard test `tests/pure/test_s1e0_min_vyska.rb` (rovnaky
       # vzor ako `DRAWER_ROLES` nizsie).
-      MIN = { width: 200.0, height: 80.0, depth: 150.0 }.freeze
+      MIN = { width: 50.0, height: 80.0, depth: 150.0 }.freeze
       # D-45: povoleny rozsah hrubky korpusu (mm) — JEDINY zdroj pravdy pre clamp
       # v normalize, pre prevzatie hrubky z materialu aj pre projektovy guard.
       THICKNESS_RANGE = [6.0, 50.0].freeze
@@ -2648,20 +2662,40 @@ module Noxun
         # Rozmiestnenie valcov pod dnom: 2 rady (predny/zadny) s odsadenim LEG_INSET;
         # plytky korpus / 1 ks -> 1 rad v strede hlbky. Predny rad berie prebytok
         # (ceil), rovnomerne po sirke. Kresli sa najviac LEG_RENDER_MAX valcov.
+        # DVE nohy (uzka skrinka) stoja v STREDE sirky, predna + zadna. Ked sa
+        # dva valce fyzicky nezmestia, kresli sa jeden — nakupny pocet ostava.
         def draw_legs(ents, cfg, qty)
           # D-37: nohy patria pod NOSNE dno (konstrukcna hlbka) — zadny rad nesmie
           # trcat pod nalozenym chrbtom (pri hrubke az 50 mm by visel vo vzduchu).
           # KON-A (Grok 9): pri komine podla hlbky DNA — zadny doraz `back_stop`
           # (bez komina presne dnesna `carcass_depth`).
-          w = cfg[:width]; d = Construction.back_stop(cfg); h = cfg[:floor_height]
+          d = Construction.back_stop(cfg)
+          lay = leg_layout(cfg, qty, d)
           r = LEG_DIAMETER / 2.0
-          count = [qty, LEG_RENDER_MAX].min
-          # D-13/D-17 (Codex F4): pri prednom sokli predny rad noh posunut ZA dosku
-          # sokla (recess + hrubka + polomer + vola) — proxy sa nesmie pretinat.
+          h = cfg[:floor_height]
+          lay[:points].each { |x, y| draw_leg_cylinder(ents, x, y, r, h) }
+        end
+
+        # Ciste rozmiestnenie noh (bez SketchUpu) — kresba aj varovanie planu
+        # citaju TO ISTO. `depth` je zadny doraz dna; bez neho sa spocita
+        # `Construction.back_stop`. Vrati { points: [[x, y], ...], collapsed: }.
+        # `collapsed` = dve nohy sa do hlbky nezmestili, kresli sa jeden valec.
+        # Nakupny pocet sa tu NEMENI.
+        def leg_layout(cfg, qty, depth = nil)
+          w = cfg[:width].to_f
+          d = depth.nil? ? Construction.back_stop(cfg).to_f : depth.to_f
+          r = LEG_DIAMETER / 2.0
+          count = [qty.to_i, LEG_RENDER_MAX].min
+          count = 0 if count.negative?
           front_y = LEG_INSET
-          if cfg[:plinth_mode] == 'front'
+          if cfg[:plinth_mode].to_s == 'front'
             front_y = [front_y, cfg[:plinth_recess].to_f + cfg[:thickness].to_f + r + 5.0].max
           end
+          if count == 2
+            pair = narrow_leg_pair(w, d, front_y, r)
+            return { points: pair[:points], collapsed: pair[:collapsed] }
+          end
+
           two_rows = count > 1 && d > front_y + LEG_INSET + 2 * r
           rows =
             if two_rows
@@ -2670,9 +2704,28 @@ module Noxun
             else
               [[d / 2.0, count]]
             end
+          points = []
           rows.each do |y, n|
-            xs = leg_xs(w, n)
-            xs.each { |x| draw_leg_cylinder(ents, x, y, r, h) }
+            leg_xs(w, n).each { |x| points << [x, y] }
+          end
+          { points: points, collapsed: false }
+        end
+
+        # Dve nohy: obe v strede sirky. Najprv predny a zadny inset. Ked sa
+        # valce pretinaju, zadna sa posunie az na fyzicky okraj (d − r);
+        # predna ostava (uz pocita so soklom vpredu). Ked ani to nestaci,
+        # jeden valec v strede toho, co sa zmesti.
+        def narrow_leg_pair(width, depth, front_y, radius)
+          x = width / 2.0
+          back_y = depth - LEG_INSET
+          back_y = depth - radius if back_y - front_y < LEG_DIAMETER
+          if back_y - front_y < LEG_DIAMETER
+            y_lo = [front_y, radius].max
+            y_hi = [depth - radius, y_lo].max
+            mid = [[(front_y + (depth - radius)) / 2.0, y_lo].max, y_hi].min
+            { points: [[x, mid]], collapsed: true }
+          else
+            { points: [[x, front_y], [x, back_y]], collapsed: false }
           end
         end
 
