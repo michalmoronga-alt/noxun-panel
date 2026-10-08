@@ -3652,6 +3652,181 @@ module NoxunSuRunner
     cleanup(model)
   end
 
+  # --- SIRKA 50: UZKA SKRINKA OD 50 mm + 2 NOHY POD UZKOU DOLNOU ------------
+  # Michal 7.-8.10.2026: najmensia sirka dolnej aj hornej skrinky 200 -> 50 mm
+  # (`CONFIG_SCHEMA` 23) a skrinka uzsia nez 200 mm ma 2 nohy v strede sirky
+  # (vpredu + vzadu), v nakupe 2 ks (seed pravidiel 8). Headless sada overuje
+  # PLAN a pravidla; tu sa overuje MODEL: stavba bez degenerovaneho dielca,
+  # proxy noh (pocet valcov a ich polohy), Mierka sirky na 50 (aj
+  # config-aware klamp pri hrubke 25) a jedno Spat.
+
+  # Valce proxy noh skrinky: stredy SPODNYCH podstav (z = 0) v mm lokalnych
+  # osi korpusu. Prekryte valce by sa zliali do jednej plochy — preto sa
+  # pocitaju plochy, nie ziadany pocet.
+  def sirka50_leg_centers(inst)
+    leg = inst.definition.entities.grep(Sketchup::ComponentInstance)
+              .find { |i| e::Store.kind(i) == 'hardware' && e::Store.get(i, 'role') == 'leg' }
+    return [] unless leg
+
+    leg.definition.entities.grep(Sketchup::Face).select do |f|
+      f.normal.z.abs > 0.99 && mm(f.bounds.max.z).abs < TOL
+    end.map { |f| [mm(f.bounds.center.x).round(1), mm(f.bounds.center.y).round(1)] }.sort
+  end
+
+  def sirka50_hw(inst)
+    Array((e::Store.config(inst) || {})['hardware']).each_with_object({}) do |h, out|
+      next unless h.is_a?(Hash) && h['owner_part_key'].nil?
+
+      out[h['generic_type'].to_s] = h['quantity']
+    end
+  end
+
+  def sirka50_lower(width, over = {})
+    { 'type' => 'lower', 'width' => width.to_f, 'height' => 720.0, 'depth' => 560.0,
+      'thickness' => 18.0, 'floor_height' => 100.0, 'fronts' => { 'items' => [] } }.merge(over)
+  end
+
+  # Snapshot pravidiel projektu sa po sekcii VRATI (dalsie scenare runnera
+  # nesmu zdedit „Doplniť nové predvoľby", ktore tu bezi).
+  def sirka50_restore_rules(model, saved)
+    model.start_operation('SIRKA50: vratit snapshot pravidiel', true)
+    if saved.nil?
+      model.delete_attribute(e::Store::DICT, e::HardwareRules::MODEL_KEY)
+    else
+      model.set_attribute(e::Store::DICT, e::HardwareRules::MODEL_KEY, saved)
+    end
+    model.commit_operation
+  rescue StandardError => ex
+    log_line("FAIL: SIRKA50 vratenie snapshotu pravidiel: #{ex.class}: #{ex.message}")
+  end
+
+  def run_sirka50(model)
+    cleanup(model)
+    hr = e::HardwareRules
+    saved_rules = model.get_attribute(e::Store::DICT, hr::MODEL_KEY)
+    sirka50_body(model, hr)
+  ensure
+    cleanup(model)
+    sirka50_restore_rules(model, saved_rules)
+  end
+
+  def sirka50_body(model, hr)
+    # (0) „Doplniť nové predvoľby": testovaci model nesie snapshot pravidiel
+    #     z predoslych behov (seed < 8) — bez neho by uzka skrinka mala 4 nohy
+    #     a zber by ju priznal ORANGE `leg_stale` (vetva v8).
+    model.start_operation('SIRKA50: doplnit nove predvolby', true)
+    _st, _added, refreshed = hr.merge_project_seed!(model)
+    model.commit_operation
+    rules = hr.project_rules(model) || hr.load
+    leg_rule = rules.find { |r| r['rule_id'].to_s == hr::LEG_RULE_ID }
+    ok("SIRKA50 (0): pravidlo noh v projekte je 2/4/6 (obnovene #{Array(refreshed).inspect})",
+       leg_rule.is_a?(Hash) && Array(leg_rule['bands']).map { |b| b['quantity'] } == [2, 4, 6])
+
+    # (a) dolna 50 x 720 x 560, hrubka 18, sokel 100
+    a = e::CabinetBuilder.build(model, sirka50_lower(50.0))
+    return ok('SIRKA50 (a): vlozenie dolnej 50 mm', false) unless a
+
+    cfg = e::Store.config(a) || {}
+    parts = s1e0_parts(a)
+    ok("SIRKA50 (a): dolna 50 mm sa postavila (sirka v configu #{cfg['width']}, #{parts.length} dielcov, schema #{cfg['config_schema']})",
+       (cfg['width'].to_f - 50.0).abs < 0.01 && parts.length.positive? && cfg['config_schema'].to_i == 23)
+    ok("SIRKA50 (a): ziadny dielec nema nekladny rozmer (#{s1e0_degenerate(parts).map { |p| e::Store.get(p, 'part_key') }.inspect})",
+       s1e0_degenerate(parts).empty?)
+    ok("SIRKA50 (a): svetla sirka 14 mm (config #{cfg['available_width']})", (cfg['available_width'].to_f - 14.0).abs < 0.01)
+    ok("SIRKA50 (a): kovanie 2 nohy + 1 prichyt (#{sirka50_hw(a).inspect})",
+       sirka50_hw(a) == { 'leg' => 2, 'plinth_clip' => 1 })
+    la = sirka50_leg_centers(a)
+    ok("SIRKA50 (a): v modeli 2 valce noh v strede sirky, predny a zadny (#{la.inspect})",
+       la.length == 2 && la.all? { |x, _| (x - 25.0).abs < TOL } && (la[0][1] - la[1][1]).abs > 50.0)
+    col = e::Bom.collect(model)
+    stale = Array(col[:hardware_issues]).select { |i| i['code'] == e::BuildPlan::LEG_STALE }
+    ok("SIRKA50 (a): kusovnik uzku skrinku vidi a leg_stale mlci (#{col[:cabinets]} korpus, #{stale.length} nalezov)",
+       col[:cabinets] == 1 && col[:records].length.positive? && stale.empty?)
+
+    # (b) dolna 150 mm — tie iste 2 nohy, x = 75
+    b = e::CabinetBuilder.build(model, sirka50_lower(150.0))
+    lb = b ? sirka50_leg_centers(b) : []
+    ok("SIRKA50 (b): dolna 150 mm ma 2 nohy v strede (#{b ? sirka50_hw(b).inspect : 'nevlozena'}, valce #{lb.inspect})",
+       b && sirka50_hw(b)['leg'] == 2 && lb.length == 2 && lb.all? { |x, _| (x - 75.0).abs < TOL } &&
+       (lb[0][1] - lb[1][1]).abs > 50.0)
+    # Bezna 600 mm sa nezmenila: 4 valce v rohoch (60 / 540).
+    n = e::CabinetBuilder.build(model, sirka50_lower(600.0))
+    ln = n ? sirka50_leg_centers(n) : []
+    ok("SIRKA50 (b): bezna 600 mm ma dalej 4 nohy v rohoch (#{ln.inspect})",
+       n && sirka50_hw(n)['leg'] == 4 && ln.length == 4 && ln.map(&:first).uniq.sort == [60.0, 540.0])
+
+    # (c) horna 50 x 720 x 320 — bez noh, bez degenerovaneho dielca
+    up = e::CabinetBuilder.build(model, 'type' => 'upper', 'width' => 50.0, 'height' => 720.0,
+                                        'depth' => 320.0, 'thickness' => 18.0)
+    up_parts = up ? s1e0_parts(up) : []
+    ok("SIRKA50 (c): horna 50 mm sa postavila (#{up_parts.length} dielcov, sirka #{up ? (e::Store.config(up) || {})['width'] : '-'})",
+       up && up_parts.length.positive? && s1e0_degenerate(up_parts).empty? &&
+       ((e::Store.config(up) || {})['width'].to_f - 50.0).abs < 0.01 && sirka50_hw(up)['leg'].nil?)
+
+    # (d) cesta Inspectora: sirka 30 sa klampne na 50
+    p30 = e::CabinetBuilder.config_to_params(e::Store.config(b)).merge('width' => 30.0)
+    e::CabinetBuilder.rebuild(model, b, p30)
+    ok("SIRKA50 (d): sirka 30 sa klampla na 50 (config #{(e::Store.config(b) || {})['width']})",
+       ((e::Store.config(b) || {})['width'].to_f - 50.0).abs < 0.01)
+
+    # (e) MIERKA sirky 600 -> 50 a JEDNO Spat
+    before_tr = n.transformation.to_a
+    model.start_operation('SU-TEST SIRKA50 user scale', true)
+    n.transformation = n.transformation * Geom::Transformation.scaling(ORIGIN, 50.0 / 600.0, 1.0, 1.0)
+    model.commit_operation
+    e::ScaleWatch.absorb(n)
+    cfg_e = e::Store.config(n) || {}
+    le = sirka50_leg_centers(n)
+    ok("SIRKA50 (e): absorpcia scale dala sirku 50 (config #{cfg_e['width']}) a 2 nohy (#{sirka50_hw(n).inspect}, valce #{le.inspect})",
+       (cfg_e['width'].to_f - 50.0).abs < 0.01 && sirka50_hw(n)['leg'] == 2 && le.length == 2)
+    ok('SIRKA50 (e): transform po absorpcii je cisty (ziadna zvysna mierka)',
+       e::ScaleWatch.scale_factors(n.transformation).nil?)
+    Sketchup.undo
+    cfg_u = e::Store.config(n) || {}
+    ok("SIRKA50 (e): 1x Spat vratil scale AJ absorpciu (sirka #{cfg_u['width']}, nohy #{sirka50_hw(n).inspect}, transform sedi)",
+       n.valid? && (cfg_u['width'].to_f - 600.0).abs < 0.01 && sirka50_hw(n)['leg'] == 4 &&
+       n.transformation.to_a == before_tr && sirka50_leg_centers(n).length == 4)
+
+    # (f) MIERKA pri hrubke 25: 50 mm by `validate!` odmietol (50 <= 60) —
+    #     absorpcia klampne na najmensiu PLATNU sirku 61, nie reject.
+    t25 = e::CabinetBuilder.build(model, sirka50_lower(600.0, 'thickness' => 25.0))
+    if t25
+      model.start_operation('SU-TEST SIRKA50 scale hrubka 25', true)
+      t25.transformation = t25.transformation * Geom::Transformation.scaling(ORIGIN, 50.0 / 600.0, 1.0, 1.0)
+      model.commit_operation
+      e::ScaleWatch.absorb(t25)
+      c25 = e::Store.config(t25) || {}
+      ok("SIRKA50 (f): hrubka #{c25['thickness']} — Mierka na 50 skoncila na 61, nie reject (config #{c25['width']})",
+         (c25['width'].to_f - 61.0).abs < 0.01 && e::ScaleWatch.scale_factors(t25.transformation).nil? &&
+         s1e0_degenerate(s1e0_parts(t25)).empty?)
+    else
+      ok('SIRKA50 (f): vlozenie skrinky s hrubkou 25', false)
+    end
+
+    # (g) PLYTKA uzka skrinka so soklom VPREDU: 2 nohy sa pod nu nezmestia —
+    #     kresli sa 1 valec za doskou sokla, v nakupe ostavaju 2 a plan to
+    #     prizna info warningom (Kontrola ho ako nalez nehlasi).
+    g = e::CabinetBuilder.build(model, sirka50_lower(150.0, 'depth' => 150.0, 'plinth_mode' => 'front'))
+    if g
+      lg = sirka50_leg_centers(g)
+      warns = Array((e::Store.config(g) || {})['warnings'])
+      ok("SIRKA50 (g): plytka 150 x 150 so soklom vpredu — 2 nohy v nakupe, 1 valec (#{sirka50_hw(g).inspect}, #{lg.inspect})",
+         sirka50_hw(g)['leg'] == 2 && lg.length == 1)
+      ok('SIRKA50 (g): plan prizna menej valcov info warningom legs_drawn_merged',
+         warns.any? { |w| w.is_a?(Hash) && w['code'] == e::Construction::LEGS_DRAWN_MERGED && w['severity'] == 'info' })
+      items = e::Validation.run(e::Bom.collect(model), sheets: e::ProductionCore.sheets_map)['items']
+      ok('SIRKA50 (g): Kontrola z neho nalez nerobi',
+         items.none? { |i| i['message_sk'].to_s.include?('v modeli sa kreslí') })
+    else
+      ok('SIRKA50 (g): vlozenie plytkej skrinky', false)
+    end
+
+    cleanup(model)
+    ok('SIRKA50: cleanup (0 korpusov)', cabinets(model).empty?)
+  rescue StandardError => ex
+    log_line("FAIL: run_sirka50 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+  end
+
   # --- S1-E: SLOT UMYVACKY -------------------------------------------------
   #
   # Headless sada overuje PLAN a KONTRAKT; tu sa overuje MODEL a to, co sa mimo
@@ -27061,7 +27236,7 @@ module NoxunSuRunner
     ok("KOV-G predvolby: pravidlo noh je `bands` podla SIRKY (#{rstatus}, " \
        "obnovene #{Array(rrefreshed).inspect})",
        leg.is_a?(Hash) && leg['kind'].to_s == 'bands' && leg['input'].to_s == 'width' &&
-       Array(leg['bands']).map { |b| b['quantity'] } == [4, 6])
+       Array(leg['bands']).map { |b| b['quantity'] } == [2, 4, 6]) # SIRKA 50: seed v8
     ok("KOV-G predvolby: projekt pozna pravidlo prichytu (doplnene #{Array(radded).inspect})",
        clip.is_a?(Hash) && clip['output'].to_s == 'plinth_clip' &&
        (clip['applies_to'] || {})['floor_height_min'].to_f == 55.0)
@@ -28970,6 +29145,7 @@ module NoxunSuRunner
     run_sync(model)
     run_sync_back(model)     # davka Chrbat: D-37 hlbka, D-31 none, D-38 pevny 18
     run_sync_rails(model)    # H3/D-80: vnutro pod vystuhami (odsadenie, upright, chrbat, odmietnutie)
+    run_sirka50(model)       # SIRKA 50: dolna/horna 50 mm bez degenerovaneho dielca, uzka dolna 2 nohy v strede (valce v modeli), bezna 600 dalej 4, Inspector 30 -> 50, Mierka 600 -> 50 + 1x Spat, Mierka pri hrubke 25 -> 61, plytka so soklom vpredu 1 valec + info warning
     run_s1e0(model)          # S1-E0: minimalna vyska korpusu 80 mm — nizka skrinka na dorovnanie sa postavi bez degenerovaneho dielca a kusovnik ju vidi, cesta Inspectora klampne 60 na 80, absorpcia scale pod hranicu tiez (a 1x Spat vrati scale aj absorpciu), horna 600 x 80 x 320
     run_s1e(model)           # S1-E: SLOT UMYVACKY — zo sablony 1 vyrobny dielec + telo ako referencia (kind reference, v kusovniku nikde), zmena vysky cela = 1 Spat, prisunutie na NOMINALNU hranu (aj pri presahujucom cele a vypnutom tagu referencie), zmena triedy prestavi telo, absorpcia scale na typove minimum, sablona so slotom, Kontrola dw_body_fit/dw_height_fit cez realny zber
     run_s1b1(model)          # S1-B1: SPOTREBIC V ZAKAZKE — priradenie z katalogu, presun, odpojenie a zmazanie ako JEDEN krok Spat (polozka + `appliance_refs[]` vlastnika + prestavba naraz), sirota po Delete (nalez BEZ `owner_id`) a jej naprava, trieda umyvacky vs slot, „dodáva zákazník" (medzisucet 0 + stitok v ponuke), legacy zakazka na kanonicke kody, ROLLBACK po riadenych zlyhaniach a bariera observera

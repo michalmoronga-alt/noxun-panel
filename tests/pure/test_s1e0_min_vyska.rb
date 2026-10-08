@@ -15,9 +15,11 @@
 #      Ked sa cisla rozidu, vznikne PASMO, v ktorom panel hodnotu pusti a
 #      builder ju ticho klampne (alebo naopak) — presne ten druh rozdielu,
 #      ktory sa v modeli objavi az ako zly rozmer vo vyrobe.
-#   2) SIRKA A HLBKA SA NEMENIA. Test ich fixuje spolu s vyskou, aby sa
+#   2) HLBKA SA NEMENI. Test ju fixuje spolu s vyskou a sirkou, aby sa
 #      „odomknutie" pri buducej uprave nerozlialo na rozmery, ktore
-#      konstrukcny zmysel nemaju.
+#      konstrukcny zmysel nemaju. SIRKA ide od 7.10.2026 od 50 mm (uzka
+#      skrinka, `CONFIG_SCHEMA` 23) — parita troch miest plati aj pre nu
+#      a regresie bumpu su v sekcii 2b nizsie.
 require_relative '../helper' unless defined?(NxTest)
 
 # Headless: `ui/*.rb` nie su v require zozname helpera (UI vrstva) — sablonovy
@@ -113,10 +115,28 @@ end
 # 1) Parita troch miest (R1)
 # ---------------------------------------------------------------------------
 
-NxTest.test('S1-E0 R1: builder MIN ma vysku 80, sirku 200 a hlbku 150') do
+NxTest.test('S1-E0 R1: builder MIN ma vysku 80, sirku 50 (od 7.10.2026) a hlbku 150') do
   NxTest.assert_close(80.0, NxS1E0.cb::MIN[:height])
-  NxTest.assert_close(200.0, NxS1E0.cb::MIN[:width])
+  NxTest.assert_close(50.0, NxS1E0.cb::MIN[:width])
   NxTest.assert_close(150.0, NxS1E0.cb::MIN[:depth])
+end
+
+NxTest.test('SIRKA 50: zalozna hranica `Construction::MIN_WIDTH_FALLBACK` = CabinetBuilder::MIN[:width]') do
+  # `construction` sa nacitava PRED `cabinet_builder` — zalozne cislo sa
+  # pouzije len bez buildera, ale nesmie sa rozist (inak by sonda bez
+  # buildera vratila ine minimum nez stavba).
+  NxTest.assert_close(NxS1E0.cb::MIN[:width], NxS1E0.cn::MIN_WIDTH_FALLBACK, 0.001)
+  NxTest.refute(NxS1E0.src('noxun_engine', 'core', 'construction.rb').include?('MIN[:width] : 200.0'),
+                'magicke 200 zo zaloznej vetvy zmizlo')
+end
+
+NxTest.test('SIRKA 50: preflight ciel nema vlastne cisla — rozsah sirky AJ vysky = CabinetBuilder::MIN') do
+  # Do 7.10.2026 tu stalo `[200, 3000]` pre sirku aj vysku: preflight odmietal
+  # korpus na dorovnanie (vyska 80-199, S1-E0) aj uzku skrinku.
+  src = NxS1E0.src('noxun_engine', 'ui', 'panel', 'actions_cabinet.rb')
+  NxTest.assert(src.include?('[CabinetBuilder::MIN[:width], 3000.0]'), 'sirka z MIN')
+  NxTest.assert(src.include?('[CabinetBuilder::MIN[:height], 3000.0]'), 'vyska z MIN')
+  NxTest.refute(src.include?('[200.0, 3000.0]'), 'opisane 200 zmizlo')
 end
 
 NxTest.test('S1-E0 R1: ScaleWatch MIN je ZRKADLOM builder MIN (string kluce)') do
@@ -126,7 +146,7 @@ NxTest.test('S1-E0 R1: ScaleWatch MIN je ZRKADLOM builder MIN (string kluce)') d
 end
 
 NxTest.test('S1-E0 R1: LIMITS vo form.js sedia s Ruby MIN (dolna hranica)') do
-  { width: 200.0, height: 80.0, depth: 150.0 }.each do |id, expected|
+  { width: 50.0, height: 80.0, depth: 150.0 }.each do |id, expected|
     lo, = NxS1E0.js_limit(id)
     NxTest.assert_close(expected, lo, 0.01,
                         "form.js LIMITS.#{id} dolna hranica #{lo} != Ruby MIN #{expected}")
@@ -159,10 +179,18 @@ NxTest.test('S1-E0: normalize klampuje vysku na 80 a 90 prijme') do
                       'to iste plati pre hornu skrinku')
 end
 
-NxTest.test('S1-E0 R1: sirka a hlbka sa NEODOMKLI (200 / 150)') do
-  cfg = NxS1E0.cb.normalize('width' => 100, 'depth' => 100, 'height' => 90)
-  NxTest.assert_close(200.0, cfg[:width], 0.01, 'sirka dalej klampuje na 200')
-  NxTest.assert_close(150.0, cfg[:depth], 0.01, 'hlbka dalej klampuje na 150')
+NxTest.test('SIRKA 50 (audit FIX 5): sirka klampuje na 50, 50-199 PRIJME; hlbka ostava 150') do
+  cb = NxS1E0.cb
+  NxTest.assert_close(50.0, cb.normalize('width' => 30)[:width], 0.01, 'sirka 30 -> 50')
+  NxTest.assert_close(50.0, cb.normalize('width' => 49.9)[:width], 0.01, 'tesne pod hranicou -> 50')
+  [50.0, 100.0, 150.0, 199.0, 199.5].each do |w|
+    NxTest.assert_close(w, cb.normalize('width' => w)[:width], 0.01, "dolna #{w} sa NEKLAMPUJE na 200")
+    NxTest.assert_close(w, cb.normalize('type' => 'upper', 'width' => w)[:width], 0.01, "horna #{w} tiez nie")
+  end
+  NxTest.assert_close(150.0, cb.normalize('depth' => 100)[:depth], 0.01, 'hlbka dalej klampuje na 150')
+  # Umyvacka (vlastne `limits`) sa NEODOMKLA.
+  NxTest.assert_close(300.0, cb.normalize('type' => 'dishwasher', 'width' => 100)[:width], 0.01,
+                      'slot umyvacky ostava od 300')
 end
 
 NxTest.test('S1-E0: nizky korpus NEPRIDAVA ziadne pole do configu') do
@@ -174,15 +202,15 @@ NxTest.test('S1-E0: nizky korpus NEPRIDAVA ziadne pole do configu') do
                       'nizky korpus ma PRESNE tie iste kluce ako bezny')
 end
 
-NxTest.test('S1-E0 (Codex #374 P1): CONFIG_SCHEMA je aspon 15 a nizka skrinka nesie aktualny marker') do
+NxTest.test('S1-E0 (Codex #374 P1): nizka skrinka nesie AKTUALNY marker (schema od sirky 50 = 23)') do
   # PRECO BUMP, ked nepribudlo pole: starsi plugin (schema 14) ma MIN[:height]
   # = 200, takze by skrinku 80-199 mm pri prvej prestavbe KLAMPOL na 200 —
   # zmenil by vysku bokov, chrbta aj ciel a nikto by to nezbadal, kym by
   # dielce neprisli z pily. Disciplina bumpu (STANDARD 2.5) hovori o TICHEJ
   # ZMENE VYROBY, nie o novom poli.
-  # S1-E: cislo uz nie je pripnute na 15 (dalsie davky bumpuju dalej) —
-  # kontroluje sa, ze S1-E0 bump NEZMIZOL a ze sa marker naozaj zapisuje.
-  NxTest.assert(NxS1E0.cb::CONFIG_SCHEMA >= 15, 'schema configu je po S1-E0 aspon pätnastka')
+  # SIRKA 50 (audit FIX 5): ten isty dovod zdvihol schemu na 23 — test uz
+  # nedokazuje „aspon 15", ale presne cislo, ktore nesie aj uzka skrinka.
+  NxTest.assert_equal(23, NxS1E0.cb::CONFIG_SCHEMA, 'sirka 50 zdvihla schemu configu na 23')
   stored = NxS1E0.stored(NxS1E0.low_lower)
   NxTest.assert_equal(NxS1E0.cb::CONFIG_SCHEMA, stored['config_schema'],
                       'ulozeny config nizkej skrinky nesie AKTUALNY marker')
@@ -213,7 +241,87 @@ end
 NxTest.test('S1-E0: HISTORIA bumpu ma zapisany dovod cisla 15 (disciplina STANDARD 2.5)') do
   hist = NxS1E0.src('noxun_engine', 'core', 'cabinet_builder.rb')[/HISTORIA:.*?CONFIG_SCHEMA = /m].to_s
   NxTest.assert(hist.include?('15 = S1-E0'), 'cislo 15 ma v komentari svoj dovod')
+  NxTest.assert(hist.include?('23 = SIRKA OD 50 mm'), 'a cislo 23 tiez (sirka 50)')
   NxTest.assert(hist.include?('newer_config?'), 'a menuje dopredu branu, ktora k bumpu patri')
+end
+
+# ---------------------------------------------------------------------------
+# 2b) SIRKA OD 50 mm — regresie bumpu na 23 (audit FIX 5)
+# ---------------------------------------------------------------------------
+
+module NxS1E0
+  module_function
+
+  def narrow(type, width, over = {})
+    base = { 'type' => type, 'width' => width, 'height' => 720.0, 'thickness' => 18.0 }
+    base['depth'] = type == 'upper' ? 320.0 : 560.0
+    cb.normalize(base.merge(over))
+  end
+end
+
+NxTest.test('SIRKA 50: ULOZENA sirka 50-199 mm sa prestavbou zachova (config -> params -> normalize)') do
+  [50.0, 120.0, 199.0].each do |w|
+    %w[lower upper].each do |type|
+      st = NxS1E0.stored(NxS1E0.narrow(type, w))
+      NxTest.assert_equal(23, st['config_schema'], "#{type} #{w}: marker 23")
+      again = NxS1E0.cb.normalize(NxS1E0.cb.config_to_params(st))
+      NxTest.assert_close(w, again[:width], 0.01, "#{type} #{w}: round-trip nesklopi na 200")
+    end
+  end
+end
+
+NxTest.test('SIRKA 50: SABLONA uzkej skrinky nesie sirku aj marker 23') do
+  tc = Noxun::Engine::Panel.template_config_from(NxS1E0.stored(NxS1E0.narrow('lower', 150.0)))
+  NxTest.assert_equal(23, tc['config_schema'], 'sablonovy whitelist stampuje aktualny marker')
+  NxTest.assert_close(150.0, tc['width'].to_f, 0.01, 'a sirka 150 sa nestrati')
+  NxTest.assert_close(150.0, NxS1E0.cb.normalize(tc)[:width], 0.01, 'vklad zo sablony postavi 150')
+end
+
+NxTest.test('SIRKA 50: starsi plugin (schema 22) uzku skrinku PRESTAVAT ODMIETNE (`newer_config?`)') do
+  # Simulacia pluginu 22: jeho `newer_config?` porovnava ulozene cislo s 22.
+  # Bez bumpu by 23 > 22 neplatilo a klamp 150 -> 200 by prebehol ticho.
+  st = NxS1E0.stored(NxS1E0.narrow('lower', 150.0))
+  NxTest.assert(NxS1E0.cb.config_schema_of(st) > 22, 'schema 23 je pre plugin 22 NOVSIA')
+  NxTest.refute(NxS1E0.cb.newer_config?(st), 'tato verzia vlastny config neblokuje')
+  NxTest.assert(NxS1E0.cb.newer_config?(st.merge('config_schema' => 24)), 'novsi config sa blokuje dalej')
+end
+
+NxTest.test('SIRKA 50: dolna aj horna 50 mm (hrubka 18) da plan bez degenerovaneho dielca') do
+  # Sonda orchestratora 7.10.: boky 18, vnutro 14 mm (50 - 2 x 18).
+  %w[lower upper].each do |type|
+    plan = NxS1E0.cn.build_plan(NxS1E0.narrow(type, 50.0), 'CAB-W50')
+    NxTest.assert(NxS1E0.plan_dims(plan).all?(&:positive?), "#{type} 50: vsetky rozmery kladne")
+    NxTest.refute(plan[:warnings].any? { |w| w['code'] == 'part_skipped_degenerate' }, "#{type} 50: nic sa nepreskakuje")
+    NxTest.assert_close(14.0, plan[:available][:width], 0.01, "#{type} 50: svetla sirka 14")
+  end
+  # S dvierkami a policami (sonda: prejde).
+  cfg = NxS1E0.narrow('lower', 50.0, 'zone_tree' => { 'id' => 'Z1', 'shelves' => 2, 'children' => [] },
+                                     'fronts' => { 'items' => [{ 'id' => 'F1', 'type' => 'door', 'mode' => 'auto',
+                                                                 'wings' => '1' }] })
+  NxTest.assert(NxS1E0.buildable?(cfg, 720.0), 'dolna 50 s dvierkami a 2 policami sa postavi')
+end
+
+NxTest.test('SIRKA 50: hruby material sa odmietne zrozumitelnou vetou (validate!: w <= 2t + 10)') do
+  NxTest.assert_raise(/Sirka je prilis mala/) { NxS1E0.cn.build_plan(NxS1E0.narrow('lower', 50.0, 'thickness' => 20.0), 'X') }
+  NxTest.assert_raise(/Sirka je prilis mala/) { NxS1E0.cn.build_plan(NxS1E0.narrow('lower', 50.0, 'thickness' => 25.0), 'X') }
+  NxTest.assert_raise(/Sirka je prilis mala/) { NxS1E0.cn.build_plan(NxS1E0.narrow('lower', 60.0, 'thickness' => 25.0), 'X') }
+  NxTest.assert(NxS1E0.buildable?(NxS1E0.narrow('lower', 61.0, 'thickness' => 25.0), 720.0), '61 pri hrubke 25 prejde')
+  NxTest.assert(NxS1E0.buildable?(NxS1E0.narrow('lower', 50.0, 'thickness' => 19.0), 720.0), '50 pri hrubke 19 prejde')
+end
+
+NxTest.test('SIRKA 50: min_valid_width = najmensia sirka, ktoru prestavba prijme (sonda pre Mierku)') do
+  { 18.0 => 50.0, 20.0 => 51.0, 25.0 => 61.0, 50.0 => 111.0 }.each do |t, want|
+    cfg = NxS1E0.narrow('lower', 600.0, 'thickness' => t)
+    w = NxS1E0.cn.min_valid_width(cfg)
+    NxTest.assert_close(want, w, 0.01, "hrubka #{t}: minimum #{want}")
+    NxTest.assert(NxS1E0.buildable?(cfg.merge(width: w), 720.0), "hrubka #{t}: #{w} sa postavi")
+    next if w <= NxS1E0.cb::MIN[:width]
+
+    NxTest.refute(NxS1E0.buildable?(cfg.merge(width: w - 1.0), 720.0), "hrubka #{t}: #{w - 1} uz nie")
+  end
+  NxTest.assert_close(NxS1E0.cb::MIN[:width],
+                      NxS1E0.cn.min_valid_width(NxS1E0.cb.normalize('type' => 'dishwasher')), 0.01,
+                      'slot bez sondy (jeho minimum drzi typ)')
 end
 
 NxTest.test('S1-E0: aktivacne schemy zasuviek, zavesov a vyklopov bump NEPRESUNUL') do

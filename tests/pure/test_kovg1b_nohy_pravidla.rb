@@ -367,7 +367,9 @@ NxTest.test('KOV-G1b (5): `SEED_VERSION` je 6 a seed nesie obe pravidlá v novom
   leg = c.rule_of(c::LEG_RULE)
   NxTest.assert_equal('bands', leg['kind'])
   NxTest.assert_equal('width', leg['input'])
-  NxTest.assert_equal([[999.0, 4], [nil, 6]], leg['bands'].map { |b| [b['max'], b['quantity']] },
+  # SIRKA 50 (seed v8): navrch pribudlo pasmo uzkej skrinky < 200 -> 2.
+  NxTest.assert_equal([[c::HR::LEG_NARROW_MAX_MM, 2], [999.0, 4], [nil, 6]],
+                      leg['bands'].map { |b| [b['max'], b['quantity']] },
                       'konvencia „< 1000" = max 999,0 (ako 849,0 pri závesoch)')
   NxTest.assert_equal(%w[legs plinth], leg['applies_to']['support'], 'filter podopretia ostáva')
   clip = c.rule_of(c::CLIP_RULE)
@@ -732,7 +734,7 @@ NxTest.test('KOV-G1b (7): `leg_stale` je ORANGE a NEZASTAVUJE výrobu ani nákup
     NxTest.assert_equal([], c::PC.hardware_blockers(collected, nil, scope: scope),
                         "nákup ani VEPO (#{scope}) sa nezastavia")
   end
-  item = c.run_items([iss]).find { |i| i['message_sk'].include?('pred pravidlom 4/6') }
+  item = c.run_items([iss]).find { |i| i['message_sk'].include?('pred pravidlom 2/4/6') }
   NxTest.assert(item, 'Kontrola nález ukáže')
   NxTest.assert_equal('orange', item['severity'])
   NxTest.assert_equal('S1', item['owner_id'], 'so skrinkou, ktorej sa týka (klik-select)')

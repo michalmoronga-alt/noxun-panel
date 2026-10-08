@@ -339,10 +339,19 @@ NxTest.test('KON-A: D-144 — chrbat vlozeny a v drazke konci pod vystuhami na v
 end
 
 NxTest.test('KON-A: nohy (proxy) podla hlbky dna R — zdroj buildera') do
+  # SIRKA 50: polohy noh pocita CISTA `Construction.leg_layout` (draw_legs ju
+  # len kresli) — zadny doraz R sa cita TAM.
   cb_src = NxKonA.src('noxun_engine', 'core', 'cabinet_builder.rb')
   legs = cb_src[/def draw_legs\(ents, cfg, qty\)(.*?)\n        end\n/m, 1].to_s
-  NxTest.assert(legs.include?('Construction.back_stop(cfg)'), 'draw_legs cita zadny doraz R')
-  NxTest.refute(legs.include?('Construction.carcass_depth(cfg)'), 'uz nie carcass_depth')
+  NxTest.assert(legs.include?('Construction.leg_layout(cfg, qty)'), 'draw_legs kresli polohy z leg_layout')
+  cn_src = NxKonA.src('noxun_engine', 'core', 'construction.rb')
+  layout = cn_src[/def leg_layout\(cfg, qty\)(.*?)\n      end\n/m, 1].to_s
+  NxTest.assert(layout.include?('d = back_stop(cfg)'), 'leg_layout cita zadny doraz R')
+  NxTest.refute(layout.include?('carcass_depth(cfg)'), 'uz nie carcass_depth')
+  cfg = NxKonA::CB.normalize('back_setback' => 100.0)
+  ys = NxKonA::CN.leg_layout(cfg, 4)[:positions].map { |_, y| y }.uniq
+  NxTest.assert_close(NxKonA::CN.back_stop(cfg) - NxKonA::CN::LEG_INSET, ys.max, 0.01,
+                      'zadny rad stoji LEG_INSET pred zadnym dorazom R (komin 100)')
   NxTest.assert_equal(NxKonA::CN.carcass_depth(NxKonA::CB.normalize({})), NxKonA::CN.back_stop(NxKonA::CB.normalize({})),
                       'pri X = 0 rovnake cislo ako dnes')
 end

@@ -231,7 +231,7 @@ NxTest.test('ROH-A1: polia sa zapisuju LEN pri rohovej a round-trip ich drzi (pr
   st = NxRohA1.stored('corner_side' => 'right', 'corner_door_w' => 600.0, 'corner_cr1' => 120.0, 'corner_cr2' => 90.0)
   NxTest.assert_equal(['right', 600.0, 120.0, 90.0], st.values_at(*%w[corner_side corner_door_w corner_cr1 corner_cr2]))
   NxTest.assert_equal('noxun-corner-blind', st['construction_preset'])
-  NxTest.assert_equal(22, st['config_schema'])
+  NxTest.assert_equal(NxRohA1::CB::CONFIG_SCHEMA, st['config_schema'], 'aktualna schema (ROH-A1 22, sirka 50 23)')
   again = NxRohA1::CB.normalize(NxRohA1::CB.config_to_params(st))
   NxTest.assert_equal(['right', 600.0, 120.0, 90.0], again.values_at(:corner_side, :corner_door_w, :corner_cr1, :corner_cr2),
                       'config -> params -> normalize nic nestrati')
@@ -871,13 +871,14 @@ end
 
 NxTest.test('ROH-A1: schemy CONFIG 22 · BuildPlan 7 · ABS seed 6 (+ HISTORIA), STD sablon sa nemeni') do
   cb = NxRohA1::CB
-  NxTest.assert_equal(22, cb::CONFIG_SCHEMA)
+  # Sirka 50 (7.10.2026) bumpla na 23 — ROH-A1 bump musi ostat v historii.
+  NxTest.assert(cb::CONFIG_SCHEMA >= 22, 'ROH-A1 zaviedla 22')
   NxTest.assert(NxRohA1.src('noxun_engine', 'core', 'cabinet_builder.rb').include?('#  22 = ROH-A1 · K3'), 'HISTORIA')
   NxTest.assert_equal(7, NxRohA1::BP::SCHEMA)
   NxTest.assert(NxRohA1.src('noxun_engine', 'core', 'build_plan.rb').include?('7 = ROH-A1 · K3'))
   NxTest.assert_equal(6, NxRohA1::ABS::SEED_VERSION)
   NxTest.assert_equal(7, Noxun::Engine::TemplateStore::STD, 'sablony bez bumpu STD')
-  NxTest.assert(cb.newer_config?({ 'config_schema' => 23 }))
+  NxTest.assert(cb.newer_config?({ 'config_schema' => cb::CONFIG_SCHEMA + 1 }))
   NxTest.refute(cb.newer_config?({ 'config_schema' => 22 }))
   NxTest.assert(cb.config_schema_of(NxRohA1.stored) > 21, 'plugin schemy 21 rohovu neprestavi (sklopil by ju na dolnu)')
   NxTest.assert_equal([5, 9, 11, 19, 20], [cb::DRAWER_ACTIVATION_SCHEMA, cb::HINGE_ACTIVATION_SCHEMA,
@@ -896,13 +897,17 @@ NxTest.test('ROH-A1 (G9): min_valid_width — sonda cez plan, obe strany, CR 19;
       NxTest.assert_equal(584.0, cn.min_valid_width(c), "#{side}: bez hrubok placeholder 18")
     end
   end
-  NxTest.assert_equal(200.0, NxRohA1::CN.min_valid_width(NxRohA1::CB.normalize('type' => 'lower')), 'dolna bez sondy')
+  # SIRKA 50: sonda plati pre kazdy korpus — pri hrubke 18 prejde uz typove
+  # minimum 50, pri hrubke 25 az 61 (`validate!`: w <= 2t + 10 = odmietnutie).
+  NxTest.assert_equal(50.0, NxRohA1::CN.min_valid_width(NxRohA1::CB.normalize('type' => 'lower')), 'dolna = typove minimum')
+  NxTest.assert_equal(61.0, NxRohA1::CN.min_valid_width(NxRohA1::CB.normalize('type' => 'lower', 'thickness' => 25.0)),
+                      'dolna z hrubeho materialu = sonda')
   NxTest.assert_equal(NxRohA1::CB::CORNER_MIN_WIDTH, NxRohA1::CN.min_valid_width(NxRohA1.cfg), 'konstanta = sonda predvolieb')
   sw = NxRohA1.src('noxun_engine', 'core', 'scale_observer.rb')
   body = sw[/def absorb\(inst\)(.*?)\n        end\n/m, 1].to_s
   NxTest.assert(body.index('clamp_corner_width') < body.index('clamp_depth(params'), 'sirka PRED hlbkou')
   NxTest.assert(body.index('clamp_depth(params') < body.index('clamp_height(params'), 'hlbka PRED vyskou')
-  NxTest.assert(body.include?('Construction.corner?(cfg)'), 'klamp sirky len pri rohovej')
+  NxTest.assert(body.include?('CabinetTypes.carcass?(type)'), 'klamp sirky pri kazdom korpuse (sirka 50), slot nie')
   NxTest.refute(body.include?('flush_pending!'), 'absorpcia nevola barieru')
   NxTest.assert(body.include?('transparent: true'), 'jeden transparentny rebuild')
 end
