@@ -309,19 +309,21 @@ NxTest.test('SIRKA 50: hruby material sa odmietne zrozumitelnou vetou (validate!
   NxTest.assert(NxS1E0.buildable?(NxS1E0.narrow('lower', 50.0, 'thickness' => 19.0), 720.0), '50 pri hrubke 19 prejde')
 end
 
-NxTest.test('SIRKA 50: min_valid_width = najmensia sirka, ktoru prestavba prijme (sonda pre Mierku)') do
-  { 18.0 => 50.0, 20.0 => 51.0, 25.0 => 61.0, 50.0 => 111.0 }.each do |t, want|
+NxTest.test('SIRKA 50: hranica validate! presne — 2t + 10 neprejde, 2t + 11 ano (aj pri hrubke 50)') do
+  # Mierka pod tuto hranicu sa VEDOME odmietne (`reject_scale` s touto vetou,
+  # vzor D-120) — sirku klampuje config-aware len rohova. Preto staci, aby
+  # hranica sedela s panelom (form.js `cabinetWidthError`, JS sada).
+  { 18.0 => 46.0, 20.0 => 50.0, 25.0 => 60.0, 50.0 => 110.0 }.each do |t, limit|
     cfg = NxS1E0.narrow('lower', 600.0, 'thickness' => t)
-    w = NxS1E0.cn.min_valid_width(cfg)
-    NxTest.assert_close(want, w, 0.01, "hrubka #{t}: minimum #{want}")
-    NxTest.assert(NxS1E0.buildable?(cfg.merge(width: w), 720.0), "hrubka #{t}: #{w} sa postavi")
-    next if w <= NxS1E0.cb::MIN[:width]
+    w_ok = [limit + 1.0, NxS1E0.cb::MIN[:width]].max
+    NxTest.assert(NxS1E0.buildable?(cfg.merge(width: w_ok), 720.0), "hrubka #{t}: #{w_ok} sa postavi")
+    next if limit < NxS1E0.cb::MIN[:width]
 
-    NxTest.refute(NxS1E0.buildable?(cfg.merge(width: w - 1.0), 720.0), "hrubka #{t}: #{w - 1} uz nie")
+    NxTest.refute(NxS1E0.buildable?(cfg.merge(width: limit), 720.0), "hrubka #{t}: #{limit} uz nie")
   end
+  # Mimo rohovej `min_valid_width` nesonduje (typove minimum) — nezmenene spravanie.
   NxTest.assert_close(NxS1E0.cb::MIN[:width],
-                      NxS1E0.cn.min_valid_width(NxS1E0.cb.normalize('type' => 'dishwasher')), 0.01,
-                      'slot bez sondy (jeho minimum drzi typ)')
+                      NxS1E0.cn.min_valid_width(NxS1E0.narrow('lower', 600.0, 'thickness' => 25.0)), 0.01)
 end
 
 NxTest.test('S1-E0: aktivacne schemy zasuviek, zavesov a vyklopov bump NEPRESUNUL') do

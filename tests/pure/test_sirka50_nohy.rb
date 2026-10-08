@@ -325,7 +325,7 @@ NxTest.test('SIRKA 50 (4): CabinetBuilder kresli VYHRADNE polohy z leg_layout') 
 end
 
 # ============================================================================
-# 5 — MIERKA: SIRKA SA PRI ZMENSENI KLAMPUJE CONFIG-AWARE (kazdy korpus)
+# 5 — MIERKA: 50 mm pri hrubke 18 prejde, hruby material sa odmietne s vetou
 # ============================================================================
 
 # ScaleWatch (klampy absorpcie) — vzor `test_h12_golden.rb`: observer triedy
@@ -341,16 +341,19 @@ if NxTest.headless? && !defined?(Noxun::Engine::ScaleWatch)
   end
 end
 
-NxTest.test('SIRKA 50 (5): Mierka na 50 mm — hrubka 18 prejde, hrubka 25 skonci na 61 s vetou') do
+NxTest.test('SIRKA 50 (5): Mierka — hole minimum 50; hruby material = odmietnutie s vetou, nie tichy klamp') do
   sw = Noxun::Engine::ScaleWatch
   c = NxSirka50
-  p18 = c::CB.config_to_params(JSON.parse(JSON.generate(c::CB.cabinet_config(c.lower))))
-  NxTest.assert_equal([50.0, nil], sw.clamp_corner_width(p18, 50.0, 'CAB-001'), '18 mm: 50 bez vety')
-  NxTest.assert_equal([50.0, nil], sw.clamp_corner_width(p18, 30.0, 'CAB-001'), 'pod MIN: hole minimum bez vety')
-  p25 = c::CB.config_to_params(JSON.parse(JSON.generate(c::CB.cabinet_config(c.lower('thickness' => 25.0)))))
-  w, note = sw.clamp_corner_width(p25, 50.0, 'CAB-002')
-  NxTest.assert_equal(61.0, w, '25 mm: najmensia platna sirka 61 (nie reject)')
-  NxTest.assert_equal('Šírka skrinky CAB-002 je pri hrúbke 25 mm a tejto konštrukcii najmenej 61 mm — nastavená na 61.', note)
+  NxTest.assert_equal(50.0, sw.min_for('width', 'lower'), 'absorpcia dolnej klampuje na 50')
+  NxTest.assert_equal(50.0, sw.min_for('width', 'upper'), 'aj hornej')
+  NxTest.assert_equal(300.0, sw.min_for('width', 'dishwasher'), 'slot ostava 300')
+  # Hrubka 25: 50 mm by prestavba odmietla — `reject_scale` vrati skrinku
+  # a ukaze PRESNE tuto vetu (vzor D-120: neplatny Scale = rollback).
+  NxTest.assert_raise(/Sirka je prilis mala vzhladom na hrubku/) do
+    c::CN.build_plan(c.lower('width' => 50.0, 'thickness' => 25.0), 'CAB-002')
+  end
   src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'scale_observer.rb'), encoding: 'UTF-8')
-  NxTest.assert(src.include?("MIN = { 'width' => 50.0,"), 'absorpcia ma minimum 50')
+  absorb = src[/def absorb\(inst\)(.*?)\n        end\n/m, 1].to_s
+  NxTest.assert(absorb.include?('if new_w < base_w && Construction.corner?(cfg)'),
+                'config-aware klamp sirky ostava len pri rohovej (ina skrinka = hole minimum)')
 end

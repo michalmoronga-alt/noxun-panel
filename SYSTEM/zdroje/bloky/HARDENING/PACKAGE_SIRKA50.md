@@ -114,9 +114,10 @@ Predrecenzia povinná (Ť). Codex-po-pr.
 - **Hranica pásma úzkej skrinky = `max 199,999`** (`HardwareRules::LEG_NARROW_MAX_MM`): žiadny nový kľúč pásma (`min`, `max_exclusive`) — starší
   plugin by ho ignoroval. Šírka 199,9995 by dostala 4 nohy (vedomá hranica, šírky sú v praxi celé mm alebo desatiny). V editore Pravidiel sa pásmo
   ukáže ako „do 199,999 mm → 2 ks".
-- **Mierka klampuje šírku config-aware pre KAŽDÝ korpus** (nad rámec zadania): od 50 mm už holé minimum nie je vždy nad hranicou `validate!` —
-  pri hrúbke 25 by 50 mm prestavba odmietla a `reject_scale` by vrátil pôvodnú skrinku bez slova. `Construction.min_valid_width` preto sonduje
-  každý korpus (pri hrúbke 18 stojí jeden plán), absorpcia dá 61 mm s nemodálnou vetou. Slot ostáva na typovom minime.
+- **Mierka pod hranicu `validate!` (napr. 50 mm pri hrúbke 25) sa odmietne** — `reject_scale` vráti skrinku a hláška povie „Sirka je prilis mala
+  vzhladom na hrubku materialu." (vzor D-120: neplatný Scale = rollback). Config-aware klamp šírky ostáva len pri rohovej. Pokus rozšíriť sondu
+  na každý korpus (klamp na 61 mm) zmenil existujúce správanie in-SU scenára CELA-B (neplatný Scale s úzkymi dvierkami sa namiesto rollbacku
+  klampol), preto sa nezaviedol — otázka pre Michala, či ho chce ako samostatnú dávku.
 - **Polohy nôh = `Construction.leg_layout`** (čistá funkcia, builder len kreslí). Keď sa valce nezmestia (plytká úzka skrinka so soklom vpredu),
   kreslí sa ich menej a plán pridá info warning `legs_drawn_merged` (Kontrola ho nehlási — `BUILD_INFO_ONLY`); **počet v nákupe ostáva podľa
   pravidla**. Vedľajší dôsledok: plytká skrinka 200–269 mm so 4 nohami sa už nekreslí so štyrmi prekrytými valcami, ale s dvoma.
@@ -130,6 +131,6 @@ Predrecenzia povinná (Ť). Codex-po-pr.
 2. Dolná 150 → to isté; dolná 200 → 4 nohy ako doteraz.
 3. Šírka 50 a hrúbka 20 (alebo 60 a 25) → šírka aj hrúbka zočervenajú s vetou „Šírka je príliš malá…", Aplikovať nič nezmení.
 4. Horná skrinka 50 mm → postaví sa bez nôh.
-5. Mierka: dolnú 600 stiahnuť na ~50 → skrinka 50 s 2 nohami; jedno Späť vráti 600 so 4 nohami.
+5. Mierka: dolnú 600 stiahnuť na ~50 → skrinka 50 s 2 nohami; jedno Späť vráti 600 so 4 nohami. (Pri hrúbke 25 Mierka na 50 → hláška, skrinka ostane.)
 6. Stará zákazka (pravidlá spred tejto verzie) + nová úzka skrinka → Kontrola ORANGE „…pred pravidlom 2/4/6 (šírka 150 → 2 nohy + 1 príchyt sokla)";
    po „Doplniť nové predvoľby" a prestavbe zhasne.

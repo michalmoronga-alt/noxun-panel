@@ -504,13 +504,14 @@ module Noxun
           th = CabinetBuilder.aux_part_thicknesses(params, model)
           # ROH-A1 (krizovy audit G9): sirka ROHOVEJ sa pri ZMENSENI klampuje
           # CONFIG-AWARE (rohova zostava sa musi zmestit pred slepu cast) —
-          # sondou cez cely plan, PRED skusanim hlbky a vysky.
-          # SIRKA 50 (7.10.2026): to iste pre KAZDY korpus — od 50 mm uz holé
-          # minimum NIE JE vzdy nad hranicou `validate!` (`w <= 2t + 10`): pri
-          # hrubke 25 by 50 mm prestavba odmietla a `reject_scale` by vratil
-          # POVODNU skrinku. Slot (bez korpusu) ostava na typovom minime.
+          # sondou cez cely plan, PRED skusanim hlbky a vysky. Ine typy ostavaju
+          # na holom typovom minime (dnesne spravanie).
+          # SIRKA 50: od 50 mm moze byt hole minimum POD hranicou `validate!`
+          # (`w <= 2t + 10`, napr. hrubka 25). Taky Scale prestavba odmietne
+          # a `reject_scale` ho vrati s hlaskou o hrubke — vedome, ako kazdy
+          # neplatny Scale (D-120), nie tichy klamp na inu sirku.
           width_note = nil
-          if new_w < base_w && CabinetTypes.carcass?(type)
+          if new_w < base_w && Construction.corner?(cfg)
             new_w, width_note = clamp_corner_width(params, new_w, cid, th)
           end
           params['width']  = new_w
@@ -526,8 +527,8 @@ module Noxun
           # Hole `MIN['height']` nestaci: pri sokli 100 by 80 mm vyrobilo config
           # bez vnutra, `Construction.validate!` by prestavbu odmietol a
           # pouzivatel by po tiahnuti uchopu dostal reject + POVODNY rozmer
-          # namiesto najnizsej platnej skrinky. Sirku a hlbku pri zmenseni
-          # klampuju sondy vyssie (`clamp_corner_width`, `clamp_depth`).
+          # namiesto najnizsej platnej skrinky. Hlbku pri zmenseni klampuje
+          # sonda vyssie (`clamp_depth`), sirku len pri rohovej.
           params['height'] = clamp_height(params, (base_h * sz).round.to_f, cid, th)
           new_h = params['height']
 
@@ -641,12 +642,10 @@ module Noxun
             "#{Construction.fmt_mm(depth)}."
         end
 
-        # ROH-A1 (krizovy audit G9 / Codex Q5): spodna hranica SIRKY KORPUSU
+        # ROH-A1 (krizovy audit G9 / Codex Q5): spodna hranica SIRKY rohovej
         # = prisnejsie z typoveho minima a `Construction.min_valid_width` (sonda
         # cez cely plan s ucinnymi hrubkami CR). -> [sirka, hlaska | nil];
-        # hlaska len ked sirku zdvihla KONSTRUKCIA (vzor `clamp_depth`).
-        # Od SIRKY 50 (7.10.2026) pre kazdy korpus, nie len rohovy — meno
-        # metody ostava (zhoda s golden H12 a testami ROH-A1).
+        # hlaska len ked sirku zdvihla ROHOVA ZOSTAVA (vzor `clamp_depth`).
         def clamp_corner_width(params, val, cid, part_thicknesses = nil)
           norm = CabinetBuilder.normalize(params)
           floor = Construction.min_valid_width(norm, part_thicknesses: part_thicknesses)
@@ -654,20 +653,14 @@ module Noxun
           m = [base, floor].max
           return [val, nil] if val >= m
 
-          why = Construction.corner?(norm) ? 'rohova zostava' : 'konstrukcia'
-          Engine.log("scale absorb #{cid}: width #{val.round} < min #{m.round} (#{why}) — clampujem na #{m.round}")
-          note = floor > base ? width_clamp_message(cid, m, norm) : nil
+          Engine.log("scale absorb #{cid}: width #{val.round} < min #{m.round} (rohova zostava) — clampujem na #{m.round}")
+          note = floor > base ? width_clamp_message(cid, m) : nil
           [m, note]
         end
 
-        def width_clamp_message(cid, width, norm = nil)
-          mm = Construction.fmt_mm(width)
-          if norm.nil? || Construction.corner?(norm)
-            return "Šírka rohovej skrinky #{cid} je pri tejto rohovej zostave najmenej #{mm} mm — nastavená na #{mm}."
-          end
-
-          "Šírka skrinky #{cid} je pri hrúbke #{Construction.fmt_mm(norm[:thickness])} mm a tejto konštrukcii " \
-            "najmenej #{mm} mm — nastavená na #{mm}."
+        def width_clamp_message(cid, width)
+          "Šírka rohovej skrinky #{cid} je pri tejto rohovej zostave najmenej " \
+            "#{Construction.fmt_mm(width)} mm — nastavená na #{Construction.fmt_mm(width)}."
         end
 
         def clamp_slot_height(params, val, cid)

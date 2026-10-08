@@ -20,8 +20,8 @@
 - **ŠÍRKA 50 · skrinka od 50 mm + 2 nohy pod úzkou dolnou (8.10.2026, PR #?, v0.17.28).** Pokyn Michala 7.–8.10.: najmenšia šírka dolnej aj hornej skrinky 200 → **50 mm**,
   skrinka užšia než 200 mm má **2 nohy** v strede šírky (vpredu + vzadu), v nákupe 2 ks; jedna dávka (audit BLOCKER 1), [package](../zdroje/bloky/HARDENING/PACKAGE_SIRKA50.md).
   **`CONFIG_SCHEMA` 22 → 23** (vzor 15: starší plugin by 50–199 ticho klampol na 200), aktivačné konštanty bez zmeny; panel zrkadlí `validate!` (šírka ≤ 2 × hrúbka + 10 =
-  červená šírka + hrúbka s vetou); preflight čiel berie šírku aj výšku z `CabinetBuilder::MIN` (výška tam bola chybne 200); Mierka klampuje šírku config-aware pre každý
-  korpus (hrúbka 25 → 61 s vetou, nie reject — nad rámec zadania). **Seed pravidiel 7 → 8** (`max 199,999 → 2`, audit FIX 4), tvar v6/v7 v `LEGACY_SEED_SHAPES`,
+  červená šírka + hrúbka s vetou); preflight čiel berie šírku aj výšku z `CabinetBuilder::MIN` (výška tam bola chybne 200); Mierka pod hranicu `validate!` sa odmietne
+  s hláškou (vzor D-120; config-aware klamp šírky len pri rohovej). **Seed pravidiel 7 → 8** (`max 199,999 → 2`, audit FIX 4), tvar v6/v7 v `LEGACY_SEED_SHAPES`,
   `LEG_NARROW_SEED_VERSION` 8 a vetva úzkej skrinky v `leg_stale` (hranice v6 bez zmeny, veta 2/4/6). Polohy nôh = čistá `Construction.leg_layout`: valce sa nikdy
   nekreslia prekryté, pri nezmestení menej valcov + info `legs_drawn_merged` (nákup podľa pravidla). Golden H12/H16 regenerované vedome (len schéma, minimum, seed).
   Testy: headless 5367/0, 163 JS, mutácie M1–M5 zhodené; in-SU nová sekcia `run_sirka50` (výsledok v PR).

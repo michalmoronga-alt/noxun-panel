@@ -1770,12 +1770,13 @@ module Noxun
       # ROH-A1 (krizovy audit G9 / Codex Q5): NAJMENSIA sirka, pri ktorej by
       # prestavba TOHTO configu presla — sonda cez CELY `build_plan` (vzor
       # `min_valid_depth`), s ucinnymi hrubkami CR list; ziadny rucny vzorec
-      # vedla `corner_error`. Cele mm; horna hranica = horny clamp `normalize`.
-      # SIRKA 50 (7.10.2026): sonda plati pre KAZDY korpus, nie len rohovy —
-      # od 50 mm uz typove minimum NIE JE vzdy nad hranicou `validate!`
-      # (`w <= 2t + 10`: pri hrubke 25 je najmensia platna sirka 61). Ked
-      # minimum prejde (bezny pripad), stoji to jeden plan. Slot (typ bez
-      # korpusu) ostava na typovom minime bez sondy.
+      # vedla `corner_error`. Pre ine typy DNESNE spravanie: typove minimum
+      # `CabinetBuilder::MIN[:width]` bez sondy (absorpcia ich sirku klampuje
+      # len holym minimom). Cele mm; horna hranica = horny clamp `normalize`.
+      # SIRKA 50 (7.10.2026): od 50 mm uz typove minimum NIE JE vzdy nad
+      # hranicou `validate!` (`w <= 2t + 10`) — Mierka pod nu sa VEDOME
+      # odmietne (`ScaleWatch.reject_scale` s hlaskou o hrubke, vzor D-120:
+      # neplatny Scale = rollback, nie tichy klamp na inu sirku).
       MAX_WIDTH = 3000.0
       # Zrkadlo `CabinetBuilder::MIN[:width]` pre pripad, ze builder este nie je
       # nacitany (`construction` sa nacitava PRED `cabinet_builder`, main.rb).
@@ -1785,7 +1786,7 @@ module Noxun
 
       def min_valid_width(cfg, hardware_rules: nil, part_thicknesses: nil)
         lo = defined?(CabinetBuilder) ? CabinetBuilder::MIN[:width] : MIN_WIDTH_FALLBACK
-        return lo unless CabinetTypes.carcass?(cfg[:type] || cfg['type'])
+        return lo unless corner?(cfg)
 
         rules = hardware_rules || HardwareRules.load
         return lo if buildable_width_at?(cfg, lo, rules, part_thicknesses)

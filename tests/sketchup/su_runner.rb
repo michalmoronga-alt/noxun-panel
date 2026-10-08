@@ -3787,18 +3787,36 @@ module NoxunSuRunner
        n.valid? && (cfg_u['width'].to_f - 600.0).abs < 0.01 && sirka50_hw(n)['leg'] == 4 &&
        n.transformation.to_a == before_tr && sirka50_leg_centers(n).length == 4)
 
-    # (f) MIERKA pri hrubke 25: 50 mm by `validate!` odmietol (50 <= 60) —
-    #     absorpcia klampne na najmensiu PLATNU sirku 61, nie reject.
+    # (f) MIERKA pri hrubke 25: 50 mm by `validate!` odmietol (50 <= 60).
+    #     Taky Scale sa VEDOME odmietne (vzor D-120): prestavba vynimkou,
+    #     `reject_scale` (to iste, co robi tik `process_dirty`) vrati
+    #     povodnu skrinku a hlaska povie dovod. Modalny dialog sa na cas
+    #     scenara zachyti (`r12_silence_messagebox!`).
     t25 = e::CabinetBuilder.build(model, sirka50_lower(600.0, 'thickness' => 25.0))
     if t25
+      before25 = e::Store.config(t25)
       model.start_operation('SU-TEST SIRKA50 scale hrubka 25', true)
       t25.transformation = t25.transformation * Geom::Transformation.scaling(ORIGIN, 50.0 / 600.0, 1.0, 1.0)
       model.commit_operation
-      e::ScaleWatch.absorb(t25)
+      bag = []
+      err = nil
+      begin
+        r12_silence_messagebox!(bag)
+        begin
+          e::ScaleWatch.absorb(t25)
+        rescue StandardError => ex
+          err = ex
+          e::ScaleWatch.reject_scale(t25, ex)
+        end
+      ensure
+        r12_restore_messagebox!
+      end
       c25 = e::Store.config(t25) || {}
-      ok("SIRKA50 (f): hrubka #{c25['thickness']} — Mierka na 50 skoncila na 61, nie reject (config #{c25['width']})",
-         (c25['width'].to_f - 61.0).abs < 0.01 && e::ScaleWatch.scale_factors(t25.transformation).nil? &&
-         s1e0_degenerate(s1e0_parts(t25)).empty?)
+      ok("SIRKA50 (f): hrubka 25 — Mierka na 50 prestavba odmietla (#{err ? err.message : 'bez vynimky'})",
+         err && err.message.include?('Sirka je prilis mala'))
+      ok("SIRKA50 (f): skrinka ostala 600 mm s cistym transformom a hlaska povedala dovod (#{bag.first.to_s[0, 90]})",
+         t25.valid? && c25 == before25 && e::ScaleWatch.scale_factors(t25.transformation).nil? &&
+         bag.any? { |m| m.include?('Sirka je prilis mala') })
     else
       ok('SIRKA50 (f): vlozenie skrinky s hrubkou 25', false)
     end
@@ -6384,7 +6402,7 @@ module NoxunSuRunner
 
       cid = e::Store.get(cab, 'cabinet_id').to_s
       ok("ROH-A1: typ, polia a schema (#{kona_cfg(cab).values_at('type', 'config_schema', 'plan_schema').inspect})",
-         kona_cfg(cab)['type'] == 'corner_blind' && kona_cfg(cab)['config_schema'] == 22 &&
+         kona_cfg(cab)['type'] == 'corner_blind' && kona_cfg(cab)['config_schema'] == e::CabinetBuilder::CONFIG_SCHEMA &&
          kona_cfg(cab)['plan_schema'] == 7 && roha1_fields(cab) == ['left', 450.0, 80.0, 80.0])
 
       # (a) MATICA plan <-> model 1:1 na jednej instancii
@@ -29145,7 +29163,7 @@ module NoxunSuRunner
     run_sync(model)
     run_sync_back(model)     # davka Chrbat: D-37 hlbka, D-31 none, D-38 pevny 18
     run_sync_rails(model)    # H3/D-80: vnutro pod vystuhami (odsadenie, upright, chrbat, odmietnutie)
-    run_sirka50(model)       # SIRKA 50: dolna/horna 50 mm bez degenerovaneho dielca, uzka dolna 2 nohy v strede (valce v modeli), bezna 600 dalej 4, Inspector 30 -> 50, Mierka 600 -> 50 + 1x Spat, Mierka pri hrubke 25 -> 61, plytka so soklom vpredu 1 valec + info warning
+    run_sirka50(model)       # SIRKA 50: dolna/horna 50 mm bez degenerovaneho dielca, uzka dolna 2 nohy v strede (valce v modeli), bezna 600 dalej 4, Inspector 30 -> 50, Mierka 600 -> 50 + 1x Spat, Mierka pri hrubke 25 = odmietnutie s hlaskou, plytka so soklom vpredu 1 valec + info warning
     run_s1e0(model)          # S1-E0: minimalna vyska korpusu 80 mm — nizka skrinka na dorovnanie sa postavi bez degenerovaneho dielca a kusovnik ju vidi, cesta Inspectora klampne 60 na 80, absorpcia scale pod hranicu tiez (a 1x Spat vrati scale aj absorpciu), horna 600 x 80 x 320
     run_s1e(model)           # S1-E: SLOT UMYVACKY — zo sablony 1 vyrobny dielec + telo ako referencia (kind reference, v kusovniku nikde), zmena vysky cela = 1 Spat, prisunutie na NOMINALNU hranu (aj pri presahujucom cele a vypnutom tagu referencie), zmena triedy prestavi telo, absorpcia scale na typove minimum, sablona so slotom, Kontrola dw_body_fit/dw_height_fit cez realny zber
     run_s1b1(model)          # S1-B1: SPOTREBIC V ZAKAZKE — priradenie z katalogu, presun, odpojenie a zmazanie ako JEDEN krok Spat (polozka + `appliance_refs[]` vlastnika + prestavba naraz), sirota po Delete (nalez BEZ `owner_id`) a jej naprava, trieda umyvacky vs slot, „dodáva zákazník" (medzisucet 0 + stitok v ponuke), legacy zakazka na kanonicke kody, ROLLBACK po riadenych zlyhaniach a bariera observera

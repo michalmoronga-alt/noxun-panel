@@ -263,10 +263,9 @@ vľavo, `gap_left` vpravo) · `D + c1 + th2 + t ≤ W − t` · `back_front_y �
 `CabinetBuilder.corner_fronts_ok?` na ňu deleguje) · strom zón je list (bez priečok). Vety `CORNER_GAP_MSG` / `CORNER_FRONTS_MSG` / `CORNER_ZONES_MSG` sú jediný zdroj
 aj pre panel. Zóny rohovej dostanú v boxe `shelf_inset = max(20, t)` (`corner_shelf_inset`, audit A1 BLOCKER 1 — polica nesmie pretínať blendu pri korpuse
 hrubšom než 20) a pri policiach vznikne **jeden** ORANGE `corner_shelf_notch` („výrez t × (80 − odsadenie) robí dielňa", `part_key` výstuhy závesov).
-**`min_valid_width(cfg, part_thicknesses:)`** = sonda cez celý plán polením (vzor `min_valid_depth`, horná hranica `MAX_WIDTH` 3000) — od **šírky 50 (v0.17.28)
-pri každom korpuse** (rohová kvôli zostave, ostatné kvôli `validate!` `w <= 2t + 10`: pri hrúbke 25 je minimum 61); keď prejde už `CabinetBuilder::MIN[:width]`,
-stojí to jeden plán. Slot (typ bez korpusu) vracia typové minimum bez sondy; bez načítaného buildera záložné `MIN_WIDTH_FALLBACK` (zrkadlo `MIN[:width]`,
-guard `test_s1e0_min_vyska.rb`). **Všetky tri sondy** (`min_valid_height`/`_depth`/`_width`) prijímajú `part_thicknesses:` a posielajú ho do
+**`min_valid_width(cfg, part_thicknesses:)`** = sonda cez celý plán polením (vzor `min_valid_depth`, horná hranica `MAX_WIDTH` 3000) — **len pri rohovej**, iné typy
+vracajú `CabinetBuilder::MIN[:width]` bez sondy (bez načítaného buildera záložné `MIN_WIDTH_FALLBACK` = zrkadlo `MIN[:width]`, guard `test_s1e0_min_vyska.rb`).
+**Všetky tri sondy** (`min_valid_height`/`_depth`/`_width`) prijímajú `part_thicknesses:` a posielajú ho do
 `build_plan` (audit A1 FIX 2); bez neho platí placeholder 18. `FRONT_MATERIAL_ROLES` obsahuje aj `cr_front`/`cr_side` (R4 — čelový kanál z definície roly), blenda
 korpusová nie (vždy korpus). **ROH-B1:** `corner_fit_width` je **presná** hranica pre panel (`nxCornerMinWidth` ju zrkadlí aj s desatinami; `min_valid_width` sonduje
 celé mm a ostáva pre klamp Scale). **`CORNER_MIRROR_EDGE_KEYS`** (blenda korpusová, CR 1) + `CORNER_MIRROR_EDGE_SWAP` (`L1 ↔ L2`) = tabuľka zrkadla ručných hrán pri
@@ -561,7 +560,7 @@ sa nemenia, hĺbka sa neodomkla. **`CONFIG_SCHEMA` sa bumpuje na 15 (výška) a 
 prestavbe ticho klampol späť na 200, teda zmenil výrobnú geometriu (dno, strop, chrbát, čelá) — a presne pred tým chráni dopredný guard `newer_config?` (prestavba,
 šablóny, kópia) a exportná brána. Aktivačné konštanty (5/9/11/19/20) sa nehýbu; žiadna migrácia netreba, config nemá nové pole. Úzku skrinku z hrubého materiálu
 zastaví `Construction.validate!` (`w <= 2t + 10` → „Sirka je prilis mala vzhladom na hrubku materialu."), panel tú istú vetu ukáže červenou šírkou a hrúbkou ešte
-pred apply (`form.js` `cabinetWidthError`, [ui-lifecycle.md](ui-lifecycle.md)) a Mierka šírku klampuje config-aware (`scale_observer.rb` nižšie).
+pred apply (`form.js` `cabinetWidthError`, [ui-lifecycle.md](ui-lifecycle.md)); Mierka pod túto hranicu sa odmietne (`reject_scale` s tou vetou, vzor D-120).
 **NOHY POD SKRINKOU — `Construction.leg_layout` (šírka 50, audit FIX 2).** Polohy valcov proxy nôh počíta **čistá** `Construction.leg_layout(cfg, qty)` → `{positions, wanted}`
 (jediná autorita; `draw_legs` ich len kreslí, `LEG_DIAMETER`/`LEG_INSET`/`LEG_RENDER_MAX` sú v builderi aliasy). Dva rady s odsadením `LEG_INSET` 60 (predný pri soklu
 vpredu za doskou sokla, zadný pred `back_stop`); **2 nohy úzkej skrinky stoja v strede šírky, vpredu + vzadu**; pri plytkej skrinke (dva rady sa nezmestia) sa 2 nohy
@@ -1282,7 +1281,8 @@ rozmere.
 s policou by geometria prešla, ale stavba padla na `validate_shelves!` — rebuild by zlyhal, `reject_scale` by vrátil PÔVODNÚ skrinku a používateľ by po ťahaní úchopu nedostal
 nič (720 mm späť namiesto 94). Hranica je preto **prísnejšia z dvoch**: `MIN['height']` a `Construction.min_valid_height` nad **kompletným** configom, ktorý o chvíľu pôjde do
 `rebuild`u (normalizuje sa **tou istou cestou**, takže pri hornej skrinke sokel korektne vypadne na 0).
-Šírka má od v0.17.28 rovnaký problém (50 mm pri hrúbke 25 neprejde `validate!`) — rieši ho config-aware klamp šírky nižšie. Lifecycle absorpcie sa tým **nemení**: klamp žije vnútri tej istej transparentnej operácie, takže
+Šírka (od 50 mm) môže byť pri hrubom materiáli pod hranicou `validate!` (50 mm pri hrúbke 25): taký Scale sa **vedome odmietne** — `reject_scale` vráti skrinku
+a hláška povie „Sirka je prilis mala vzhladom na hrubku materialu." (vzor D-120: neplatný Scale = rollback, nie tichý klamp na inú šírku). Lifecycle absorpcie sa tým **nemení**: klamp žije vnútri tej istej transparentnej operácie, takže
 jedno Späť ďalej vráti scale AJ absorpciu (in-SU `run_s1e0` body c, e a f, reálny debounce tik `async S1`).
 
 **HĹBKA sa pri ZMENŠENÍ klampuje CONFIG-AWARE (`clamp_depth`, KON-A · Codex FIX 10, Grok 9).** Komín, zapustenie a výstuhy robia z hĺbky konštrukčnú hranicu
@@ -1291,11 +1291,9 @@ normalizovaným configom (sonda cez celý plán, dedí aj minimum vnútra 40 pri
 `refresh_panel` pošle **nemodálnu hlášku** `notify_user` („Hĺbka skrinky CAB-004 je pri komíne 100 mm najmenej 160 mm — nastavená na 160."). Tichá odmietacia cesta
 `reject_scale` sa pri hĺbke týmto nedosiahne; pre iné príčiny ostáva. Jedno Späť vráti scale aj absorpciu (in-SU `run_kona` bod c).
 
-**ROH-A1 — ŠÍRKA ROHOVEJ sa pri ZMENŠENÍ klampuje CONFIG-AWARE (`clamp_corner_width`, krížový audit G9 / Codex Q5); od šírky 50 (v0.17.28) KAŽDÝ KORPUS.** Rohová
-zostava sa musí zmestiť pred slepú časť a úzka skrinka z hrubého materiálu medzi boky (`w <= 2t + 10`), takže holé `MIN['width']` 50 by pri zúžení vyrobilo neplatnú
-konštrukciu a tichý `reject_scale`. Keď `new_w < base_w` **a** skrinka má korpus (`CabinetTypes.carcass?`; slot nie), hranica je prísnejšia z `min_for('width')`
-a `Construction.min_valid_width` (sonda cez celý plán); pri bežnej skrinke s hrúbkou 18 prejde už 50 bez vety, pri hrúbke 25 skončí Mierka na 61 s vetou „Šírka skrinky
-CAB-004 je pri hrúbke 25 mm a tejto konštrukcii najmenej 61 mm — nastavená na 61." (meno metódy ostalo kvôli golden H12); klamp beží **pred** skúšaním hĺbky
+**ROH-A1 — ŠÍRKA ROHOVEJ sa pri ZMENŠENÍ klampuje CONFIG-AWARE (`clamp_corner_width`, krížový audit G9 / Codex Q5).** Rohová zostava sa musí zmestiť pred slepú
+časť, takže holé `MIN['width']` 50 by pri zúžení vyrobilo neplatnú konštrukciu a `reject_scale`. Keď `new_w < base_w` **a** skrinka je rohová
+(`Construction.corner?`), hranica je prísnejšia z `min_for('width')` a `Construction.min_valid_width` (sonda cez celý plán); klamp beží **pred** skúšaním hĺbky
 a výšky (tie už počítajú s novou šírkou) a keď šírku zdvihla zostava, po `refresh_panel` príde nemodálna veta („Šírka rohovej skrinky CAB-009 je pri tejto rohovej
 zostave najmenej 584 mm — nastavená na 584."; pri súčasnom klampe hĺbky obe vety v jednej hláške). Ostatné typy ostávajú na holom minime. **Všetky tri sondy
 absorpcie** dostávajú `part_thicknesses` z **jedného** volania `CabinetBuilder.aux_part_thicknesses(params, model)` (audit A1 FIX 2 — tie isté účinné hrúbky CR,

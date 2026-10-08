@@ -897,17 +897,14 @@ NxTest.test('ROH-A1 (G9): min_valid_width — sonda cez plan, obe strany, CR 19;
       NxTest.assert_equal(584.0, cn.min_valid_width(c), "#{side}: bez hrubok placeholder 18")
     end
   end
-  # SIRKA 50: sonda plati pre kazdy korpus — pri hrubke 18 prejde uz typove
-  # minimum 50, pri hrubke 25 az 61 (`validate!`: w <= 2t + 10 = odmietnutie).
-  NxTest.assert_equal(50.0, NxRohA1::CN.min_valid_width(NxRohA1::CB.normalize('type' => 'lower')), 'dolna = typove minimum')
-  NxTest.assert_equal(61.0, NxRohA1::CN.min_valid_width(NxRohA1::CB.normalize('type' => 'lower', 'thickness' => 25.0)),
-                      'dolna z hrubeho materialu = sonda')
+  # SIRKA 50: typove minimum dolnej je od 7.10.2026 50 (predtym 200).
+  NxTest.assert_equal(50.0, NxRohA1::CN.min_valid_width(NxRohA1::CB.normalize('type' => 'lower')), 'dolna bez sondy')
   NxTest.assert_equal(NxRohA1::CB::CORNER_MIN_WIDTH, NxRohA1::CN.min_valid_width(NxRohA1.cfg), 'konstanta = sonda predvolieb')
   sw = NxRohA1.src('noxun_engine', 'core', 'scale_observer.rb')
   body = sw[/def absorb\(inst\)(.*?)\n        end\n/m, 1].to_s
   NxTest.assert(body.index('clamp_corner_width') < body.index('clamp_depth(params'), 'sirka PRED hlbkou')
   NxTest.assert(body.index('clamp_depth(params') < body.index('clamp_height(params'), 'hlbka PRED vyskou')
-  NxTest.assert(body.include?('CabinetTypes.carcass?(type)'), 'klamp sirky pri kazdom korpuse (sirka 50), slot nie')
+  NxTest.assert(body.include?('Construction.corner?(cfg)'), 'klamp sirky len pri rohovej')
   NxTest.refute(body.include?('flush_pending!'), 'absorpcia nevola barieru')
   NxTest.assert(body.include?('transparent: true'), 'jeden transparentny rebuild')
 end
