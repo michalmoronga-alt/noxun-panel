@@ -253,8 +253,18 @@ nôh zmení **ručným zámkom** (`hardware_overrides`) alebo **vlastným pravid
 `leg_stale`, nie tento nález.
 
 **`LEG_WIDTH_SEED_VERSION` = 6** je pevné číslo (ako `LIFT_SEED_VERSION`) pre migračnú bránu `leg_stale` — ORANGE „skrinka má nohy spočítané ešte pred
-pravidlom 4/6" ([outputs.md](outputs.md)). Editor pravidiel: [ui-lifecycle.md](ui-lifecycle.md). Testy: `tests/pure/test_kovg1b_nohy_pravidla.rb`,
+pravidlom 2/4/6" ([outputs.md](outputs.md)). Editor pravidiel: [ui-lifecycle.md](ui-lifecycle.md). Testy: `tests/pure/test_kovg1b_nohy_pravidla.rb`,
 `tests/js/test_kovg1b_editor_nohy.js`, in-SketchUp sekcia `run_kovg`.
+
+**ŠÍRKA 50 (v0.17.28, seed v8) — ÚZKA SKRINKA MÁ 2 NOHY.** Najmenšia šírka skrinky klesla na 50 mm (`CONFIG_SCHEMA` 23, [construction.md](construction.md));
+rozhodnutie Michala: skrinka **užšia než 200 mm má 2 nohy** v strede šírky (vpredu + vzadu), v nákupe 2 ks. Seed `nohy-zakladne` dostal navrch pásmo
+**`max LEG_NARROW_MAX_MM` (199,999) → 2**, potom `999 → 4`, catch-all `→ 6`. Hranica nie je `max 199` (audit FIX 4): `bands` porovnáva `v <= max`, takže šírka
+199,5 by padla do pásma 4. 199,999 pokryje každú šírku pod 200 zadanú na tri desatinné miesta a **nezavádza žiadny nový kľúč pásma** (`min`, `max_exclusive`) —
+starší plugin by ho ignoroval a rátal inak. Autoritou hlások a brány je `LEG_NARROW_BELOW_MM` = 200 (vzor `LEG_WIDE_FROM_MM`). Príchyt sokla sa **nemení**
+(1 ks na začaté 4 nohy → aj pri 2 nohách 1; `plinth_clip_check` mlčí). **`SEED_VERSION` 7 → 8** a `LEGACY_SEED_SHAPES['nohy-zakladne']` má druhý tvar —
+**v6/v7 (4/6 podľa šírky)**: nedotknuté pravidlo knižnica obnoví sama, projektový snapshot cez „Doplniť nové predvoľby"; upravené (iné pásma, vypnuté) sa
+nikdy neprepíše. **`LEG_NARROW_SEED_VERSION` = 8** je pevné číslo pre vetvu úzkej skrinky v `leg_stale` ([outputs.md](outputs.md)). Testy:
+`tests/pure/test_sirka50_nohy.rb`, in-SketchUp sekcia `run_sirka50`.
 
 
 **KOV-C2b (v0.9.31) — R2 EXKLUZIVITA.** `evaluate(..., suppress_slide_owners:)` dostáva množinu `owner_part_key` čiel, ktoré už majú položku výsuvu **z receptu**, a pravidlá

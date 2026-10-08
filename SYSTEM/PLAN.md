@@ -58,9 +58,10 @@ predrecenzia, in-SU) sa určí pri package podľa CLAUDE.md; stĺpec je predpokl
 | H17 · spoločná príprava exportov (prvý rez R-15) | C-06 | kód · audit · výrobná |
 | ✅ H18 · Inspector ukáže skutočne použitý set závesov (D-149, rozhodnutie Michala 3A); nákup a ceny bez zmeny — [package](zdroje/bloky/HARDENING/PACKAGE_H18.md), **PR #462** | — | kód · audit · výrobná/cenová (zobrazenie) · predrecenzia |
 
-| ✅ H18b-1 · voľba setu krídla platí (D-150 v archíve), v0.17.27 — [package](zdroje/bloky/HARDENING/PACKAGE_H18b.md); predrecenzia 0 P1/P2/P3, in-SU 3400 PASS nad `337f9601`; PR #463 ready, po P1 docs oprava; nové GH kolo/CI čaká | — | kód · výrobná/cenová · predrecenzia · in-SU |
+| ✅ H18b-1 · voľba setu krídla platí (D-150 v archíve), v0.17.27 — [package](zdroje/bloky/HARDENING/PACKAGE_H18b.md); predrecenzia 0 P1/P2/P3, in-SU 3400 PASS nad `337f9601` — **PR #463** | — | kód · výrobná/cenová · predrecenzia · in-SU |
+| ✅ ŠÍRKA 50 · skrinka od 50 mm + 2 nohy pod úzkou dolnou (pokyn Michala 7.–8.10.), v0.17.28 — [package](zdroje/bloky/HARDENING/PACKAGE_SIRKA50.md); `CONFIG_SCHEMA` 23, seed pravidiel 8 — **PR #?** | — | kód · audit · výrobná/cenová · predrecenzia · in-SU |
 
-**Otvorené po H18:** D-151 (výklop bez systému) a D-152 (oživenie mŕtveho výberu) → zásobník. D-150 opravené H18b-1, plný text a index v [archíve](archiv/DOGFOODING_vyriesene.md); GH kolo/CI PR #463 pred merge čaká.
+**Otvorené po H18:** D-151 (výklop bez systému) a D-152 (oživenie mŕtveho výberu) → zásobník. D-150 opravené H18b-1, plný text a index v [archíve](archiv/DOGFOODING_vyriesene.md).
 
 ### 3 · STABILITA
 

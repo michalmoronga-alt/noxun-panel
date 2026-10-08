@@ -437,6 +437,12 @@ byť v `bindExprFields` — guard `test_rohb1_ovladace.js`, výnimka `aprMountVa
   `<= MIN_AVAIL_H` (10 mm) a pri vrchu „dve výstuhy" `NX_MIN_INTERIOR_H` (20 mm) — zhodu stráži `tests/pure/test_s1e0_min_vyska.rb`. **Prázdne pole nie je nula:**
   `cabFieldOrDefault(id)` číta `DEFAULTS[getType()]` (= `CabinetBuilder::LOWER_DEFAULTS` / `UPPER_DEFAULTS` zo `sync.rb`); kým predvoľby neprišli, kontrola mlčí.
   JS sada `tests/js/test_s1e0_min_vyska.js`.
+- **Krížová kontrola šírky proti hrúbke** (šírka od 50 mm; `form.js` `cabinetWidthError` + `markWidthError`, po kontrole rohovej): `LIMITS.width` je od
+  7.10.2026 **[50, 3000]**, ale úzka skrinka z hrubého materiálu nemá medzi bokmi miesto — zrkadlo Ruby `Construction.validate!` (`šírka <= 2 × hrúbka + 10`
+  = odmietnutie, `MIN_SIDES_GAP`). Zočervená **dvojicu Šírka + Hrúbka** s vetou „Šírka je príliš malá vzhľadom na hrúbku materiálu — pri hrúbke 20 mm musí byť
+  viac ako 50 mm." v `title` aj v stavovom riadku (`nxCabFieldError`), apply sa zablokuje. Prázdna hrúbka = predvoľba typu (`cabFieldOrDefault`); šírka mimo
+  `LIMITS` má prednosť (krížová veta sa nepočíta), slot (typ bez korpusu) kontrolu nemá. Tooltip šírky spravuje kontrola rohovej (na začiatku ho zmaže), tooltip
+  hrúbky zruší `markWidthError` sám. JS sada `tests/js/test_s1e0_min_vyska.js`.
 - **Typ badge** v hlavičke je readonly (`nxCabInfo(c).type` = `NXTypes.label` — `label` registra servera, neznámy typ = Dolná) — typ určuje šablóna/vkladanie. Mini-modal „Uložiť ako
   šablónu" nesie **Názov + Typ** (`handle_save_template_as`, whitelist) a drží identitu skrinky aj dokumentu (`tplModalGuid`); červené pole uloženie zastaví.
 

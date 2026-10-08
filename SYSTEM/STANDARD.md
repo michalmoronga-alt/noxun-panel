@@ -295,6 +295,10 @@ meria výšku niky (vnútro − osadenie) aj hranu delenia čiel. Je to vlastnos
   5–21; zároveň **BuildPlan `SCHEMA` 7** (päť nových rolí, §2.4) a **ABS `SEED_VERSION` 6** (§7.5). `TemplateStore::STD` sa nemení — šablóna nesie polia rohovej
   v configu (výslovne všetky štyri, pri vklade ich server číta zo **záznamu** šablóny) a starší plugin ju odmietne markerom `config_schema`. **Obe PC sa aktualizujú
   pred prvou rohovou.**
+- **`23 = ŠÍRKA OD 50 mm` (v0.17.28, Michal 7.10.2026): úzka skrinka.** Ako pri 15 **nepribudlo pole** — prípustný rozsah `width` dolnej aj hornej skrinky klesol
+  z 200 na **50 mm** (umývačka a rohová majú vlastné hranice). Starší plugin (schéma 22) má minimum 200, takže by skrinku 50–199 mm pri prvej prestavbe **ticho
+  klampol na 200** (iné dno, strop, chrbát a čelá, teda iný kusovník, VEPO aj nákup). Brány sú tie isté ako pri 5–22; aktivačné konštanty sa nehýbu. Zároveň
+  **seed pravidiel kovania 8** (úzka skrinka < 200 mm má 2 nohy, §6). **Obe PC sa aktualizujú pred prvou úzkou skrinkou.**
 - **`rules_seed_version` — DRUHÁ proveniencia stavby (KOV-E1b, v0.9.54).** Config nesie **aditívne** pole so **seed verziou pravidiel kovania, s ktorou stavba bežala**
   (`HardwareRules.effective_seed_version`; chýbajúce pole = `0`). Zapisuje ho **výhradne stavba** (`cabinet_config`) — z klientskeho payloadu sa **nikdy nepreberá**,
   presne ako `config_schema`. Dôvod: projektový snapshot pravidiel sa zámerne nemerguje sám, takže prestavba starej zákazky zapíše aktuálnu schému, ale kovanie
@@ -683,6 +687,12 @@ odkiaľ existuje lišta na nohách AXILO). Kontext bez použiteľnej výšky fil
 `flap_dir`): starší plugin kľúč `normalize_rules` zachová, ale **neuplatní** — vedomá hranica downgrade, rovnaká ako pri smere výklopu.
 Zóna výšky sokla 20–55 mm ostáva vedome nepokrytá **setom** (ORANGE „doplň pásmo"), nie pravidlom. `SEED_VERSION` 5 → 6; migračná brána
 `leg_stale` je **ORANGE bez exportnej brány** (nohy nezastavujú výrobu) a pýta sa `rules_seed_version` < 6 (§2.5).
+**ŠÍRKA 50 (v0.17.28, seed v8):** skrinka **užšia než 200 mm má 2 nohy** v strede šírky (vpredu + vzadu) — seed `nohy-zakladne` má navrch pásmo
+`max 199,999 → 2` (nie `max 199`: pásma porovnávajú `v <= max`, takže 199,5 by dostalo 4; žiadny nový kľúč pásma), potom `999 → 4`, catch-all `→ 6`.
+Príchyt sa nemení (1 ks na začaté 4 nohy, aj pri 2 nohách 1). Nedotknuté pravidlo v6/v7 sa obnoví (knižnica sama, snapshot cez „Doplniť nové predvoľby"),
+upravené nikdy. `leg_stale` má **druhú, vlastnú** vetvu: úzka skrinka so snapshotom pod `LEG_NARROW_SEED_VERSION` (8) a 4 nohami z pravidla; hranice v6
+sa nemenia. Proxy nôh sa **nikdy nekreslí prekrytá** — keď sa valce pod úzku/plytkú skrinku nezmestia, kreslí sa ich menej a plán to prizná info warningom
+`legs_drawn_merged` (počet v nákupe ostáva z pravidla).
 
 **BRÁNY VÝKLOPU (KOV-E1b, v0.9.54) — jeden register, jeden výklad.** Kódy žijú v `BuildPlan::HW_LIFT_BLOCKERS` a zastavujú **nákupné CSV, rozpočet a cenovú ponuku;
 VEPO nikdy** (geometria čela je správna). Štyri z nich vydáva PRAVIDLO do **uloženého nosiča** `hardware_conflicts` (rovnaký kontrakt ako `door_height_out_of_table`):
@@ -1784,7 +1794,7 @@ v §2.5, pri ABS seede v §7.5 a v [archiv/KRONIKA.md](archiv/KRONIKA.md) (Grep 
 
 | Čo | Kde | Hodnota | Kedy zvýšiť | Schéma |
 |---|---|---|---|---|
-| config skrinky | `noxun_engine/core/cabinet_builder.rb` · `CabinetBuilder::CONFIG_SCHEMA` | **22** | nové pole, typ alebo hodnota configu, ktorej tichá strata v staršom plugine zmení výrobu (§2.5) | áno |
+| config skrinky | `noxun_engine/core/cabinet_builder.rb` · `CabinetBuilder::CONFIG_SCHEMA` | **23** | nové pole, typ alebo hodnota configu, ktorej tichá strata v staršom plugine zmení výrobu (§2.5) | áno |
 | config dosky | `noxun_engine/core/board_builder.rb` · `BoardBuilder::BOARD_CONFIG_SCHEMA` | **2** | nové pole configu dosky, ktoré by starší plugin whitelistom zahodil | áno |
 | výrobný plán | `noxun_engine/core/build_plan.rb` · `BuildPlan::SCHEMA` | **7** | nová rola (§2.4) alebo zmena významu či povinného poľa plánu (+ migrácia); **aditívne voliteľné pole schému nezvyšuje** (kontrakt v `build_plan.rb`) | áno |
 | kľúče dielcov | `noxun_engine/core/part_keys.rb` · `PartKeys::SCHEMA` | **1** | zmena tvaru `part_key` (identita dielca pre override a kovanie) | áno |
@@ -1804,7 +1814,7 @@ Ktoré súbory sa zdieľajú medzi PC, ich zámky a prílohy: súpis [../docs/ar
 | pravidlá ABS — formát | `noxun_engine/core/abs_rules.rb` · `AbsRules::STD` | **1** | formát `abs_rules.json` | áno |
 | pravidlá ABS — seed | `noxun_engine/core/abs_rules.rb` · `AbsRules::SEED_VERSION` | **6** | nová rola s predvolenými hranami (§7.5) — bez bumpu sa na existujúcich PC postaví bez pásky | nie (seed) |
 | pravidlá kovania — formát | `noxun_engine/core/hardware_rules.rb` · `HardwareRules::STD` | **3** | nový `kind` alebo kľúč filtra, ktorý by starší plugin uplatnil zle (dopredná brána) | áno |
-| pravidlá kovania — seed | `noxun_engine/core/hardware_rules.rb` · `HardwareRules::SEED_VERSION` | **7** | nové alebo zmenené seed pravidlo — aj nový visiaci typ skrinky (pasca CN-03) | nie (seed) |
+| pravidlá kovania — seed | `noxun_engine/core/hardware_rules.rb` · `HardwareRules::SEED_VERSION` | **8** | nové alebo zmenené seed pravidlo — aj nový visiaci typ skrinky (pasca CN-03) | nie (seed) |
 | katalóg kovania — schéma | `noxun_engine/core/hardware_catalog.rb` · `HardwareCatalog::SCHEMA_CURRENT` | **4** | nové pole položky (marker lazy podľa obsahu, vzor materiálov) | áno |
 | katalóg kovania — seed | `noxun_engine/core/hardware_catalog_seed.rb` · `HardwareCatalog::SEED_SET_VERSION` | **6** | nové alebo opravené seed kódy (patch len nedotknutých riadkov; zoznam kódov patchu v tom istom súbore) | nie (seed) |
 | taxonómia kovania — schéma | `noxun_engine/core/hardware_taxonomy.rb` · `HardwareTaxonomy::SCHEMA_CURRENT` | **1** | formát výrobcov a radov | áno |
@@ -1840,6 +1850,7 @@ nový tvar = nová konštanta a riadok v `STD_SUPPORTED`.
 | tabuľka závesov v pravidlách | `noxun_engine/core/hardware_rules.rb` · `HardwareRules::HINGE_TABLE_STD` | **2** | seed pravidlo závesov nesie door guardy |
 | výklopy v seede | `noxun_engine/core/hardware_rules.rb` · `HardwareRules::LIFT_SEED_VERSION` | **5** | pravidlá vedia vydať kovanie výklopu a sklopu |
 | nohy podľa šírky | `noxun_engine/core/hardware_rules.rb` · `HardwareRules::LEG_WIDTH_SEED_VERSION` | **6** | nohy podľa šírky a príchyt sokla |
+| 2 nohy úzkej skrinky | `noxun_engine/core/hardware_rules.rb` · `HardwareRules::LEG_NARROW_SEED_VERSION` | **8** | skrinka užšia než 200 mm má 2 nohy (`leg_stale` vetva úzkej skrinky) |
 | sety — pásma člena | `noxun_engine/core/hardware_sets.rb` · `HardwareSets::STD_PARAM_FORMS` | **2** | člen setu s pásmami alebo selektorom |
 | sety — triedny kľúč | `noxun_engine/core/hardware_sets.rb` · `HardwareSets::STD_CLASSIFIED` | **3** | set s triednym kľúčom |
 | sety — výškový variant | `noxun_engine/core/hardware_sets.rb` · `HardwareSets::STD_HEIGHT_VARIANT` | **4** | set s výškovým variantom |
