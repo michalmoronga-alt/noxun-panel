@@ -121,6 +121,10 @@ module Noxun
         # setov projektu. Otazka je rovnako MODELOVA ako `rules_stale`, preto sa
         # pyta RAZ na zber; `project_state` cita len atribut modelu (ziadne IO).
         flap_codes = defined?(HardwareSets) ? HardwareSets.flap_set_codes(HardwareSets.project_state(model)) : nil
+        # SIRKA 50 (Codex #466 kolo 1 P2): spravuje pravidlo noh projektu seed?
+        # Vedome upravene pravidlo vetvu uzkej skrinky v `leg_stale` zhasne.
+        # MODELOVA otazka (vzor `rules_stale`) — raz na zber.
+        legs_managed = defined?(HardwareRules) ? HardwareRules.seed_managed_leg_rule?(model) : true
         model.entities.grep(Sketchup::ComponentInstance).each do |inst|
           case Store.kind(inst)
           when 'cabinet'
@@ -205,7 +209,7 @@ module Noxun
             # pred pravidlom „4/6 podla sirky". Nakup by mal o dve nohy a o
             # prichyty menej; vyrobu to ale nezastavuje (kod nie je v registri
             # blokerov), preto len upozornenie s napravou.
-            ls = leg_stale_issue(cid, inst.persistent_id, ccfg)
+            ls = leg_stale_issue(cid, inst.persistent_id, ccfg, leg_rule_managed: legs_managed)
             hardware_issues << ls if ls
             # KOV-G1b (Codex #338 kolo 1 N2): pocet prichytov sokla je zo SIRKY
             # korpusu (O3), takze rucny zamok poctu noh ho NEZMENI. Vedome —
@@ -889,23 +893,42 @@ module Noxun
       # `legs` by u nej migracnu vetu POTICHU zhasla a nakup by mal o dve nohy
       # menej. Symptom (b) ostava LEN pri `legs`: samostatna soklova lista (a
       # teda jej prichyt) pri sokli vpredu neexistuje.
+      #
+      # SIRKA 50 (seed v8): DRUHA, nezavisla proveniencia. Uzka skrinka
+      # (`HardwareRules.narrow_leg_width?`) postavena so snapshotom pravidiel
+      # POD `LEG_NARROW_SEED_VERSION` ma z pasma `< 1000` 4 nohy namiesto 2.
+      # Symptom (c) = uzka skrinka + ulozene 4 nohy z PRAVIDLA. Hranice v6
+      # (symptomy a/b a ich proveniencia) sa NEMENIA (audit FIX 3) — kazda
+      # vetva ma vlastny prah, takze buduci bump ani jednu nepresunie.
+      # Skrinka uzsia nez 200 mm mohla vzniknut az so schemou 23, ale snapshot
+      # pravidiel projektu sa nemerguje sam — preto ten nalez vobec existuje.
+      # Codex #466 kolo 1 P2: vetva (c) plati LEN ked pravidlo noh projektu
+      # spravuje seed (`leg_rule_managed`, `HardwareRules.seed_managed_leg_rule?`)
+      # — vedome upravene pravidlo „Doplniť nové predvoľby" neprepise, takze
+      # nalez by sa nedal zhasnut a radil by 2 nohy proti vuli pouzivatela.
+      # Tvar sa posudzuje rovnakym testom ako migracia (`LEGACY_SEED_SHAPES`);
+      # proveniencia sa pri no-op migracii zamerne NEPOSUVA (seed_version
+      # snapshotu nesie aj ine prahy — vyklopy, zavesy).
       # -> nalez | nil
-      def leg_stale_issue(owner_id, owner_pid, ccfg)
+      def leg_stale_issue(owner_id, owner_pid, ccfg, leg_rule_managed: true)
         return nil unless defined?(HardwareRules)
 
         cfg = ccfg.is_a?(Hash) ? cfg_hash(ccfg) : {}
         sup = support_type_of(cfg)
         return nil unless LEG_SUPPORTS.include?(sup)
-        return nil if provenance_marker(cfg['rules_seed_version']) >=
-                      HardwareRules::LEG_WIDTH_SEED_VERSION
 
-        wide = num_of(cfg['width']).to_f >= HardwareRules::LEG_WIDE_FROM_MM
+        marker = provenance_marker(cfg['rules_seed_version'])
+        w = num_of(cfg['width']).to_f
         fh = num_of(cfg['floor_height']).to_f
         hw = Array(cfg['hardware'])
-        legs4 = wide && hw.any? { |h| rule_leg_four?(h) }
-        clip_missing = clips_expected?(sup, fh) &&
+        legs4_rule = hw.any? { |h| rule_leg_four?(h) }
+        pre_width = marker < HardwareRules::LEG_WIDTH_SEED_VERSION
+        legs4 = pre_width && w >= HardwareRules::LEG_WIDE_FROM_MM && legs4_rule
+        clip_missing = pre_width && clips_expected?(sup, fh) &&
                        hw.none? { |h| h.is_a?(Hash) && h['generic_type'].to_s == 'plinth_clip' }
-        return nil unless legs4 || clip_missing
+        narrow4 = leg_rule_managed && marker < HardwareRules::LEG_NARROW_SEED_VERSION &&
+                  HardwareRules.narrow_leg_width?(w) && legs4_rule
+        return nil unless legs4 || clip_missing || narrow4
 
         { 'code' => BuildPlan::LEG_STALE, 'severity' => 'orange',
           'owner_id' => owner_id.to_s, 'owner_pid' => owner_pid,
@@ -922,15 +945,26 @@ module Noxun
       end
 
       # Veta hovori KONKRETNE cislami tejto skrinky, aby bolo jasne, co sa zmeni.
+      # SIRKA 50: pocet je 2 / 4 / 6 (uzka < 200, bezna, siroka od 1000)
+      # a prichyt ostava 1 ks na zacate 4 nohy (aj pri 2 nohach 1).
       def leg_stale_message(owner_id, width, floor_height, support)
         w = num_of(width).to_f
-        legs = w >= HardwareRules::LEG_WIDE_FROM_MM ? 6 : 4
+        legs = leg_count_for_width(w)
         clips = clips_expected?(support, floor_height) ? (legs / 4.0).ceil : 0
-        want = "#{legs} nôh"
+        want = sk_count(legs, 'noha', 'nohy', 'nôh')
         want += " + #{clips} #{clips == 1 ? 'príchyt' : 'príchyty'} sokla" if clips.positive?
-        "Skrinka #{owner_id} má nohy spočítané ešte pred pravidlom 4/6 (šírka " \
+        "Skrinka #{owner_id} má nohy spočítané ešte pred pravidlom 2/4/6 (šírka " \
           "#{fmt_mm(w)} → #{want}) — v Pravidlách spusti „Doplniť nové predvoľby“ " \
           'a skrinku prestav.'
+      end
+
+      # Pocet noh podla SEED pravidla pre sirku (len pre HLASKU — vypocet drzia
+      # pasma pravidla; hranice su konstanty `HardwareRules`).
+      def leg_count_for_width(width)
+        return 2 if HardwareRules.narrow_leg_width?(width)
+        return 6 if width >= HardwareRules::LEG_WIDE_FROM_MM
+
+        4
       end
 
       # Ulozena polozka noh, ktora este nesie STARY pevny pocet 4 z pravidla.

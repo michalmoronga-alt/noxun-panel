@@ -16,14 +16,15 @@ module Noxun
       SCALE_TOL = 0.001  # tolerancia: dlzka osi != 1.0 => scale
       DEBOUNCE  = 0.2    # s — cakanie na ustalenie po poslednej zmene
       # S1-E0: spodna hranica absorbovaneho rozmeru. VYSKA je od 80 mm (korpus
-      # na dorovnanie nad umyvackou) — hodnoty su ZRKADLOM `CabinetBuilder::MIN`
+      # na dorovnanie nad umyvackou), SIRKA od 50 mm (uzka skrinka, Michal
+      # 7.10.2026, `CONFIG_SCHEMA` 23) — hodnoty su ZRKADLOM `CabinetBuilder::MIN`
       # (string kluce, lebo sem chodi kluc z uloženeho configu). Priama
       # referencia sa pouzit NEDA: `scale_observer` sa nacitava PRED
       # `cabinet_builder` (main.rb), takze konstanta by pri boote neexistovala —
       # zhodu preto strazi guard test `tests/pure/test_s1e0_min_vyska.rb`.
-      MIN = { 'width' => 200.0, 'height' => 80.0, 'depth' => 150.0 }.freeze
+      MIN = { 'width' => 50.0, 'height' => 80.0, 'depth' => 150.0 }.freeze
       # S1-E: SLOT UMYVACKY ma VLASTNE minima — nema vnutro, takze sa neriadi
-      # korpusovymi hranicami, a zaroven nema zmysel pustat 200 mm „umyvacku".
+      # korpusovymi hranicami, a zaroven nema zmysel pustat 50 mm „umyvacku".
       # Su to TIE ISTE cisla ako spodne hranice v `CabinetBuilder::DW_WIDTH_RANGE`
       # / `DW_HEIGHT_RANGE` (Astra S1-E BLOCKER E1: jedna hranica na oboch
       # miestach). H12a: odvodene z `limits` registra `CabinetTypes` (spodne
@@ -505,6 +506,10 @@ module Noxun
           # CONFIG-AWARE (rohova zostava sa musi zmestit pred slepu cast) —
           # sondou cez cely plan, PRED skusanim hlbky a vysky. Ine typy ostavaju
           # na holom typovom minime (dnesne spravanie).
+          # SIRKA 50: od 50 mm moze byt hole minimum POD hranicou `validate!`
+          # (`w <= 2t + 10`, napr. hrubka 25). Taky Scale prestavba odmietne
+          # a `reject_scale` ho vrati s hlaskou o hrubke — vedome, ako kazdy
+          # neplatny Scale (D-120), nie tichy klamp na inu sirku.
           width_note = nil
           if new_w < base_w && Construction.corner?(cfg)
             new_w, width_note = clamp_corner_width(params, new_w, cid, th)
@@ -522,8 +527,8 @@ module Noxun
           # Hole `MIN['height']` nestaci: pri sokli 100 by 80 mm vyrobilo config
           # bez vnutra, `Construction.validate!` by prestavbu odmietol a
           # pouzivatel by po tiahnuti uchopu dostal reject + POVODNY rozmer
-          # namiesto najnizsej platnej skrinky. Sirka a hlbka taky problem
-          # nemaju (ich MIN je vzdy nad hranicou validacie).
+          # namiesto najnizsej platnej skrinky. Hlbku pri zmenseni klampuje
+          # sonda vyssie (`clamp_depth`), sirku len pri rohovej.
           params['height'] = clamp_height(params, (base_h * sz).round.to_f, cid, th)
           new_h = params['height']
 

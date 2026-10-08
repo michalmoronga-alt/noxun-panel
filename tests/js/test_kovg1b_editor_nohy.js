@@ -118,4 +118,13 @@ eq(SENT.length, 1, 'G4: formulár sa dá uložiť');
 eq(SENT[0].rules[1].applies_to.floor_height_min, 55,
    'G4: a na server odchádza AJ s prahom');
 
+// ============ ŠÍRKA 50: desatinná hranica pásma úzkej skrinky =================
+const leg8 = legRule();
+leg8.bands = [{ max: 199.999, quantity: 2 }, { max: 999, quantity: 4 }, { max: null, quantity: 6 }];
+show([leg8]);
+const html8 = box().innerHTML;
+ok(html8.indexOf('step="any" value="199.999"') >= 0, 'ŠÍRKA 50: hranica 199,999 má step="any"');
+ok(html8.indexOf('step="1" value="999"') >= 0, 'ŠÍRKA 50: celé číslo ostáva step="1"');
+eq(R.rdCollectRules()[0].bands[0], { max: 199.999, quantity: 2 }, 'ŠÍRKA 50: hranica prežije zber bez zaokrúhlenia');
+
 console.log('KOV-G1b editor nôh: ' + n + ' assertov OK');

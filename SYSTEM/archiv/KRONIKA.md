@@ -17,9 +17,23 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **ŠÍRKA 50 · skrinka od 50 mm + 2 nohy pod úzkou dolnou (8.10.2026, PR #466, v0.17.28).** Pokyn Michala 7.–8.10.: najmenšia šírka dolnej aj hornej skrinky 200 → **50 mm**,
+  skrinka užšia než 200 mm má **2 nohy** v strede šírky (vpredu + vzadu), v nákupe 2 ks; jedna dávka (audit BLOCKER 1), [package](../zdroje/bloky/HARDENING/PACKAGE_SIRKA50.md).
+  **`CONFIG_SCHEMA` 22 → 23** (vzor 15: starší plugin by 50–199 ticho klampol na 200), aktivačné konštanty bez zmeny; panel zrkadlí `validate!` (šírka ≤ 2 × hrúbka + 10 =
+  červená šírka + hrúbka s vetou); preflight čiel berie šírku aj výšku z `CabinetBuilder::MIN` (výška tam bola chybne 200); Mierka pod hranicu `validate!` sa odmietne
+  s hláškou (vzor D-120; config-aware klamp šírky len pri rohovej). **Seed pravidiel 7 → 8** (`max 199,999 → 2`, audit FIX 4), tvar v6/v7 v `LEGACY_SEED_SHAPES`,
+  `LEG_NARROW_SEED_VERSION` 8 a vetva úzkej skrinky v `leg_stale` (hranice v6 bez zmeny, veta 2/4/6). Polohy nôh = čistá `Construction.leg_layout`: valce sa nikdy
+  nekreslia prekryté; úzka skrinka má valce v strede šírky, za soklom a na nosnom dne, pri nezmestení menej (aj 0) + info `legs_drawn_merged` (nákup
+  podľa pravidla); skrinka od 200 mm sa kreslí bajtovo po starom (nezávislý recenzent Codex 3× P2 a predrecenzia 5× P3 opravené pred PR). Golden H12/H16 regenerované vedome (len schéma, minimum, seed).
+  GH kolo 1: 1× P2 — vetva úzkej skrinky v `leg_stale` len pri pravidle nôh spravovanom seedom (`seed_managed_leg_rule?`), vedome upravené pravidlo ju zhasne.
+  Testy: headless 5373/0, 163 JS, mutácie M1–M10 zhodené; in-SU 3421 PASS/0 FAIL nad `ca606a01` (nová sekcia `run_sirka50`; prvý beh nad `29368874` zhodil
+  CELA-B — config-aware klamp šírky pre každý korpus menil rollback neplatného Scale, preto vrátený).
+  Nahradený STAV (v0.17.27): H18b-1 PR #463 ready → v maine; „Ďalší krok" H18b-1 delta/GH kolo → ŠÍRKA 50 predrecenzia a PR.
+
 - **Matica výberu agentov (7.10.2026, PR #465, docs).** Michal schválil 7.10. výber implementátora podľa triedy dávky. Fakt overený orchestrátorom: effort subagenta sa pri volaní Agent tool nedá nastaviť, len `effort:` v definícii typu (parameter `model:` prepíše model, effort nie; code.claude.com/docs/en/sub-agents) — typy agentov sú preto **profily** (model + effort).
   Nové typy `implementator-lahky` (Sonnet `medium`, trieda Ľ) a `implementator-stredny` (Sonnet `high`, trieda S); `implementator` ostáva profil Ť (Opus `high`). WORKFLOW § 2: riadky profilov v Obsadení rolí a nová podsekcia **Matica výberu** (triedy, profily, postup výberu, eskalácia P1 → Opus, shadow len pri voľných limitoch, povýšenie po 5 behoch, návrhy orchestrátora na potvrdenie Michala, smer Claude/Codex/Grok); § 10 odsek o Grok shadow odkazuje na maticu.
   Parser modu `usage-bar` (`parseRoleModels`) overený spustením jeho funkcie nad WORKFLOW z main aj z vetvy: rovnaký výstup (Codex `gpt-6-astra`, `gpt-6.1-sol`; Grok `grok-4.7`), nové riadky ani podsekcia ho nerozbíjajú. Kód pluginu, verzia ani STAV bez zmeny. Kolo 3 GH review vrátilo len P2 → vedomá výnimka podľa pravidla 3 kôl (oprava + slepá delta, bez 4. kola).
+
 - **Roly: náhradníci, čakanie, kontrola modelu, Grok shadow (7.10.2026, PR #464, docs).** Zápis rozhodnutí, ktoré Michal schválil 6.10.2026 (návrh routera v `noxun-mods`, otázky 1–4).
   WORKFLOW § 2: tabuľka Náhradníci (najprv schopnosť, až potom kvóta; Codex `gpt-6.1-sol` smie zastúpiť implementátora len pri bežných dávkach, predrecenziu vtedy robí vždy slepý recenzent Claude), veta o kontrole modelu cez mod `usage-bar` a nový riadok Grok `grok-4.7` ako implementátor skúšobne (shadow, nikdy sa nemerguje); § 10 pravidlá shadow behov.
   CLAUDE.md Kvóty + WORKFLOW § 6/§ 7 + skill `usage`: reset primárneho agenta do 60 min → čaká sa; Claude nad 80 % s resetom neskôr → bežná dávka smie ísť na náhradného implementátora, ostatné čakajú.

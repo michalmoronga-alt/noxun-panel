@@ -149,7 +149,7 @@ eq(FM.LIMITS.dw_front_height, undefined, 'D-139: vyska cela uz nie je pole s roz
 eq(FM.SLOT_FIELDS.dw_front_height, undefined, 'ani pole slotu');
 
 setType('lower');
-eq(FM.limitFor('width'), [200, 3000], 'dolna skrinka drzi korpusove hranice');
+eq(FM.limitFor('width'), [50, 3000], 'dolna skrinka drzi korpusove hranice (sirka od 50, 7.10.2026)');
 eq(FM.limitFor('height'), [80, 3000], 'vratane 80 mm korpusu na dorovnanie (S1-E0)');
 setType('dishwasher');
 eq(FM.limitFor('width'), [300, 1200], 'slot prepne na svoje');

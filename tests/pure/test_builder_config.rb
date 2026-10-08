@@ -65,7 +65,7 @@ NxTest.test('builder: normalize clampuje rozmery na realne hranice') do
 
   cfg2 = cb.normalize('width' => 10, 'depth' => 10, 'thickness' => 200,
                       'floor_height' => -50, 'rail_depth' => 999)
-  NxTest.assert_close(200.0, cfg2[:width])   # MIN[:width]
+  NxTest.assert_close(50.0, cfg2[:width])    # MIN[:width] (od 7.10.2026 50, predtym 200)
   NxTest.assert_close(150.0, cfg2[:depth])   # MIN[:depth]
   NxTest.assert_close(50.0, cfg2[:thickness]) # max 50
   NxTest.assert_close(0.0, cfg2[:floor_height]) # min 0 (lower)

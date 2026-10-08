@@ -378,7 +378,8 @@ po ktorom konflikt pri prestavbe nevznikne. **Tou istou kategóriou ide aj `hing
 zastavuje je rovnaké, vetu o náprave („prestav ju") nesie správa zo zberu. `CAT_HW_MISMATCH` (`hardware_mismatch`) — vybraný set odporuje čelu (Tip-On čelo na klasickom sete); náprava je
 DÁTOVÁ (vyber set / Doplniť nové predvoľby), nikdy fallback na iný set. K tomu ORANGE `set_none` (vedomá voľba „bez setu" — nie chyba nastavenia) a ORANGE
 `hinge_set_unclassified` z nového aditívneho kľúča `expansion['notes']` (`check_hardware_notes`): nákup beží ďalej, ale set bez zaradenia sa nedá vybrať
-podľa otvárania čela. `BUILD_INFO_ONLY` má navyše `hinge_weight_unknown` — INFO o stave dát, nie nález.
+podľa otvárania čela. `BUILD_INFO_ONLY` má navyše `hinge_weight_unknown` — INFO o stave dát, nie nález — a od šírky 50 (v0.17.28) `legs_drawn_merged`
+(proxy nôh sa pod úzku či plytkú skrinku nakreslila s menej valcami, nákup je správny — [construction.md](construction.md)).
 
 **KOV-G1b (v0.9.59) — MIGRAČNÝ `leg_stale`: prvý nález kovania, ktorý je ORANGE.** `Bom.leg_stale_issue` je štvrtý vzor po `drawer_stale` / `hinge_stale`
 / `flap_stale`, ale **zámerne bez brány**: skrinka na podstavci (uložený deskriptor `support.type` ∈ `Bom::LEG_SUPPORTS` = `legs` + `plinth`) postavená
@@ -394,6 +395,15 @@ tiež 6 nôh a kontrola len na `legs` by jej migračnú vetu potichu zhasla; (b)
 lebo samostatná soklová lišta pri sokli vpredu neexistuje — a tá istá funkcia drží vetu, takže skrinke s `plinth` sa v nej príchyty nespomenú. Náprava je tá istá ako pri `flap_stale`: „Doplniť nové
 predvoľby" + prestavba (po nej je marker 6 a nález zhasne). Príchyt **bez setu** ostáva bežná ORANGE `hardware_unmapped` — `HW_LABELS['plinth_clip']`
 (z G1a) z nej zloží „Príchyt sokla (S1) nemá priradený set…".
+**ŠÍRKA 50 (v0.17.28) — tretí symptóm s VLASTNOU provenienciou.** (c) **úzka skrinka** (šírka < `HardwareRules::LEG_NARROW_BELOW_MM` 200) so snapshotom
+pravidiel pod `LEG_NARROW_SEED_VERSION` (8) a uloženými **4 nohami z pravidla** — jej snapshot ešte nepozná pásmo „< 200 → 2". Skrinka užšia než 200 mm môže
+vzniknúť až so schémou 23, ale projektový snapshot sa nemerguje sám, takže stará zákazka s novou úzkou skrinkou tento stav mať vie. Hranice v6 (symptómy a/b a ich
+proveniencia `LEG_WIDTH_SEED_VERSION`) sa **nemenia** (audit FIX 3) — každá vetva má vlastný prah. Vetva (c) platí **len keď pravidlo nôh projektu spravuje
+seed** (`HardwareRules.seed_managed_leg_rule?`: nedotknutý starý tvar podľa `LEGACY_SEED_SHAPES` — ten istý test ako migrácia — alebo presne aktuálny seed);
+vedome upravené či vypnuté pravidlo „Doplniť nové predvoľby" neprepíše, takže nález by sa nedal zhasnúť a radil by 2 nohy proti vôli používateľa (Codex #466
+P2). Zber sa pýta raz na model (vzor `rules_stale`) a pošle odpoveď ako `leg_rule_managed:`; proveniencia snapshotu sa pri no-op migrácii zámerne neposúva. Veta (`leg_stale_message`) počíta **2/4/6**
+(`leg_count_for_width`) so slovenským tvarom (`sk_count`: „2 nohy", „6 nôh") a príchyt `ceil(nohy / 4)` → pri 2 nohách 1; náhradná veta Kontroly
+(`HW_ORANGE_NOTES`) hovorí „pred pravidlom 2/4/6".
 
 **KOV-G1b (Codex #338 kolo 1 N2) — `plinth_clip_check`: DRUHÝ ORANGE nález kovania.** Príchyt sa počíta **zo šírky korpusu**, nie z počtu nôh (rozhodnutie
 O3 — [hardware.md](hardware.md)), takže ručný zámok počtu nôh ani vlastné pravidlo nôh množstvo príchytov nezmenia. Vedomé to je, potichu byť nesmie:

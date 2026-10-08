@@ -4,10 +4,14 @@
 // korpusom na dorovnanie — plugin ma pod 200 nepusti."
 //
 // Co sa tu strazi:
-//   1) LIMITS.height = [80,3000]; sirka a hlbka sa NEMENIA (ich cisla su tu
-//      zamerne tiez, aby sa „odomknutie" neprelialo na rozmery bez zmyslu).
+//   1) LIMITS.height = [80,3000], LIMITS.width = [50,3000] (sirka 50,
+//      7.10.2026); hlbka sa NEMENI (jej cislo je tu zamerne tiez, aby sa
+//      „odomknutie" neprelialo na rozmery bez zmyslu).
 //   2) validateFields naozaj pusti 80 a odmietne 79 — teda cerveny okraj
 //      a zablokovany apply sa riadia zmenenym limitom, nie starou hodnotou.
+//   4) SIRKA 50: KRIZOVA KONTROLA sirky proti HRUBKE — zrkadlo Ruby
+//      `Construction.validate!` (sirka <= 2 x hrubka + 10 = odmietnutie):
+//      50/18 prejde, 50/20 a 60/25 zocervenie sirku aj hrubku.
 //   3) KRIZOVA KONTROLA: vyska je CELKOVA vratane sokla, takze dolna skrinka
 //      90 mm s predvolenym soklom 100 nema ziadne vnutro. Panel to musi
 //      povedat CERVENYM polom a hlaskou — bez toho by apply presiel az
@@ -93,7 +97,7 @@ function reset(){
 // `Array.from` je nutne: pole vzniklo VNUTRI vm kontextu, takze nie je
 // instanciou Array tohto realmu a deepEqual by ho odmietol aj pri zhode.
 assert.deepEqual(Array.from(ctx.LIMITS.height), [80, 3000], 'vyska ide od 80 mm (S1-E0)');
-assert.deepEqual(Array.from(ctx.LIMITS.width), [200, 3000], 'sirka sa NEMENI');
+assert.deepEqual(Array.from(ctx.LIMITS.width), [50, 3000], 'sirka ide od 50 mm (7.10.2026)');
 assert.deepEqual(Array.from(ctx.LIMITS.depth), [150, 2000], 'hlbka sa NEMENI');
 n += 3;
 
@@ -112,14 +116,48 @@ fields.height = '3001';
 assert.equal(valid(), false, 'horna hranica 3000 plati dalej');
 n += 6;
 
-// --- 3) sirka sa NEODOMKLA ---------------------------------------------------
+// --- 3) sirka od 50 mm --------------------------------------------------------
 reset();
-fields.width = '199';
-assert.equal(valid(), false, 'sirka 199 je dalej chyba');
+fields.width = '49';
+assert.equal(valid(), false, 'sirka 49 je pod limitom');
 assert.equal(bad('width'), true, 'a sirka zocervenie');
-fields.width = '200';
-assert.equal(valid(), true, 'sirka 200 je dalej platna');
-n += 3;
+assert.equal(bad('thickness'), false, 'hrubka nie — chyba je len v rozsahu sirky');
+fields.width = '50';
+assert.equal(valid(), true, 'sirka 50 pri hrubke 18 je platna');
+assert.equal(bad('width'), false, 'a pole nie je cervene');
+fields.width = '199';
+assert.equal(valid(), true, 'sirka 199 tiez (do 7.10.2026 chyba)');
+n += 6;
+
+// --- 3b) SIRKA 50: krizova kontrola sirky proti hrubke -------------------------
+reset();
+fields.width = '50'; fields.thickness = '20';
+assert.equal(valid(), false, '50 mm pri hrubke 20 sa NEAPLIKUJE (50 <= 2 x 20 + 10)');
+assert.equal(bad('width'), true, 'sirka zocervenie');
+assert.equal(bad('thickness'), true, 'aj hrubka — chyba je v ich dvojici');
+assert.match(node('width').title, /Šírka je príliš malá vzhľadom na hrúbku materiálu/, 'ta ista veta ako Ruby');
+assert.match(node('width').title, /viac ako 50 mm/, 'a povie hranicu');
+assert.equal(ctx.nxCabFieldError(), node('width').title, 'stavovy riadok ukaze tu istu vetu');
+fields.width = '60'; fields.thickness = '25';
+assert.equal(valid(), false, '60 pri hrubke 25 tiez nie (60 <= 60)');
+assert.match(node('thickness').title, /hrúbke 25 mm musí byť viac ako 60 mm/, 'veta s cislami');
+fields.width = '61';
+assert.equal(valid(), true, '61 pri hrubke 25 prejde');
+assert.equal(bad('width') || bad('thickness'), false, 'a cervena zmizne');
+assert.equal(node('thickness').title, '', 'aj tooltip hrubky');
+fields.width = '50'; fields.thickness = '18';
+assert.equal(valid(), true, '50/18 prejde (vnutro 14 mm)');
+// Prazdna hrubka = PREDVOLBA typu (18), nie nula.
+fields.thickness = '';
+assert.equal(valid(), true, 'prazdna hrubka = 18 -> 50 prejde');
+fields.width = '46';
+assert.equal(valid(), false, 'sirka 46 je uz pod limitom 50 (rozsah ma prednost)');
+assert.doesNotMatch(node('width').title || '', /hrúbku/, 'krizova veta sa pri sirke mimo rozsahu nepocita');
+// Slot umyvacky korpus nema — krizova kontrola sa ho netyka.
+cabType = 'dishwasher'; fields.width = '50'; fields.thickness = '25';
+assert.equal(ctx.cabinetWidthError(), '', 'slot: ziadna krizova veta sirky');
+cabType = 'lower';
+n += 16;
 
 // --- 4) krizova kontrola: vyska je CELKOVA vratane sokla ---------------------
 reset();

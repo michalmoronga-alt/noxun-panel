@@ -37,3 +37,12 @@ zachovalo poradie kľúčov, druhy kontajnerov, skalárne typy aj zápis čísel
 
 Regresný test odmieta neznámy profil, celý opačný variant, SHA z opačného variantu primiešaný do jedného súboru aj poškodený SHA každého
 zo 16 súborov. Poradie kľúčov, čísla, hodnoty a ďalšie formátovanie sú stále súčasťou bajtového kontraktu.
+
+## Vedomé zmeny obsahu prvého behu
+
+Manifest sa mení len pri **vedomej zmene seedu alebo nového súboru**, zdôvodnenej v PR — vždy len dotknuté SHA, nič iné.
+
+| Dávka | Súbor | Prečo | Ako overené |
+|---|---|---|---|
+| ŠÍRKA 50 (v0.17.28, `feat/sirka-50mm`) | `hardware_rules.json` | seed pravidiel kovania 7 → 8 (pásmo nôh úzkej skrinky `max 199,999 → 2`) | `diff` prvého behu pred/po: len `seed_version` a nové pásmo; SHA v oboch formátoch rovnaký (súbor nemá prázdne kontajnery) |
+| ŠÍRKA 50 | `templates.json` | `CONFIG_SCHEMA` 22 → 23 (vstavané šablóny nesú marker) | `diff`: len trikrát `config_schema`; kompaktný SHA odvodený nahradením prázdnych kontajnerov (`[\n\n  ]` → `[]`, `{\n  }` → `{}`) — tá istá transformácia nad behom pôvodného `main` dala presne pôvodné kompaktné SHA `abs_rules.json`, `materials.json` aj `templates.json` |

@@ -218,6 +218,11 @@ module Noxun
                                                         suppress_slide_owners: drawer[:suppress],
                                                         manual_flap_owners: manual_flap_owners)
         warnings.concat(hw[:warnings])
+        # SIRKA 50 (audit FIX 2): nohy, ktore sa pod UZKU skrinku nezmestia,
+        # sa nekreslia prekryte (skrinka od 200 mm sa kresli po starom a tam
+        # sa prekryt mozu — warning nedostane). Pocet v nakupe ostava podla
+        # pravidla a plan to prizna (info, nie nalez Kontroly).
+        legs_drawn_warning!(warnings, cfg, hw[:items])
 
         plan = {
           schema: BuildPlan::SCHEMA,
@@ -1769,10 +1774,19 @@ module Noxun
       # vedla `corner_error`. Pre ine typy DNESNE spravanie: typove minimum
       # `CabinetBuilder::MIN[:width]` bez sondy (absorpcia ich sirku klampuje
       # len holym minimom). Cele mm; horna hranica = horny clamp `normalize`.
+      # SIRKA 50 (7.10.2026): od 50 mm uz typove minimum NIE JE vzdy nad
+      # hranicou `validate!` (`w <= 2t + 10`) — Mierka pod nu sa VEDOME
+      # odmietne (`ScaleWatch.reject_scale` s hlaskou o hrubke, vzor D-120:
+      # neplatny Scale = rollback, nie tichy klamp na inu sirku).
       MAX_WIDTH = 3000.0
+      # Zrkadlo `CabinetBuilder::MIN[:width]` pre pripad, ze builder este nie je
+      # nacitany (`construction` sa nacitava PRED `cabinet_builder`, main.rb).
+      # Za behu sa pouzije vzdy konstanta buildera; zhodu strazi
+      # `tests/pure/test_s1e0_min_vyska.rb`.
+      MIN_WIDTH_FALLBACK = 50.0
 
       def min_valid_width(cfg, hardware_rules: nil, part_thicknesses: nil)
-        lo = defined?(CabinetBuilder) ? CabinetBuilder::MIN[:width] : 200.0
+        lo = defined?(CabinetBuilder) ? CabinetBuilder::MIN[:width] : MIN_WIDTH_FALLBACK
         return lo unless corner?(cfg)
 
         rules = hardware_rules || HardwareRules.load
@@ -1799,6 +1813,115 @@ module Noxun
         true
       rescue StandardError
         false
+      end
+
+      # === SIRKA 50: ROZMIESTNENIE NOH POD DNOM ==============================
+      #
+      # JEDINA autorita POLOH valcov noh (proxy `CabinetBuilder.draw_legs`)
+      # aj otazky „kolko valcov sa naozaj nakresli" (warning planu). Je to
+      # CISTA geometria v lokalnych mm korpusu — headless testovatelna.
+      # Pravidla:
+      #   * SKRINKA OD 200 mm = PRESNE povodne spravanie (2 rady s odsadenim
+      #     LEG_INSET, predny pri SOKLI VPREDU za doskou sokla; plytka = jeden
+      #     rad v strede hlbky) — aj ked v nom valce mozu splynut. Zamknuty
+      #     pocet noh na sirokej skrinke sa NESMIE ticho preskladat (Codex P2-3).
+      #   * UZKA skrinka (`HardwareRules.narrow_leg_width?`, < 200 mm): VSETKY
+      #     valce v STREDE SIRKY — predna + zadna (audit FIX 2, Codex P2-1).
+      #     Ked sa obe po hlbke nezmestia, JEDEN valec za doskou sokla a na
+      #     nosnom dne (`y + r <= zadny doraz`); ked nema miesto ani ten, ziadny
+      #     (Codex P2-2). Pocet v NAKUPE sa tym NEMENI — plan to prizna info
+      #     warningom `legs_drawn_merged`.
+      LEG_DIAMETER   = 50.0
+      LEG_INSET      = 60.0
+      # Vola medzi doskou predneho sokla a nohou (D-13/D-17, Codex F4).
+      LEG_PLINTH_CLEAR = 5.0
+      # Vizualny strop kreslenych noh — quantity v DATACH plati vzdy (supis), geometria
+      # je proxy a nesmie polozit SketchUp pri poskodenom/extremnom pocte (audit D7).
+      LEG_RENDER_MAX = 16
+      # Kod info warningu planu (nie nalez Kontroly — `Validation::BUILD_INFO_ONLY`).
+      LEGS_DRAWN_MERGED = 'legs_drawn_merged'
+
+      # -> { positions: [[x, y], ...], wanted: n } — `wanted` = pocet, ktory by
+      # sa mal nakreslit (po strope LEG_RENDER_MAX), `positions` = naozaj
+      # nakreslene stredy valcov.
+      def leg_layout(cfg, qty)
+        count = [qty.to_i, LEG_RENDER_MAX].min
+        return { positions: [], wanted: 0 } if count < 1
+
+        w = cfg[:width].to_f
+        # D-37: nohy patria pod NOSNE dno (konstrukcna hlbka) — zadny rad nesmie
+        # trcat pod nalozenym chrbtom (pri hrubke az 50 mm by visel vo vzduchu).
+        # KON-A (Grok 9): pri komine podla hlbky DNA — zadny doraz `back_stop`
+        # (bez komina presne dnesna `carcass_depth`).
+        d = back_stop(cfg)
+        r = LEG_DIAMETER / 2.0
+        plinth = cfg[:plinth_mode] == 'front'
+        # D-13/D-17 (Codex F4): pri prednom sokli predny rad noh posunut ZA dosku
+        # sokla (recess + hrubka + polomer + vola) — proxy sa nesmie pretinat.
+        front_y = LEG_INSET
+        front_y = [front_y, cfg[:plinth_recess].to_f + cfg[:thickness].to_f + r + LEG_PLINTH_CLEAR].max if plinth
+        if HardwareRules.narrow_leg_width?(w)
+          return { positions: narrow_leg_ys(count, d, r, plinth, front_y).map { |y| [w / 2.0, y] }, wanted: count }
+        end
+
+        # Skrinka od 200 mm: povodne spravanie bajtovo (pred sirkou 50).
+        two_rows = count > 1 && d > front_y + LEG_INSET + 2 * r
+        rows =
+          if two_rows
+            front = (count / 2.0).ceil
+            [[front_y, front], [d - LEG_INSET, count - front]].reject { |_, n| n < 1 }
+          else
+            [[d / 2.0, count]]
+          end
+        { positions: rows.flat_map { |y, n| leg_row_xs(w, n).map { |x| [x, y] } }, wanted: count }
+      end
+
+      # Y stredov valcov UZKEJ skrinky (x je vzdy stred sirky): najviac dva —
+      # predny a zadny. Najprv odsadenie LEG_INSET (ako bezna skrinka), na
+      # plytkej skrinke krajne pripustne polohy; inak jeden valec, inak ziadny.
+      # Pripustna poloha = za doskou predneho sokla (`front_y`) a cely valec
+      # na nosnom dne (`y + r <= d`).
+      def narrow_leg_ys(count, depth, radius, plinth, front_y)
+        lo = plinth ? front_y : radius
+        hi = depth - radius
+        return [] if hi < lo # valec sa pod skrinku nezmesti vobec
+
+        back = depth - LEG_INSET
+        if count >= 2
+          return [front_y, back] if back - front_y >= LEG_DIAMETER && front_y >= lo && back <= hi
+          return [lo, hi] if hi - lo >= LEG_DIAMETER
+        end
+        [[[depth / 2.0, lo].max, hi].min]
+      end
+
+      # X stredov n noh v rade: 1 ks stred; inak rovnomerne od insetu po sirku-inset.
+      # (Povodna `CabinetBuilder.leg_xs` — skrinka od 200 mm sa kresli bez zmeny.)
+      def leg_row_xs(width, n)
+        return [width / 2.0] if n == 1
+
+        inset = [LEG_INSET, width / 2.0].min
+        span = width - 2 * inset
+        (0...n).map { |i| inset + span * i / (n - 1.0) }
+      end
+
+      # Info warning, ked sa nakresli MENEJ valcov, nez kolko noh ma skrinka
+      # v nakupe. Rovnaka podmienka ako pri kresleni (`render_hardware`): nohy
+      # z polozky `leg`, len pri skrinke s podstavcom.
+      def legs_drawn_warning!(warnings, cfg, items)
+        qty = Array(items).select { |h| h.is_a?(Hash) && h['generic_type'] == 'leg' }
+                          .sum { |h| h['quantity'].to_i }
+        return if qty < 1 || cfg[:floor_height].to_f <= 0
+
+        lay = leg_layout(cfg, qty)
+        drawn = lay[:positions].length
+        return if drawn >= lay[:wanted]
+
+        warnings << BuildPlan.warning(
+          LEGS_DRAWN_MERGED,
+          "Nohy: v nákupe #{qty} ks, v modeli sa kreslí #{drawn} — pod úzku skrinku #{fmt_mm(cfg[:width])} × " \
+          "#{fmt_mm(back_stop(cfg))} mm sa za soklom nezmestia (priemer #{fmt_mm(LEG_DIAMETER)} mm).",
+          severity: 'info', data: { 'quantity' => qty, 'drawn' => drawn }
+        )
       end
 
       # Svetla vyska configu pri INEJ vyske korpusu (cista sonda pre testy
