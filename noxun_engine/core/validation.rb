@@ -944,7 +944,7 @@ module Noxun
       #   leg_stale         — skrinka postavena pred pravidlom „4/6 podla sirky"
       #   plinth_clip_check — pocet prichytov nesedi s poctom noh (Codex #338 N2)
       HW_ORANGE_NOTES = {
-        BuildPlan::LEG_STALE => 'Nohy sú spočítané ešte pred pravidlom 4/6.',
+        BuildPlan::LEG_STALE => 'Nohy sú spočítané ešte pred pravidlom 4/6 alebo pre úzke skrinky (2 nohy).',
         BuildPlan::PLINTH_CLIP_CHECK =>
           'Počet príchytov sokla nesedí s počtom nôh.'
       }.freeze

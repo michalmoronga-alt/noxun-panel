@@ -4,8 +4,9 @@
 // korpusom na dorovnanie — plugin ma pod 200 nepusti."
 //
 // Co sa tu strazi:
-//   1) LIMITS.height = [80,3000]; sirka a hlbka sa NEMENIA (ich cisla su tu
-//      zamerne tiez, aby sa „odomknutie" neprelialo na rozmery bez zmyslu).
+//   1) LIMITS.height = [80,3000]; LIMITS.width = [50,3000] (CONFIG_SCHEMA 23,
+//      Michal 7.10.2026); hlbka sa NEMENI (cisla su tu zamerne tiez, aby sa
+//      „odomknutie" neprelialo na rozmery bez zmyslu).
 //   2) validateFields naozaj pusti 80 a odmietne 79 — teda cerveny okraj
 //      a zablokovany apply sa riadia zmenenym limitom, nie starou hodnotou.
 //   3) KRIZOVA KONTROLA: vyska je CELKOVA vratane sokla, takze dolna skrinka
@@ -93,7 +94,7 @@ function reset(){
 // `Array.from` je nutne: pole vzniklo VNUTRI vm kontextu, takze nie je
 // instanciou Array tohto realmu a deepEqual by ho odmietol aj pri zhode.
 assert.deepEqual(Array.from(ctx.LIMITS.height), [80, 3000], 'vyska ide od 80 mm (S1-E0)');
-assert.deepEqual(Array.from(ctx.LIMITS.width), [200, 3000], 'sirka sa NEMENI');
+assert.deepEqual(Array.from(ctx.LIMITS.width), [50, 3000], 'sirka ide od 50 mm (schema 23)');
 assert.deepEqual(Array.from(ctx.LIMITS.depth), [150, 2000], 'hlbka sa NEMENI');
 n += 3;
 
@@ -112,14 +113,31 @@ fields.height = '3001';
 assert.equal(valid(), false, 'horna hranica 3000 plati dalej');
 n += 6;
 
-// --- 3) sirka sa NEODOMKLA ---------------------------------------------------
+// --- 3) sirka od 50 mm + KRIZOVA KONTROLA sirka x hrubka ------------------------
 reset();
-fields.width = '199';
-assert.equal(valid(), false, 'sirka 199 je dalej chyba');
+fields.width = '49';
+assert.equal(valid(), false, 'sirka 49 je pod limitom');
 assert.equal(bad('width'), true, 'a sirka zocervenie');
+fields.width = '50';
+assert.equal(valid(), true, 'sirka 50 s hrubkou 18 je platna');
+assert.equal(bad('width'), false, 'pole nie je cervene');
+assert.equal(node('width').title, '', 'a bez hlasky');
+fields.width = '199';
+assert.equal(valid(), true, 'sirka 199 uz nie je chyba');
 fields.width = '200';
-assert.equal(valid(), true, 'sirka 200 je dalej platna');
-n += 3;
+assert.equal(valid(), true, 'sirka 200 je platna');
+// Zrkadlo Ruby `Construction.validate!`: chyba ak w <= 2t + 10.
+reset();
+fields.width = '50'; fields.thickness = '20';
+assert.equal(valid(), false, '50 mm / hrubka 20 (50 <= 50) sa odmietne');
+assert.equal(bad('width'), true, 'sirka zocervenie');
+assert.match(node('width').title, /Šírka je príliš malá vzhľadom na hrúbku materiálu/, 'rovnaka veta ako Ruby');
+assert.equal(ctx.nxCabFieldError(), 'Šírka je príliš malá vzhľadom na hrúbku materiálu.', 'stavova veta formulara');
+fields.width = '60'; fields.thickness = '25';
+assert.equal(valid(), false, '60 mm / hrubka 25 sa odmietne');
+fields.width = '60'; fields.thickness = '24';
+assert.equal(valid(), true, '60 mm / hrubka 24 (60 > 58) prejde - tesne nad hranicou');
+n += 16;
 
 // --- 4) krizova kontrola: vyska je CELKOVA vratane sokla ---------------------
 reset();

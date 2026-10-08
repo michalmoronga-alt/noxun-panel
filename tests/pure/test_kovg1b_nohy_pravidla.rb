@@ -367,8 +367,9 @@ NxTest.test('KOV-G1b (5): `SEED_VERSION` je 6 a seed nesie obe pravidlá v novom
   leg = c.rule_of(c::LEG_RULE)
   NxTest.assert_equal('bands', leg['kind'])
   NxTest.assert_equal('width', leg['input'])
-  NxTest.assert_equal([[999.0, 4], [nil, 6]], leg['bands'].map { |b| [b['max'], b['quantity']] },
-                      'konvencia „< 1000" = max 999,0 (ako 849,0 pri závesoch)')
+  NxTest.assert_equal([[c::HR::LEG_NARROW_BAND_MAX, 2], [999.0, 4], [nil, 6]],
+                      leg['bands'].map { |b| [b['max'], b['quantity']] },
+                      'konvencia „< 1000" = max 999,0 (ako 849,0 pri závesoch); od seedu 8 aj „< 200" = 2 nohy')
   NxTest.assert_equal(%w[legs plinth], leg['applies_to']['support'], 'filter podopretia ostáva')
   clip = c.rule_of(c::CLIP_RULE)
   NxTest.assert_equal(c::CLIP_TYPE, clip['output'])

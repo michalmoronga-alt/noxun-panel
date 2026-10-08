@@ -1770,9 +1770,13 @@ module Noxun
       # `CabinetBuilder::MIN[:width]` bez sondy (absorpcia ich sirku klampuje
       # len holym minimom). Cele mm; horna hranica = horny clamp `normalize`.
       MAX_WIDTH = 3000.0
+      # Zalozna spodna hranica sirky, ked sa `CabinetBuilder` este nenacital
+      # (`construction` sa nacitava PRED nim). Zrkadlo `CabinetBuilder::MIN[:width]`
+      # — zhodu strazi `tests/pure/test_s1e0_min_vyska.rb`.
+      MIN_WIDTH_FALLBACK = 50.0
 
       def min_valid_width(cfg, hardware_rules: nil, part_thicknesses: nil)
-        lo = defined?(CabinetBuilder) ? CabinetBuilder::MIN[:width] : 200.0
+        lo = defined?(CabinetBuilder) ? CabinetBuilder::MIN[:width] : MIN_WIDTH_FALLBACK
         return lo unless corner?(cfg)
 
         rules = hardware_rules || HardwareRules.load

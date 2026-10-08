@@ -340,8 +340,8 @@ end
 
 NxTest.test('KON-A: nohy (proxy) podla hlbky dna R — zdroj buildera') do
   cb_src = NxKonA.src('noxun_engine', 'core', 'cabinet_builder.rb')
-  legs = cb_src[/def draw_legs\(ents, cfg, qty\)(.*?)\n        end\n/m, 1].to_s
-  NxTest.assert(legs.include?('Construction.back_stop(cfg)'), 'draw_legs cita zadny doraz R')
+  legs = cb_src[/def leg_layout\(cfg, qty\)(.*?)\n        end\n/m, 1].to_s
+  NxTest.assert(legs.include?('Construction.back_stop(cfg)'), 'leg_layout (pozicie noh) cita zadny doraz R')
   NxTest.refute(legs.include?('Construction.carcass_depth(cfg)'), 'uz nie carcass_depth')
   NxTest.assert_equal(NxKonA::CN.carcass_depth(NxKonA::CB.normalize({})), NxKonA::CN.back_stop(NxKonA::CB.normalize({})),
                       'pri X = 0 rovnake cislo ako dnes')

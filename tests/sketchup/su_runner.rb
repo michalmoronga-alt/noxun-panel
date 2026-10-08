@@ -3652,6 +3652,84 @@ module NoxunSuRunner
     cleanup(model)
   end
 
+  # --- SIRKA OD 50 mm + 2 NOHY POD UZKOU SKRINKOU (CONFIG_SCHEMA 23) -----------
+  #
+  # Headless sada overuje plan, pasma a pozicie (`CabinetBuilder.leg_layout`);
+  # tu sa overuje MODEL: uzka skrinka sa naozaj postavi, ma 2 nohy v strede
+  # sirky (predna + zadna), kusovnik ju vidi, Mierka sirky klampne na 50
+  # a 1x Spat vrati scale aj absorpciu.
+
+  def sirka50_legs(inst)
+    inst.definition.entities.grep(Sketchup::ComponentInstance)
+        .find { |i| e::Store.get(i, 'role') == 'leg' }
+  end
+
+  def run_sirka50(model)
+    [[50.0, 'dolna 50'], [150.0, 'dolna 150']].each do |w, label|
+      inst = e::CabinetBuilder.build(model, 'type' => 'lower', 'width' => w, 'height' => 720.0,
+                                            'depth' => 560.0, 'thickness' => 18.0, 'floor_height' => 100.0)
+      unless inst
+        ok("SIRKA50 (#{label}): vlozenie", false)
+        next
+      end
+      cfg = e::Store.config(inst) || {}
+      ok("SIRKA50 (#{label}): sirka v configu #{cfg['width']}, schema #{cfg['config_schema']}",
+         (cfg['width'].to_f - w).abs < 0.01 && cfg['config_schema'].to_i >= 23)
+      parts = s1e0_parts(inst)
+      ok("SIRKA50 (#{label}): dielce su realne a ziadny nema nekladny rozmer (#{parts.length})",
+         parts.length.positive? && s1e0_degenerate(parts).empty?)
+      leg_qty = Array(cfg['hardware']).select { |h| h['generic_type'] == 'leg' }.sum { |h| h['quantity'].to_i }
+      ok("SIRKA50 (#{label}): v nakupe (config.hardware) 2 nohy, nie 4 (#{leg_qty})", leg_qty == 2)
+      legs = sirka50_legs(inst)
+      ok("SIRKA50 (#{label}): proxy nohy v modeli existuje", !legs.nil?)
+      if legs
+        b = legs.bounds
+        cx = (b.min.x.to_mm + b.max.x.to_mm) / 2.0
+        ok("SIRKA50 (#{label}): nohy v strede sirky (x #{cx.round(2)} ~ #{w / 2.0})", (cx - w / 2.0).abs < 0.5)
+        ok("SIRKA50 (#{label}): predna a zadna noha (rozpatie y #{(b.max.y.to_mm - b.min.y.to_mm).round(1)} mm)",
+           (b.max.y.to_mm - b.min.y.to_mm) > 400.0)
+      end
+      col = e::Bom.collect(model)
+      ok("SIRKA50 (#{label}): kusovnik skrinku VIDI", col[:cabinets] == 1 && col[:records].length.positive?)
+      cleanup(model)
+    end
+
+    # horna 50 mm
+    up = e::CabinetBuilder.build(model, 'type' => 'upper', 'width' => 50.0, 'height' => 720.0,
+                                        'depth' => 320.0, 'thickness' => 18.0)
+    up_parts = up ? s1e0_parts(up) : []
+    ok("SIRKA50 (horna 50): postavila sa (#{up_parts.length} dielcov, ziadny degenerovany)",
+       up_parts.length.positive? && s1e0_degenerate(up_parts).empty?)
+    cleanup(model)
+
+    # Mierka sirky na 50 mm: 600 * 0,05 = 30 -> klamp na 50; 1x Spat vrati vsetko.
+    inst = e::CabinetBuilder.build(model, 'type' => 'lower', 'width' => 600.0, 'height' => 720.0,
+                                          'depth' => 560.0, 'thickness' => 18.0, 'floor_height' => 100.0)
+    if inst
+      before_tr = inst.transformation.to_a
+      model.start_operation('SU-TEST SIRKA50 user scale', true)
+      inst.transformation = inst.transformation * Geom::Transformation.scaling(ORIGIN, 0.05, 1.0, 1.0)
+      model.commit_operation
+      e::ScaleWatch.absorb(inst)
+      cfg_sc = e::Store.config(inst) || {}
+      ok("SIRKA50 (Mierka): absorpcia klampla sirku na 50 (config #{cfg_sc['width']})",
+         (cfg_sc['width'].to_f - 50.0).abs < 0.01)
+      ok('SIRKA50 (Mierka): transform po absorpcii je cisty',
+         e::ScaleWatch.scale_factors(inst.transformation).nil?)
+      Sketchup.undo
+      cfg_undo = e::Store.config(inst) || {}
+      ok("SIRKA50 (Mierka): 1x Spat vratil scale AJ absorpciu (sirka #{cfg_undo['width']})",
+         inst.valid? && (cfg_undo['width'].to_f - 600.0).abs < 0.01 && inst.transformation.to_a == before_tr)
+    else
+      ok('SIRKA50 (Mierka): vlozenie skrinky', false)
+    end
+    cleanup(model)
+    ok('SIRKA50: cleanup (0 korpusov)', cabinets(model).empty?)
+  rescue StandardError => ex
+    log_line("FAIL: run_sirka50 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    cleanup(model)
+  end
+
   # --- S1-E: SLOT UMYVACKY -------------------------------------------------
   #
   # Headless sada overuje PLAN a KONTRAKT; tu sa overuje MODEL a to, co sa mimo
@@ -28970,6 +29048,7 @@ module NoxunSuRunner
     run_sync(model)
     run_sync_back(model)     # davka Chrbat: D-37 hlbka, D-31 none, D-38 pevny 18
     run_sync_rails(model)    # H3/D-80: vnutro pod vystuhami (odsadenie, upright, chrbat, odmietnutie)
+    run_sirka50(model)       # SIRKA50: korpus od 50 mm — dolna 50 a 150 mm sa postavi, 2 nohy v strede sirky (predna + zadna, v nakupe 2 ks), kusovnik ju vidi, horna 50 mm, Mierka sirky klampne na 50 a 1x Spat vrati scale aj absorpciu
     run_s1e0(model)          # S1-E0: minimalna vyska korpusu 80 mm — nizka skrinka na dorovnanie sa postavi bez degenerovaneho dielca a kusovnik ju vidi, cesta Inspectora klampne 60 na 80, absorpcia scale pod hranicu tiez (a 1x Spat vrati scale aj absorpciu), horna 600 x 80 x 320
     run_s1e(model)           # S1-E: SLOT UMYVACKY — zo sablony 1 vyrobny dielec + telo ako referencia (kind reference, v kusovniku nikde), zmena vysky cela = 1 Spat, prisunutie na NOMINALNU hranu (aj pri presahujucom cele a vypnutom tagu referencie), zmena triedy prestavi telo, absorpcia scale na typove minimum, sablona so slotom, Kontrola dw_body_fit/dw_height_fit cez realny zber
     run_s1b1(model)          # S1-B1: SPOTREBIC V ZAKAZKE — priradenie z katalogu, presun, odpojenie a zmazanie ako JEDEN krok Spat (polozka + `appliance_refs[]` vlastnika + prestavba naraz), sirota po Delete (nalez BEZ `owner_id`) a jej naprava, trieda umyvacky vs slot, „dodáva zákazník" (medzisucet 0 + stitok v ponuke), legacy zakazka na kanonicke kody, ROLLBACK po riadenych zlyhaniach a bariera observera

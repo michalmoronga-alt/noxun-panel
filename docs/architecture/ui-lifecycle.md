@@ -432,6 +432,9 @@ byť v `bindExprFields` — guard `test_rohb1_ovladace.js`, výnimka `aprMountVa
   odpoveď sa prijme len pri type s nohami (`nxLegsTypeHasLegs` = známy typ registra s `on_floor` — dnes `lower`, `corner_blind`; `nxLegsApplyVisibility(t)`
   dostáva skutočný typ a skryje riadok pri `!onFloor`). `NX.setHardwareSets` prekreslí vetu pri označenej skrinke a bez nej
   volá `nxLegsInsertInvalidate` (mapovanie, definícia setu a názvy nie sú v kľúči).
+- **Krížová kontrola šírky × hrúbky** (`form.js` `cabinetWidthError`, šírka od 50 mm, `CONFIG_SCHEMA` 23): zrkadlo `Construction.validate!` (`šírka <= 2 × hrúbka + 10`),
+  rovnaká veta „Šírka je príliš malá vzhľadom na hrúbku materiálu." ako server; zočervená pole šírky (`markWidthError` AŽ PO `cabinetCornerError`, ktorá `title` šírky
+  maže), apply sa zablokuje, veta ide aj do stavového riadku (`nxCabFieldError`). Slot a rohová sa netýkajú (rohová má vlastnú prísnejšiu kontrolu). `LIMITS.width` = `[50, 3000]`.
 - **Krížová kontrola výšky** (`form.js` `cabinetHeightError` na konci `validateFields`): výška je **celková vrátane sokla**; `markHeightError` zočervená
   **dvojicu Výška + Podstavec** s dôvodom v `title`, apply sa zablokuje. Zrkadlo dvoch Ruby pravidiel cez zdieľanú `nxInteriorZ` (`core.js`): svetlé vnútro
   `<= MIN_AVAIL_H` (10 mm) a pri vrchu „dve výstuhy" `NX_MIN_INTERIOR_H` (20 mm) — zhodu stráži `tests/pure/test_s1e0_min_vyska.rb`. **Prázdne pole nie je nula:**

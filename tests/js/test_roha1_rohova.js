@@ -68,10 +68,10 @@ eq(NXInsert.templatesForType(LIB, 'lower').map(t => t.name), ['Dolna klasik'], '
 // ROH-B1 (O2 + P3-2): pevne minimum 584 zaniklo — najmensiu sirku pocita
 // krizova kontrola z poli rohovej a ucinnych hrubok (test_rohb1_ovladace.js).
 eq(vm.runInContext("NXTypes.get('corner_blind').limits", ctx), null, 'rohova nema vlastne rozsahy (ROH-B1)');
-eq(Array.from(vm.runInContext("limitFor('width')", ctx)), [200, 3000], 'limit sirky pri rohovej = korpus (minimum riesi kontrola)');
+eq(Array.from(vm.runInContext("limitFor('width')", ctx)), [50, 3000], 'limit sirky pri rohovej = korpus (minimum riesi kontrola)');
 eq(ctx.nxCornerMinWidth(450, 80, 18, 18), 584, 'minimum predvolieb 450 + 80 + 18 + 2 x 18');
 ctx.setType('lower');
-eq(Array.from(vm.runInContext("limitFor('width')", ctx)), [200, 3000], 'dolna ma dalej 200');
+eq(Array.from(vm.runInContext("limitFor('width')", ctx)), [50, 3000], 'dolna ma sirku od 50 (schema 23)');
 ctx.setType('corner_blind');
 const tplSrc = fs.readFileSync(path.join(JS, 'templates.js'), 'utf8');
 ok(tplSrc.indexOf('TPL_TYPE_WORDS') < 0, 'Studio nema vlastnu mapu slov typu (H12c: `type_word` zo servera)');

@@ -252,6 +252,11 @@ nôh zmení **ručným zámkom** (`hardware_overrides`) alebo **vlastným pravid
 `plinth_clip_check` ([outputs.md](outputs.md)). Skrinka **bez** príchytu (klzák 17-20 mm, sokel vpredu, stará skrinka) mlčí — chýbajúci príchyt rieši
 `leg_stale`, nie tento nález.
 
+**ŠÍRKA OD 50 mm — 2 NOHY (seed 7 → 8, Michal 8.10.2026).** Seed `nohy-zakladne` má tri pásma: `max 199.999 → 2`, `max 999 → 4`, catch-all `→ 6` (konvencia `v <= max`:
+199 aj 199,5 dá 2, 200 dá 4; konštanty `LEG_NARROW_BELOW_MM` 200 a `LEG_NARROW_BAND_MAX`). Príchyt sokla ostáva 1 ks (na začaté 4 nohy). `LEGACY_SEED_SHAPES['nohy-zakladne']`
+nesie odteraz aj v6/v7 tvar `bands` 4/6, takže `merge_seed` (knižnica) aj „Doplniť nové predvoľby" (snapshot) obnoví LEN nedotknuté pravidlo; upravené ostáva.
+**`LEG_NARROW_SEED_VERSION` = 8** je pevné číslo pre tretí symptóm `leg_stale` (úzka skrinka so 4 nohami z pravidla, [outputs.md](outputs.md)).
+
 **`LEG_WIDTH_SEED_VERSION` = 6** je pevné číslo (ako `LIFT_SEED_VERSION`) pre migračnú bránu `leg_stale` — ORANGE „skrinka má nohy spočítané ešte pred
 pravidlom 4/6" ([outputs.md](outputs.md)). Editor pravidiel: [ui-lifecycle.md](ui-lifecycle.md). Testy: `tests/pure/test_kovg1b_nohy_pravidla.rb`,
 `tests/js/test_kovg1b_editor_nohy.js`, in-SketchUp sekcia `run_kovg`.

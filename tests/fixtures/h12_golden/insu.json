@@ -8,7 +8,7 @@
         0.0
       ],
       "config": {
-        "config_schema": 22,
+        "config_schema": 23,
         "rules_seed_version": 7,
         "part_key_schema": 1,
         "plan_schema": 7,
@@ -490,7 +490,7 @@
         0.0
       ],
       "config": {
-        "config_schema": 22,
+        "config_schema": 23,
         "rules_seed_version": 7,
         "part_key_schema": 1,
         "plan_schema": 7,
@@ -1074,7 +1074,7 @@
         1400.0
       ],
       "config": {
-        "config_schema": 22,
+        "config_schema": 23,
         "rules_seed_version": 7,
         "part_key_schema": 1,
         "plan_schema": 7,
@@ -1492,7 +1492,7 @@
         0.0
       ],
       "config": {
-        "config_schema": 22,
+        "config_schema": 23,
         "rules_seed_version": 7,
         "part_key_schema": 1,
         "plan_schema": 7,
@@ -1673,7 +1673,7 @@
         0.0
       ],
       "config": {
-        "config_schema": 22,
+        "config_schema": 23,
         "rules_seed_version": 7,
         "part_key_schema": 1,
         "plan_schema": 7,
@@ -2309,7 +2309,7 @@
         0.0
       ],
       "config": {
-        "config_schema": 22,
+        "config_schema": 23,
         "rules_seed_version": 7,
         "part_key_schema": 1,
         "plan_schema": 7,

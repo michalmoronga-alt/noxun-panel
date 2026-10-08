@@ -30,7 +30,7 @@
     "config_to_params_type": "lower",
     "normalize_type": "lower",
     "cabinet_config": {
-      "config_schema": 22,
+      "config_schema": 23,
       "rules_seed_version": 7,
       "part_key_schema": 1,
       "plan_schema": 7,
@@ -248,7 +248,7 @@
       "front:F1/wing:single"
     ],
     "scale_min": {
-      "width": 200.0,
+      "width": 50.0,
       "height": 80.0,
       "depth": 150.0
     },
@@ -352,7 +352,7 @@
     "config_to_params_type": "upper",
     "normalize_type": "upper",
     "cabinet_config": {
-      "config_schema": 22,
+      "config_schema": 23,
       "rules_seed_version": 7,
       "part_key_schema": 1,
       "plan_schema": 7,
@@ -570,7 +570,7 @@
       "front:F1/wing:single"
     ],
     "scale_min": {
-      "width": 200.0,
+      "width": 50.0,
       "height": 80.0,
       "depth": 150.0
     },
@@ -676,7 +676,7 @@
     "config_to_params_type": "dishwasher",
     "normalize_type": "dishwasher",
     "cabinet_config": {
-      "config_schema": 22,
+      "config_schema": 23,
       "rules_seed_version": 7,
       "part_key_schema": 1,
       "plan_schema": 7,
@@ -1006,7 +1006,7 @@
     "config_to_params_type": "corner_blind",
     "normalize_type": "corner_blind",
     "cabinet_config": {
-      "config_schema": 22,
+      "config_schema": 23,
       "rules_seed_version": 7,
       "part_key_schema": 1,
       "plan_schema": 7,
@@ -1235,7 +1235,7 @@
       "front:F1/wing:single"
     ],
     "scale_min": {
-      "width": 200.0,
+      "width": 50.0,
       "height": 80.0,
       "depth": 150.0
     },
@@ -1339,7 +1339,7 @@
     "config_to_params_type": "tall",
     "normalize_type": "lower",
     "cabinet_config": {
-      "config_schema": 22,
+      "config_schema": 23,
       "rules_seed_version": 7,
       "part_key_schema": 1,
       "plan_schema": 7,
@@ -1557,7 +1557,7 @@
       "front:F1/wing:single"
     ],
     "scale_min": {
-      "width": 200.0,
+      "width": 50.0,
       "height": 80.0,
       "depth": 150.0
     },
@@ -1661,7 +1661,7 @@
     "config_to_params_type": "lower",
     "normalize_type": "lower",
     "cabinet_config": {
-      "config_schema": 22,
+      "config_schema": 23,
       "rules_seed_version": 7,
       "part_key_schema": 1,
       "plan_schema": 7,
@@ -1879,7 +1879,7 @@
       "front:F1/wing:single"
     ],
     "scale_min": {
-      "width": 200.0,
+      "width": 50.0,
       "height": 80.0,
       "depth": 150.0
     },
@@ -1983,7 +1983,7 @@
     "config_to_params_type": "",
     "normalize_type": "lower",
     "cabinet_config": {
-      "config_schema": 22,
+      "config_schema": 23,
       "rules_seed_version": 7,
       "part_key_schema": 1,
       "plan_schema": 7,
@@ -2201,7 +2201,7 @@
       "front:F1/wing:single"
     ],
     "scale_min": {
-      "width": 200.0,
+      "width": 50.0,
       "height": 80.0,
       "depth": 150.0
     },

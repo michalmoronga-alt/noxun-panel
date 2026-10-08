@@ -403,7 +403,7 @@ teda iný mechanizmus, iné ramená a iná tyč v objednávke; nové dôvody by 
 · **`14` = D-128** (RUČNÁ VÝŠKA DREVENÉHO BOXU): záznam `hardware_overrides` s `rule_id recipe:<id>` smie niesť pole **`box_height`** (mm Float), tretiu os zámku popri
 `nominal_length` a `height_variant`. Starší plugin (schéma 13) ho pri normalizácii **zahodí** whitelistom `norm_hardware_overrides`, takže zásuvka by sa ticho vrátila na
 **automatickú výšku boxu** — teda by narezal iné dielce boxu (2 boky, vnútorné čelo, chrbát), než odsúhlasila objednávka. Brány sú tie isté ako pri 5–13.
-· **`15` = S1-E0** (NÍZKY KORPUS NA DOROVNANIE, výška od 80 mm): **jediný bump v celej histórii, pri ktorom nepribudlo pole** — zmenil sa prípustný rozsah hodnoty
+· **`15` = S1-E0** (NÍZKY KORPUS NA DOROVNANIE, výška od 80 mm): **prvý bump, pri ktorom nepribudlo pole** (rovnako `23` = šírka od 50 mm, odsek ROZMEROVÉ HRANICE nižšie) — zmenil sa prípustný rozsah hodnoty
 `height` z 200 na 80 mm. Povinný je napriek tomu, lebo strata je výrobná a tichá: starší plugin (schéma 14) má `MIN[:height]` = 200, takže by skrinku 80–199 mm pri
 prvej prestavbe **klampol na 200** a zmenil výšku bokov, chrbta aj čiel — nikto by si to nevšimol, kým by dielce neprišli z píly (Codex #374 P1). Disciplína bumpu
 (STANDARD §2.5) hovorí o TICHEJ ZMENE VÝROBY, nie o novom poli. Brány sú tie isté ako pri 5–14.
@@ -429,7 +429,10 @@ istom registri** ako D-143 a hromadná prestavba ju vezme cez **spoločný predi
 **KON-A · K1 — polia `back_setback` / `top_front_setback` (`SETBACK_KEYS`).** `normalize` ich číta **prísne** (`norm_setback`: Numeric alebo reťazec, ktorý je celý
 číslom podľa `SETBACK_NUM_RE`, inak 0; klamp 0–300; slot 0), `cabinet_config` ich zapisuje **len keď sú > 0** (config existujúcich skriniek sa nemení; vnorené
 `top`/`back` bez zmeny) a `config_to_params` pri chýbajúcom kľúči dá 0.0 — ním idú všetky round-tripy (prestavba, absorpcia, kópie, dedup, „Nahradiť UNI", hromadné
-zmeny). Nohy (`draw_legs`) stoja podľa `Construction.back_stop`.
+zmeny). Nohy (`draw_legs`) stoja podľa `Construction.back_stop`. **Pozície valcov počíta čistá `leg_layout(cfg, qty)`** (headless testovateľná): 2 nohy = stred šírky,
+predná + zadná v osi (šírka od 50 mm, seed pravidiel 8); pri plytkej skrinke sa rozostup stiahne k stredu hĺbky (min. priemer 50 + 10 mm) a keď sa nezmestí ani to
+(predný sokel + hĺbka 150), kreslí sa 1 valec a `attach_leg_fit_warning!` pridá do plánu info `legs_not_fit` — **počet v nákupe ostáva podľa pravidla**. 4 a 6 nôh
+ostávajú v pôvodnom rozložení (2 rady, predný berie prebytok).
 **KON-B · K2 — chrbát z líšt (`back_mode 'rails'`, pole `back_rail_height`, `BACK_RAIL_KEY`).** `normalize` pozná `rails` v enume chrbta (bez neho by ho ticho
 zmenil na predvolený chrbát typu) a výšku líšt číta **prísne** (`norm_rail_height`: vzor `norm_setback`, neplatné → 100, klamp 20–300, slot 100). `cabinet_config`
 zapisuje H **len pri H ≠ 100** (aj pri inom type chrbta — hodnota sa pamätá), `config_to_params` pri chýbajúcom kľúči dá 100. `LOWER_DEFAULTS`/`UPPER_DEFAULTS`
@@ -552,9 +555,14 @@ false — zdroj pravdy súpisu je VÝHRADNE `config.hardware[]` korpusu). Profil
 neschová** — patrí k čelu, nie k nohám (tie na `hardware_tag` ostávajú). Dáta proxy sa tým NEMENIA (súpis, nákup ani dĺžka rezu sa tagu nedotýkajú) a staré zákazky sa preznačia pri
 najbližšej prestavbe — proxy vzniká pri každom rebuilde nanovo, takže žiadna migrácia netreba. Stráži in-SU sekcia `run_d116`.
 
-**ROZMEROVÉ HRANICE (`MIN`, S1-E0, v0.12.9).** `normalize` klampuje obálku korpusu na `MIN` = šírka **200**, výška **80**, hĺbka **150** (horné hranice 3000/3000/2000).
-Výška ide od 80 mm od S1-E0 (Michal 20.9.2026): nad umývačkou ostáva po líniu linky často len 80–110 mm a vypĺňa sa **nízkym korpusom na dorovnanie**. Šírka ani hĺbka sa
-neodomkli — užší či plytší korpus nemá konštrukčný zmysel. **`CONFIG_SCHEMA` sa bumpuje na 15**, hoci nepribudlo pole: starší plugin (schéma 14) by skrinku 80–199 mm
+**ROZMEROVÉ HRANICE (`MIN`, S1-E0, v0.12.9; šírka od 50 mm v0.17.28).** `normalize` klampuje obálku korpusu na `MIN` = šírka **50**, výška **80**, hĺbka **150** (horné hranice 3000/3000/2000).
+**Šírka od 50 mm (Michal 7.10.2026, `CONFIG_SCHEMA` 23):** dolná aj horná skrinka (typy bez vlastných `limits`) smie byť od 50 mm (predtým 200); umývačka (300–1200), rohová
+(sonda `min_valid_width`), výška 80 a hĺbka 150 sú bez zmeny. Bump 22 → 23 je z toho istého dôvodu ako schéma 15 (tichý klamp na 200 u staršieho pluginu). Horná hranica pri
+hrúbke ostáva stráž `Construction.validate!` (`šírka <= 2 × hrúbka + 10` → „Šírka je príliš malá vzhľadom na hrúbku materiálu"); panel ju zrkadlí krížovou kontrolou
+`cabinetWidthError` (`form.js`, červené pole šírky, rovnaká veta), `front_preflight_result` berie fallback rozsahy šírky aj výšky z `CabinetBuilder::MIN` a
+`Construction.min_valid_width` má zálohu `MIN_WIDTH_FALLBACK` (50) pre čas, keď sa `CabinetBuilder` ešte nenačítal. Nohy pod úzkou skrinkou: odsek `hardware_rules` v hardware.md.
+Výška ide od 80 mm od S1-E0 (Michal 20.9.2026): nad umývačkou ostáva po líniu linky často len 80–110 mm a vypĺňa sa **nízkym korpusom na dorovnanie**. Hĺbka sa
+neodomkla — plytší korpus nemá konštrukčný zmysel. **`CONFIG_SCHEMA` sa bumpuje na 15**, hoci nepribudlo pole: starší plugin (schéma 14) by skrinku 80–199 mm
 pri prestavbe ticho klampol späť na 200, teda zmenil výrobnú geometriu — a presne pred tým chráni dopredný guard `newer_config?` (prestavba, šablóny, kópia) a exportná
 brána. Detail je v histórii čísel vyššie; žiadna migrácia netreba, config nemá nové pole.
 **Tú istú hodnotu držia TRI miesta:** `MIN` tu, `ScaleWatch::MIN` (absorpcia scale) a `LIMITS` v `ui/js/form.js` (červené pole panela). Priama referencia možná nie je
@@ -1260,7 +1268,7 @@ aj `clamp_height` sa pýtajú `min_for(key, type)`, takže typové minimum má p
 `scaletool`=120 aj na definícii = čisté osi. Mapovanie je **lokálne**, takže platí aj pre otočenú dosku (UI-C1c) — používateľov scale v globálnom Z stojacej dosky skončí v jej
 ŠÍRKE.
 
-**SPODNÉ HRANICE ABSORPCIE (`MIN`, S1-E0, v0.12.9).** `clamp_min` neprepustí šírku ani hĺbku pod `MIN` = **200** / **150** (mm, string kľúče — chodí sem kľúč z uloženého
+**SPODNÉ HRANICE ABSORPCIE (`MIN`, S1-E0, v0.12.9).** `clamp_min` neprepustí šírku ani hĺbku pod `MIN` = **50** / **150** (mm, string kľúče — chodí sem kľúč z uloženého
 configu) a klamp **loguje**, nikdy ho nerobí ticho. Čísla sú **zrkadlom `CabinetBuilder::MIN`** — priama referencia sa použiť nedá (`scale_observer` sa načítava PRED
 `cabinet_builder`), preto zhodu stráži guard `tests/pure/test_s1e0_min_vyska.rb`; keby sa rozišli, ten istý korpus by po ťahaní myšou a po zápise do poľa skončil na inom
 rozmere.
@@ -1269,7 +1277,8 @@ rozmere.
 s policou by geometria prešla, ale stavba padla na `validate_shelves!` — rebuild by zlyhal, `reject_scale` by vrátil PÔVODNÚ skrinku a používateľ by po ťahaní úchopu nedostal
 nič (720 mm späť namiesto 94). Hranica je preto **prísnejšia z dvoch**: `MIN['height']` a `Construction.min_valid_height` nad **kompletným** configom, ktorý o chvíľu pôjde do
 `rebuild`u (normalizuje sa **tou istou cestou**, takže pri hornej skrinke sokel korektne vypadne na 0).
-Šírka taký problém nemá — jej `MIN` je vždy nad hranicou validácie. Lifecycle absorpcie sa tým **nemení**: klamp žije vnútri tej istej transparentnej operácie, takže
+Šírka (od 50 mm) problém má len pri hrubom materiáli: `MIN['width']` 50 je pod hranicou validácie `2 × hrúbka + 10` už od hrúbky 20 mm, takže potiahnutie takej skrinky
+pod ~`2t + 10` skončí `reject_scale` (pôvodná skrinka sa vráti, nič sa ticho nezmení) — config-aware klamp šírky nie je zavedený. Lifecycle absorpcie sa tým **nemení**: klamp žije vnútri tej istej transparentnej operácie, takže
 jedno Späť ďalej vráti scale AJ absorpciu (in-SU `run_s1e0` body c, e a f, reálny debounce tik `async S1`).
 
 **HĹBKA sa pri ZMENŠENÍ klampuje CONFIG-AWARE (`clamp_depth`, KON-A · Codex FIX 10, Grok 9).** Komín, zapustenie a výstuhy robia z hĺbky konštrukčnú hranicu

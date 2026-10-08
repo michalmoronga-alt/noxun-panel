@@ -388,7 +388,7 @@ Kontrola z neho robí ORANGE riadok kategórie `CAT_HARDWARE` (`hardware_note_it
 nezastavujú.". **Proveniencia je JEDNA a je NUTNÁ:** `rules_seed_version` < `HardwareRules::LEG_WIDTH_SEED_VERSION` (6) — marker už zapisuje každá stavba
 (E1b), takže sa **nezakladá žiadny nový kľúč configu** a `CONFIG_SCHEMA` sa nebumpuje. K nej musí sedieť aspoň jeden **symptóm**, inak by veta strašila aj
 tam, kde sa nič nezmení: (a) šírka ≥ 1000 mm a uložená položka `leg` má ešte 4 kusy zo `source: 'rule'` (ručný zámok nesie `manual` a je to vedomé
-rozhodnutie), alebo (b) výška sokla ≥ 55 mm a v kovaní **nie je ani jeden** `plinth_clip`. **Podopretie rozlišuje symptómy (Codex #338 kolo 1 N1):**
+rozhodnutie), alebo (c) **šírka od 50 mm, seed 8:** šírka v (0, 200) mm a uložené 4 nohy zo `source: 'rule'` pod `rules_seed_version` < `LEG_NARROW_SEED_VERSION` (8) — hláška počíta 2/4/6 nôh (symptómy (a) a (b) stoja dalej len na hranici 6), alebo (b) výška sokla ≥ 55 mm a v kovaní **nie je ani jeden** `plinth_clip`. **Podopretie rozlišuje symptómy (Codex #338 kolo 1 N1):**
 (a) platí pre `legs` aj `plinth` — seed `nohy-zakladne` má filter `support legs plinth`, takže široká skrinka so **soklom vpredu** dostane po prestavbe
 tiež 6 nôh a kontrola len na `legs` by jej migračnú vetu potichu zhasla; (b) ostáva LEN pri `legs` (`clips_expected?` = jediná autorita otázky v zbere),
 lebo samostatná soklová lišta pri sokli vpredu neexistuje — a tá istá funkcia drží vetu, takže skrinke s `plinth` sa v nej príchyty nespomenú. Náprava je tá istá ako pri `flap_stale`: „Doplniť nové

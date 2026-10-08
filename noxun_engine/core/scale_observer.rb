@@ -16,12 +16,12 @@ module Noxun
       SCALE_TOL = 0.001  # tolerancia: dlzka osi != 1.0 => scale
       DEBOUNCE  = 0.2    # s — cakanie na ustalenie po poslednej zmene
       # S1-E0: spodna hranica absorbovaneho rozmeru. VYSKA je od 80 mm (korpus
-      # na dorovnanie nad umyvackou) — hodnoty su ZRKADLOM `CabinetBuilder::MIN`
+      # na dorovnanie nad umyvackou), SIRKA od 50 mm (CONFIG_SCHEMA 23) — hodnoty su ZRKADLOM `CabinetBuilder::MIN`
       # (string kluce, lebo sem chodi kluc z uloženeho configu). Priama
       # referencia sa pouzit NEDA: `scale_observer` sa nacitava PRED
       # `cabinet_builder` (main.rb), takze konstanta by pri boote neexistovala —
       # zhodu preto strazi guard test `tests/pure/test_s1e0_min_vyska.rb`.
-      MIN = { 'width' => 200.0, 'height' => 80.0, 'depth' => 150.0 }.freeze
+      MIN = { 'width' => 50.0, 'height' => 80.0, 'depth' => 150.0 }.freeze
       # S1-E: SLOT UMYVACKY ma VLASTNE minima — nema vnutro, takze sa neriadi
       # korpusovymi hranicami, a zaroven nema zmysel pustat 200 mm „umyvacku".
       # Su to TIE ISTE cisla ako spodne hranice v `CabinetBuilder::DW_WIDTH_RANGE`

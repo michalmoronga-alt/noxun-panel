@@ -867,6 +867,12 @@ module Noxun
       # Kod preto ZAMERNE NIE JE v `BuildPlan::HW_ISSUE_BLOCKERS`, takze nakup,
       # rozpocet ani ponuku nezastavi.
       #
+      # SIRKA OD 50 mm (CONFIG_SCHEMA 23, seed v8): skrinka UZSIA nez
+      # `LEG_NARROW_BELOW_MM` (200) ma mat 2 nohy v strede. Snapshot pravidiel
+      # POD `LEG_NARROW_SEED_VERSION` (8) + ulozene 4 nohy z pravidla = ORANGE
+      # „prestav skrinku" (symptom (c) nizsie). Povodna migracna hranica (v6) sa
+      # NEMENI: symptomy (a) a (b) stoja dalej len na `LEG_WIDTH_SEED_VERSION`.
+      #
       # PROVENIENCIA je JEDNA a je NUTNA (na rozdiel od `flap_stale`, kde staci
       # jedna z dvoch): `rules_seed_version` < `LEG_WIDTH_SEED_VERSION`. ZIADNY
       # novy kluc configu sa NEZAKLADA — marker uz zapisuje kazda stavba
@@ -880,7 +886,9 @@ module Noxun
       #       4 kusy z PRAVIDLA (`source: 'rule'` — rucny zamok nesie 'manual'
       #       a je to vedome rozhodnutie pouzivatela),
       #   (b) vyska sokla >= `PLINTH_CLIP_MIN_MM` a ulozene kovanie nema ANI
-      #       JEDEN `plinth_clip`.
+      #       JEDEN `plinth_clip`,
+      #   (c) sirka v (0, `LEG_NARROW_BELOW_MM`) a ulozene 4 nohy z pravidla
+      #       (proveniencia pod `LEG_NARROW_SEED_VERSION`).
       #
       # PODOPRETIE (Codex #338 kolo 1 N1): symptom (a) plati pre OBA typy,
       # pri ktorych nohy vobec vznikaju — `legs` aj `plinth`. Seed
@@ -896,16 +904,18 @@ module Noxun
         cfg = ccfg.is_a?(Hash) ? cfg_hash(ccfg) : {}
         sup = support_type_of(cfg)
         return nil unless LEG_SUPPORTS.include?(sup)
-        return nil if provenance_marker(cfg['rules_seed_version']) >=
-                      HardwareRules::LEG_WIDTH_SEED_VERSION
+        marker = provenance_marker(cfg['rules_seed_version'])
+        return nil if marker >= HardwareRules::LEG_NARROW_SEED_VERSION
 
-        wide = num_of(cfg['width']).to_f >= HardwareRules::LEG_WIDE_FROM_MM
+        pre_g1b = marker < HardwareRules::LEG_WIDTH_SEED_VERSION
+        w = num_of(cfg['width']).to_f
         fh = num_of(cfg['floor_height']).to_f
         hw = Array(cfg['hardware'])
-        legs4 = wide && hw.any? { |h| rule_leg_four?(h) }
-        clip_missing = clips_expected?(sup, fh) &&
+        legs4 = pre_g1b && w >= HardwareRules::LEG_WIDE_FROM_MM && hw.any? { |h| rule_leg_four?(h) }
+        clip_missing = pre_g1b && clips_expected?(sup, fh) &&
                        hw.none? { |h| h.is_a?(Hash) && h['generic_type'].to_s == 'plinth_clip' }
-        return nil unless legs4 || clip_missing
+        narrow = w.positive? && w < HardwareRules::LEG_NARROW_BELOW_MM && hw.any? { |h| rule_leg_four?(h) }
+        return nil unless legs4 || clip_missing || narrow
 
         { 'code' => BuildPlan::LEG_STALE, 'severity' => 'orange',
           'owner_id' => owner_id.to_s, 'owner_pid' => owner_pid,
@@ -924,13 +934,24 @@ module Noxun
       # Veta hovori KONKRETNE cislami tejto skrinky, aby bolo jasne, co sa zmeni.
       def leg_stale_message(owner_id, width, floor_height, support)
         w = num_of(width).to_f
-        legs = w >= HardwareRules::LEG_WIDE_FROM_MM ? 6 : 4
+        legs = leg_count_for_width(w)
+        # Prichyt: 1 ks na ZACATE 4 nohy — pri 2 nohach teda tiez 1.
         clips = clips_expected?(support, floor_height) ? (legs / 4.0).ceil : 0
-        want = "#{legs} nôh"
+        want = "#{legs} #{legs == 2 ? 'nohy' : 'nôh'}"
         want += " + #{clips} #{clips == 1 ? 'príchyt' : 'príchyty'} sokla" if clips.positive?
-        "Skrinka #{owner_id} má nohy spočítané ešte pred pravidlom 4/6 (šírka " \
+        rule = w.positive? && w < HardwareRules::LEG_NARROW_BELOW_MM ? '2/4/6 podľa šírky' : '4/6'
+        "Skrinka #{owner_id} má nohy spočítané ešte pred pravidlom #{rule} (šírka " \
           "#{fmt_mm(w)} → #{want}) — v Pravidlách spusti „Doplniť nové predvoľby“ " \
           'a skrinku prestav.'
+      end
+
+      # Pocet noh podla sirky — zrkadlo pasiem seed pravidla `nohy-zakladne`
+      # (< 200 -> 2, < 1000 -> 4, inak 6); slúži LEN hláškam.
+      def leg_count_for_width(w)
+        if w < HardwareRules::LEG_NARROW_BELOW_MM then 2
+        elsif w < HardwareRules::LEG_WIDE_FROM_MM then 4
+        else 6
+        end
       end
 
       # Ulozena polozka noh, ktora este nesie STARY pevny pocet 4 z pravidla.

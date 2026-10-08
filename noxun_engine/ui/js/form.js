@@ -170,10 +170,12 @@
   // V0.4.7e: cita cez evalDim (vyraz = hodnota); ROZPISANY vyraz vo fokusovanom
   // poli sa preskoci (ani apply, ani cervene — hint bezi); COMMITNUTY neprazdny
   // nezmysel je PO NOVOM chyba (predtym NaN ticho presiel) a blokuje apply.
-  // S1-E0: VYSKA od 80 mm (korpus na dorovnanie nad umyvackou) — sirka a hlbka
-  // ostavaju. Cisla su zrkadlom Ruby `CabinetBuilder::MIN` / `ScaleWatch::MIN`;
-  // zhodu vsetkych troch miest strazi `tests/pure/test_s1e0_min_vyska.rb`.
-  var LIMITS = { width:[200,3000], height:[80,3000], depth:[150,2000], thickness:[6,50],
+  // S1-E0: VYSKA od 80 mm (korpus na dorovnanie nad umyvackou), SIRKA od 50 mm
+  // (CONFIG_SCHEMA 23, Michal 7.10.2026) — hlbka ostava. Cisla su zrkadlom Ruby
+  // `CabinetBuilder::MIN` / `ScaleWatch::MIN`; zhodu vsetkych troch miest strazi
+  // `tests/pure/test_s1e0_min_vyska.rb`. Sirka v tesnej blizkosti hrubky ma
+  // este krizovu kontrolu `cabinetWidthError`.
+  var LIMITS = { width:[50,3000], height:[80,3000], depth:[150,2000], thickness:[6,50],
                  floor_height:[0,500], plinth_recess:[0,300], rail_depth:[20,400], rails_top_offset:[0,500],
                  // KON-A · K1: komin vzadu a zapustenie stropu — zrkadlo Ruby
                  // `Construction::SETBACK_MAX` (guard `tests/pure/test_kona_komin.rb`).
@@ -193,7 +195,7 @@
                  // D-07: medzery/presahy cel — zaporny okraj = presah cez obrys (limit zhodny s Fronts::EDGE_LIMIT)
                  fr_gap:[0,50], fr_gap_top:[-100,100], fr_gap_bottom:[-100,100], fr_gap_left:[-100,100], fr_gap_right:[-100,100] };
   // S1-E: sirka a vyska maju INE hranice per TYP — slot nema vnutro, takze
-  // korpusove 200/80 mm by nedavali zmysel, a naopak „umyvacka" 3000 mm tiez
+  // korpusove 50/80 mm by nedavali zmysel, a naopak „umyvacka" 3000 mm tiez
   // nie. Zrkadlo `CabinetBuilder::DW_WIDTH_RANGE` / `DW_HEIGHT_RANGE`.
   // ROH-B1 (O2 + P3-2 z A1): rohova uz NEMA pevne minimum sirky 584 —
   // najmensiu sirku pocita krizova kontrola `cabinetCornerError` z poli
@@ -253,6 +255,27 @@
     var dv = parseFloat(d[id]);
     return isNaN(dv) ? NaN : dv;   // NaN = predvolby zo servera este nedosli
   }
+  // CONFIG_SCHEMA 23: KRIZOVA KONTROLA SIRKY x HRUBKY. Od sirky 50 mm uz limit
+  // samotny nestaci — pri hrubke 20 mm a sirke 50 mm by stavba padla na
+  // `Construction.validate!` (`w <= 2t + 10`). Ta ista veta ako na serveri,
+  // pole sirky zocervenie UZ V PANELI. Slot (bez korpusu) sa netyka; prazdne
+  // pole sa cita ako predvolba typu (vzor `cabinetHeightError`).
+  function cabinetWidthError(){
+    var we = el('width');
+    if (!we || we.value === '') return '';
+    // Slot korpus nema; rohova ma vlastnu (prisnejsiu) kontrolu `cabinetCornerError`.
+    if (!NXTypes.carcass(cabTypeNow()) || NXTypes.corner(cabTypeNow())) return '';
+    var w = evalDim(we.value);
+    if (isNaN(w)) return ''; // nezmysel uz oznacil hlavny cyklus
+    var t = cabFieldOrDefault('thickness');
+    if (isNaN(t)) return '';
+    return (w <= 2 * t + 10) ? WIDTH_THICKNESS_MSG : '';
+  }
+  function markWidthError(message){
+    var e = el('width'); if (!e) return;
+    if (message){ e.classList.add('bad'); e.title = message; } else { e.title = ''; }
+  }
+  var WIDTH_THICKNESS_MSG = 'Šírka je príliš malá vzhľadom na hrúbku materiálu.';
   function cabinetHeightError(){
     var he = el('height');
     if (!he || he.value === '') return '';
@@ -428,6 +451,8 @@
     }
     // S1-E0: krizova kontrola AZ TU — hlavny cyklus vyssie uz `bad` nastavil
     // aj zrusil podla rozsahov, takze nas priznak nic neprepise.
+    var wErr = cabinetWidthError();
+    if (wErr) ok = false;
     var hErr = cabinetHeightError();
     markHeightError(hErr);
     if (hErr) ok = false;
@@ -452,7 +477,9 @@
     // casti a CR 1 (mockup B · O2). Pri inom type nic (a rámy CR sa zhasnu).
     var cErr = cabinetCornerError(cornerNow);
     if (cErr) ok = false;
-    cabFieldErrorMsg = hErr || sErr || rErr || cErr || '';
+    // Tooltip sirky AZ PO rohovej kontrole — ta title sirky na zaciatku maze.
+    markWidthError(wErr);
+    cabFieldErrorMsg = wErr || hErr || sErr || rErr || cErr || '';
     if (!skipFrontDraft && typeof nxFrontDraftReady === 'function' && !nxFrontDraftReady()) ok = false;
     return ok;
   }
@@ -3277,6 +3304,7 @@
                        // D-139: odvodene celo (krizova kontrola), schema medzier
                        // slotu a preklik „Medzera hore".
                        SLOT_HIDDEN_GAPS: SLOT_HIDDEN_GAPS, cabinetHeightError: cabinetHeightError,
+                       cabinetWidthError: cabinetWidthError,
                        // KON-A · K1: zrkadlo validacie komina/zapustenia, tooltip,
                        // suhrn hlavicky a stavova veta formulara.
                        cabinetSetbackError: cabinetSetbackError, nxCabFieldError: nxCabFieldError,

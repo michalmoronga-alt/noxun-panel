@@ -377,7 +377,15 @@ module Noxun
       #       kovanie bez hlasky — a polia rohovej by whitelistom zahodil. Brany
       #       su tie iste ako pri 5-21 (`newer_config?`,
       #       `ProductionCore.export_blockers`).
-      CONFIG_SCHEMA = 22
+      #  23 = SIRKA KORPUSU OD 50 mm (Michal 7.10.2026). Tu NEPRIBUDLO ziadne
+      #       pole: zmenil sa PRIPUSTNY ROZSAH hodnoty `width` z 200 na 50 mm
+      #       (precedens schemy 15 — vyska 200 -> 80). Strata je VYROBNA a TICHA:
+      #       starsi plugin (schema 22) ma `MIN[:width]` = 200, takze by skrinku
+      #       50-199 mm pri prvej prestavbe KLAMPOL na 200 a zmenil dno, strop,
+      #       chrbat aj celá. Brany su tie iste ako pri 5-22 (`newer_config?`,
+      #       `ProductionCore.export_blockers`). Aktivacne konstanty
+      #       (5 / 9 / 11 / 19 / 20) ostavaju.
+      CONFIG_SCHEMA = 23
 
       # KOV-C2b: schema, OD KTOREJ stavba emituje dielce zasuviek z receptu.
       # VLASTNA konstanta (nie `CONFIG_SCHEMA`), lebo pri bumpe na 6 (KOV-D1a)
@@ -435,15 +443,17 @@ module Noxun
 
       # S1-E0 (Michal 20.9.2026): VYSKA ide od 80 mm, nie od 200. Nad umyvackou
       # (a pod linkou) ostava casto len 80-110 mm a stolar tam kladie NIZKY
-      # korpus na dorovnanie — plugin ho do teraz nepustil. Sirka (200) a hlbka
-      # (150) sa NEMENIA: uzsi korpus nez 200 nema konstrukcny zmysel.
+      # korpus na dorovnanie — plugin ho do teraz nepustil. Hlbka (150) sa NEMENI.
+      # SIRKA ide od 50 mm (Michal 7.10.2026, CONFIG_SCHEMA 23): uzky korpus
+      # (zasuvka na korenie, vyplnovy diel) je realny. Hornu hranicu sirky pri
+      # hrubke drzi straz `Construction.validate!` (`w <= 2t + 10`).
       # Tri miesta musia drzat TU ISTU hodnotu (normalize tu, absorpcia scale
       # v `ScaleWatch::MIN`, validacia panela v `ui/js/form.js` LIMITS) —
       # priamu referenciu brani poradie requirov (`scale_observer` sa nacitava
       # PRED `cabinet_builder`) a JS ju mat ani nemoze, preto zhodu vsetkych
       # troch strazi guard test `tests/pure/test_s1e0_min_vyska.rb` (rovnaky
       # vzor ako `DRAWER_ROLES` nizsie).
-      MIN = { width: 200.0, height: 80.0, depth: 150.0 }.freeze
+      MIN = { width: 50.0, height: 80.0, depth: 150.0 }.freeze
       # D-45: povoleny rozsah hrubky korpusu (mm) — JEDINY zdroj pravdy pre clamp
       # v normalize, pre prevzatie hrubky z materialu aj pre projektovy guard.
       THICKNESS_RANGE = [6.0, 50.0].freeze
@@ -1174,6 +1184,7 @@ module Noxun
             render_front_profile(model, ents, pd, cid)
           end
           attach_abs_warnings!(plan, abs_issues)
+          attach_leg_fit_warning!(plan, cfg)
 
           render_hardware(model, ents, plan[:hardware], cfg, cid)
           # S1-E: referencna geometria (telo spotrebica). Vznika VNUTRI tej
@@ -2648,20 +2659,65 @@ module Noxun
         # Rozmiestnenie valcov pod dnom: 2 rady (predny/zadny) s odsadenim LEG_INSET;
         # plytky korpus / 1 ks -> 1 rad v strede hlbky. Predny rad berie prebytok
         # (ceil), rovnomerne po sirke. Kresli sa najviac LEG_RENDER_MAX valcov.
+        # Pozicie pocita CISTA `leg_layout` (headless testovatelna).
         def draw_legs(ents, cfg, qty)
           # D-37: nohy patria pod NOSNE dno (konstrukcna hlbka) — zadny rad nesmie
           # trcat pod nalozenym chrbtom (pri hrubke az 50 mm by visel vo vzduchu).
           # KON-A (Grok 9): pri komine podla hlbky DNA — zadny doraz `back_stop`
           # (bez komina presne dnesna `carcass_depth`).
-          w = cfg[:width]; d = Construction.back_stop(cfg); h = cfg[:floor_height]
+          layout = leg_layout(cfg, qty)
           r = LEG_DIAMETER / 2.0
-          count = [qty, LEG_RENDER_MAX].min
+          layout[:positions].each { |x, y| draw_leg_cylinder(ents, x, y, r, cfg[:floor_height]) }
+        end
+
+        # CISTA geometria noh (bez SketchUp API): { positions: [[x, y], ...],
+        # overlap: bool }. `overlap` = fyzicky sa nezmestia tolko ROZNYCH
+        # nepretinajucich sa valcov, kolko pravidlo vyda (kresli sa menej valcov,
+        # POCET V NAKUPE ostava podla pravidla — geometria je len proxy).
+        #
+        # 2 NOHY (uzka skrinka < 200 mm, seed v8): STRED SIRKY, predna + zadna
+        # pozicia v osi. Pri plytkej skrinke (jeden rad by sa kryl: ucinna hlbka
+        # 150 mm, odsadenie 60 mm = stredy len 30 mm od seba pri priemere 50) sa
+        # rozostup stiahne k stredu hlbky, najmenej priemer + 10 mm vola; ked sa
+        # ani to nezmesti (komin, predny sokel), kresli sa JEDEN valec a
+        # `overlap` je true (plan nesie warning `legs_not_fit`).
+        # Ostatne pocty: povodne rozlozenie (2 rady, predny berie prebytok).
+        def leg_layout(cfg, qty)
+          w = cfg[:width].to_f; d = Construction.back_stop(cfg).to_f
+          r = LEG_DIAMETER / 2.0
+          count = [qty.to_i, LEG_RENDER_MAX].min
+          return { positions: [], overlap: false } if count < 1
+
           # D-13/D-17 (Codex F4): pri prednom sokli predny rad noh posunut ZA dosku
           # sokla (recess + hrubka + polomer + vola) — proxy sa nesmie pretinat.
           front_y = LEG_INSET
           if cfg[:plinth_mode] == 'front'
             front_y = [front_y, cfg[:plinth_recess].to_f + cfg[:thickness].to_f + r + 5.0].max
           end
+          positions = count == 2 ? two_leg_positions(w, d, front_y, r) : leg_grid(w, d, front_y, r, count)
+          positions = positions.map { |x, y| [x.round(3), y.round(3)] }.uniq
+          { positions: positions, overlap: legs_overlap?(positions, count) }
+        end
+
+        # 2 nohy v osi (stred sirky): predna a zadna pozicia.
+        def two_leg_positions(w, d, front_y, r)
+          cx = w / 2.0
+          rear_y = d - LEG_INSET
+          return [[cx, front_y], [cx, rear_y]] if rear_y - front_y >= 2 * r
+
+          # Plytka skrinka: stiahni rozostup k stredu volneho useku [lo, hi].
+          lo = front_y > LEG_INSET ? front_y : r # predny sokel posuva prednu nohu
+          hi = d - r
+          sep = LEG_DIAMETER + 10.0
+          return [[cx, (lo + hi) / 2.0]] if hi - lo < sep
+
+          mid = (lo + hi) / 2.0
+          [[cx, mid - sep / 2.0], [cx, mid + sep / 2.0]]
+        end
+
+        # Povodne rozlozenie pre 1 a 3+ nohy: 2 rady (predny/zadny), plytky
+        # korpus / 1 ks -> 1 rad v strede hlbky.
+        def leg_grid(w, d, front_y, r, count)
           two_rows = count > 1 && d > front_y + LEG_INSET + 2 * r
           rows =
             if two_rows
@@ -2670,10 +2726,35 @@ module Noxun
             else
               [[d / 2.0, count]]
             end
-          rows.each do |y, n|
-            xs = leg_xs(w, n)
-            xs.each { |x| draw_leg_cylinder(ents, x, y, r, h) }
+          rows.flat_map { |y, n| leg_xs(w, n).map { |x| [x, y] } }
+        end
+
+        # Pretinaju sa nejake dva valce (alebo ich je menej nez ma byt)?
+        def legs_overlap?(positions, count)
+          return true if positions.length < count
+
+          positions.combination(2).any? do |(ax, ay), (bx, by)|
+            Math.hypot(ax - bx, ay - by) < LEG_DIAMETER - 0.001
           end
+        end
+
+        # Warning planu: nohy sa pod touto skrinkou fyzicky nezmestia ako rozne
+        # valce (uzka a plytka skrinka, komin). Nakup sa NEMENI — pocet nôh
+        # drzi pravidlo; kresli sa menej valcov.
+        def attach_leg_fit_warning!(plan, cfg)
+          return plan unless cfg[:floor_height].to_f.positive?
+
+          qty = Array(plan[:hardware]).select { |h| h['generic_type'] == 'leg' }.sum { |h| h['quantity'].to_i }
+          return plan if qty < 1 || !leg_layout(cfg, qty)[:overlap]
+
+          plan[:warnings] << BuildPlan.warning(
+            'legs_not_fit',
+            "Nohy sa pod touto skrinkou nezmestia ako samostatné valce (#{qty} ks v nákupe) — " \
+            'vizuál ich kreslí menej, počet nôh v nákupe sa tým nemení.',
+            severity: 'info', data: { 'quantity' => qty }
+          )
+          BuildPlan.validate!(plan)
+          plan
         end
 
         # X pozicie n noh v rade: 1 ks stred; inak rovnomerne od insetu po sirku-inset.

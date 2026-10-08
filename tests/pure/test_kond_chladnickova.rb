@@ -121,7 +121,7 @@ NxTest.test('KON-D seed: obsah — rozmery, komin, bez chrbta, vyslovne predvolb
   NxTest.assert(c.key?('top_front_setback') && c.key?('back_rail_height'),
                 'predvolby KON-A/KON-B su VYSLOVNE (inak by sablona hodnotu ciela zachovala)')
   NxTest.assert_equal(NxKonD::CB::CONFIG_SCHEMA, c['config_schema'], 'seed nesie AKTUALNU schemu (R-12)')
-  NxTest.assert_equal(22, c['config_schema'], 'po ROH-A1 22')
+  NxTest.assert(c['config_schema'] >= 22, 'po ROH-A1 aspon 22')
   NxTest.assert_equal(0, c['zone_tree']['shelves'].to_i, 'bez polic')
 end
 
