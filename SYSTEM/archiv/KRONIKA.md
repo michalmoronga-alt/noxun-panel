@@ -24,7 +24,8 @@
   s hláškou (vzor D-120; config-aware klamp šírky len pri rohovej). **Seed pravidiel 7 → 8** (`max 199,999 → 2`, audit FIX 4), tvar v6/v7 v `LEGACY_SEED_SHAPES`,
   `LEG_NARROW_SEED_VERSION` 8 a vetva úzkej skrinky v `leg_stale` (hranice v6 bez zmeny, veta 2/4/6). Polohy nôh = čistá `Construction.leg_layout`: valce sa nikdy
   nekreslia prekryté, pri nezmestení menej valcov + info `legs_drawn_merged` (nákup podľa pravidla). Golden H12/H16 regenerované vedome (len schéma, minimum, seed).
-  Testy: headless 5367/0, 163 JS, mutácie M1–M5 zhodené; in-SU nová sekcia `run_sirka50` (výsledok v PR).
+  Testy: headless 5367/0, 163 JS, mutácie M1–M5 zhodené; in-SU 3420 PASS/0 FAIL nad `c031c001` (nová sekcia `run_sirka50`; prvý beh nad `29368874` zhodil
+  CELA-B — config-aware klamp šírky pre každý korpus menil rollback neplatného Scale, preto vrátený).
   Nahradený STAV (v0.17.27): H18b-1 PR #463 ready → v maine; „Ďalší krok" H18b-1 delta/GH kolo → ŠÍRKA 50 predrecenzia a PR.
 
 - **Roly: náhradníci, čakanie, kontrola modelu, Grok shadow (7.10.2026, PR #464, docs).** Zápis rozhodnutí, ktoré Michal schválil 6.10.2026 (návrh routera v `noxun-mods`, otázky 1–4).
