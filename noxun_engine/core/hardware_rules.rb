@@ -942,6 +942,29 @@ module Noxun
         nil
       end
 
+      # SIRKA 50 (Codex #466 kolo 1 P2): je UCINNE pravidlo noh projektu
+      # SPRAVOVANE SEEDOM? Ano = nedotknuty stary tvar (`LEGACY_SEED_SHAPES` —
+      # TEN ISTY test tvaru ako migracia, caka na „Doplniť nové predvoľby")
+      # alebo presne aktualny seed (snapshot uz obnoveny, caka sa na prestavbu).
+      # Nie = vedome upravene (ine pasma, vypnute) alebo zmazane pravidlo —
+      # migracia ho NIKDY neprepise, takze vetva uzkej skrinky v
+      # `Bom.leg_stale_issue` by svietila navzdy a navrhovala 2 nohy proti
+      # vuli pouzivatela. Ucinne = snapshot projektu, bez neho globalna kniznica
+      # (vzor `effective_seed_version`). Neprecitatelne pravidla = true
+      # (radsej nalez nez ticho, dnesne spravanie).
+      def seed_managed_leg_rule?(model)
+        rules = project_rules(model) || load
+        leg = Array(rules).find { |r| r.is_a?(Hash) && r['rule_id'].to_s == LEG_RULE_ID }
+        return false unless leg
+        return true if legacy_seed_shape?(leg)
+
+        seed = SEED_RULES.find { |r| r['rule_id'] == LEG_RULE_ID }
+        normalize_rules([leg]).first == normalize_rules([seed]).first
+      rescue StandardError => e
+        Engine.log_error(e, 'HardwareRules.seed_managed_leg_rule?') if defined?(Engine)
+        true
+      end
+
       # Vrati pravidla projektu; ak snapshot chyba, zapise don globalnu kniznicu.
       # VOLAT LEN vnutri otvorenej operacie (build/rebuild) — zapis je sucastou
       # undo kroku, ktory snapshot prvykrat potreboval.

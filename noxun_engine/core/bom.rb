@@ -121,6 +121,10 @@ module Noxun
         # setov projektu. Otazka je rovnako MODELOVA ako `rules_stale`, preto sa
         # pyta RAZ na zber; `project_state` cita len atribut modelu (ziadne IO).
         flap_codes = defined?(HardwareSets) ? HardwareSets.flap_set_codes(HardwareSets.project_state(model)) : nil
+        # SIRKA 50 (Codex #466 kolo 1 P2): spravuje pravidlo noh projektu seed?
+        # Vedome upravene pravidlo vetvu uzkej skrinky v `leg_stale` zhasne.
+        # MODELOVA otazka (vzor `rules_stale`) — raz na zber.
+        legs_managed = defined?(HardwareRules) ? HardwareRules.seed_managed_leg_rule?(model) : true
         model.entities.grep(Sketchup::ComponentInstance).each do |inst|
           case Store.kind(inst)
           when 'cabinet'
@@ -205,7 +209,7 @@ module Noxun
             # pred pravidlom „4/6 podla sirky". Nakup by mal o dve nohy a o
             # prichyty menej; vyrobu to ale nezastavuje (kod nie je v registri
             # blokerov), preto len upozornenie s napravou.
-            ls = leg_stale_issue(cid, inst.persistent_id, ccfg)
+            ls = leg_stale_issue(cid, inst.persistent_id, ccfg, leg_rule_managed: legs_managed)
             hardware_issues << ls if ls
             # KOV-G1b (Codex #338 kolo 1 N2): pocet prichytov sokla je zo SIRKY
             # korpusu (O3), takze rucny zamok poctu noh ho NEZMENI. Vedome —
@@ -898,8 +902,15 @@ module Noxun
       # vetva ma vlastny prah, takze buduci bump ani jednu nepresunie.
       # Skrinka uzsia nez 200 mm mohla vzniknut az so schemou 23, ale snapshot
       # pravidiel projektu sa nemerguje sam — preto ten nalez vobec existuje.
+      # Codex #466 kolo 1 P2: vetva (c) plati LEN ked pravidlo noh projektu
+      # spravuje seed (`leg_rule_managed`, `HardwareRules.seed_managed_leg_rule?`)
+      # — vedome upravene pravidlo „Doplniť nové predvoľby" neprepise, takze
+      # nalez by sa nedal zhasnut a radil by 2 nohy proti vuli pouzivatela.
+      # Tvar sa posudzuje rovnakym testom ako migracia (`LEGACY_SEED_SHAPES`);
+      # proveniencia sa pri no-op migracii zamerne NEPOSUVA (seed_version
+      # snapshotu nesie aj ine prahy — vyklopy, zavesy).
       # -> nalez | nil
-      def leg_stale_issue(owner_id, owner_pid, ccfg)
+      def leg_stale_issue(owner_id, owner_pid, ccfg, leg_rule_managed: true)
         return nil unless defined?(HardwareRules)
 
         cfg = ccfg.is_a?(Hash) ? cfg_hash(ccfg) : {}
@@ -915,7 +926,7 @@ module Noxun
         legs4 = pre_width && w >= HardwareRules::LEG_WIDE_FROM_MM && legs4_rule
         clip_missing = pre_width && clips_expected?(sup, fh) &&
                        hw.none? { |h| h.is_a?(Hash) && h['generic_type'].to_s == 'plinth_clip' }
-        narrow4 = marker < HardwareRules::LEG_NARROW_SEED_VERSION &&
+        narrow4 = leg_rule_managed && marker < HardwareRules::LEG_NARROW_SEED_VERSION &&
                   HardwareRules.narrow_leg_width?(w) && legs4_rule
         return nil unless legs4 || clip_missing || narrow4
 

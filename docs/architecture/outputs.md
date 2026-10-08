@@ -398,7 +398,10 @@ predvoľby" + prestavba (po nej je marker 6 a nález zhasne). Príchyt **bez set
 **ŠÍRKA 50 (v0.17.28) — tretí symptóm s VLASTNOU provenienciou.** (c) **úzka skrinka** (šírka < `HardwareRules::LEG_NARROW_BELOW_MM` 200) so snapshotom
 pravidiel pod `LEG_NARROW_SEED_VERSION` (8) a uloženými **4 nohami z pravidla** — jej snapshot ešte nepozná pásmo „< 200 → 2". Skrinka užšia než 200 mm môže
 vzniknúť až so schémou 23, ale projektový snapshot sa nemerguje sám, takže stará zákazka s novou úzkou skrinkou tento stav mať vie. Hranice v6 (symptómy a/b a ich
-proveniencia `LEG_WIDTH_SEED_VERSION`) sa **nemenia** (audit FIX 3) — každá vetva má vlastný prah. Veta (`leg_stale_message`) počíta **2/4/6**
+proveniencia `LEG_WIDTH_SEED_VERSION`) sa **nemenia** (audit FIX 3) — každá vetva má vlastný prah. Vetva (c) platí **len keď pravidlo nôh projektu spravuje
+seed** (`HardwareRules.seed_managed_leg_rule?`: nedotknutý starý tvar podľa `LEGACY_SEED_SHAPES` — ten istý test ako migrácia — alebo presne aktuálny seed);
+vedome upravené či vypnuté pravidlo „Doplniť nové predvoľby" neprepíše, takže nález by sa nedal zhasnúť a radil by 2 nohy proti vôli používateľa (Codex #466
+P2). Zber sa pýta raz na model (vzor `rules_stale`) a pošle odpoveď ako `leg_rule_managed:`; proveniencia snapshotu sa pri no-op migrácii zámerne neposúva. Veta (`leg_stale_message`) počíta **2/4/6**
 (`leg_count_for_width`) so slovenským tvarom (`sk_count`: „2 nohy", „6 nôh") a príchyt `ceil(nohy / 4)` → pri 2 nohách 1; náhradná veta Kontroly
 (`HW_ORANGE_NOTES`) hovorí „pred pravidlom 2/4/6".
 

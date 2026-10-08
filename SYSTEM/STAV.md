@@ -6,7 +6,7 @@
 
 ## Stav
 
-**v0.17.28 · 8.10.2026 — ŠÍRKA 50, PR #466 (predrecenzia čaká):** skrinka (dolná aj horná) od **50 mm**; úzka dolná (< 200 mm) má **2 nohy** v strede šírky, v nákupe 2 ks; panel
+**v0.17.28 · 8.10.2026 — ŠÍRKA 50, PR #466 (review kolo 1: P2 opravená):** skrinka (dolná aj horná) od **50 mm**; úzka dolná (< 200 mm) má **2 nohy** v strede šírky, v nákupe 2 ks; panel
 odmietne šírku, ktorá sa pri hrúbke nepostaví; Mierka neskončí tichým odmietnutím. **Schéma configu 23, seed pravidiel 8.** **Main pri štarte: v0.17.27, H18b-1, PR #463**:
 set krídla platí v nákupe; pod tým **H18** (PR #462, skutočne použitý výber závesov) a **H16** (PR #461, súpis [kniznice.md](../docs/architecture/kniznice.md), `LibraryRegistry`).
 Pod tým **H15a/H15b** (PR #459, #460): kovanie v súboroch `core/*_seed.rb` · **H11a** (PR #458): chyba súboru = jedna hláška; pád #1117 na 2026.2 rieši **H11c** · **H7a/H7b** (PR #456, #457): názov zákazky v hlavičke Štúdia · **H3–H6c, H8–H14b** (PR #435–#455): texty, nápovedy, čísla v Štúdiu, poškodené súbory a dve okná bez straty dát, SketchUp 2026+ — **čísla a exporty bez zmeny**.
@@ -24,21 +24,21 @@ ani nevyexportuje** (rohovú by sklopil na dolnú, úzku rozšíril na 200). **R
 **Ochranu pred poškodeným súborom nastavení (H9) má len 0.17.7+, nastavení exportu (H7a) 0.17.20+, ochranu dvoch okien 0.17.8+ (pravidlá) a 0.17.9+ (rady) — aktualizovať obe PC a potom zavrieť všetky okná SketchUpu** (staré okno zapisuje bez ochrany).
 **Aktualizuj plugin na oboch PC (Michal aj Lucia) na 0.17.0 pred prvým uložením odkazu, ručným overením ceny alebo porovnávaním a posielaním ponúk — starší plugin počíta sklo aj dosku bez formátu po starom** (`BUDGET_STD` blok CENY nemení, takže starší plugin nevaruje).
 
-**Testy (ŠÍRKA 50):** 5370 Ruby/0/0, 163 JS PASS, mutácie zhodené; encoding/docs PASS. In-SU 3421 PASS/0 FAIL nad `ca606a01` (8.10.).
+**Testy (ŠÍRKA 50):** 5373 Ruby/0/0, 163 JS PASS, mutácie zhodené; encoding/docs PASS. In-SU 3421 PASS/0 FAIL nad `ca606a01` (8.10.).
 
 ## Robí sa
 
 **Blok 9 · HARDENING PO V1** (štart 1.10.2026, PR #432): krížový audit V1 sedmimi audítormi → Michalovo triedenie **35 Teraz · 29 Po V1 · 11 vyradených**; 17 dávok **H1…H17** sekvenčne podľa tabuľky v [PLAN.md](PLAN.md), **bez zmeny výrobných a cenových čísel**; priečinok bloku [zdroje/bloky/HARDENING/](zdroje/bloky/HARDENING/).
 Hotové **H1–H5** (PR #433–#440), **H6a–H6c** (PR #453–#455), **H7a/H7b** (nastavenia exportu + R-38, názov zákazky v hlavičke — PR #456, #457), **H8–H10b** (R-13, R-37, R-35 — PR #441–#444), **H11b** (PR #445),
 **H12a–d** (PR #446–#448, #452), **H13** (PR #449), **H14a/H14b** (PR #450, #451); **H11a** (PR #458, len načítanie; ukončovanie vrátené — poradie B na 26.0), **H15a/H15b** (PR #459, #460, seed dáta kovania), **H16** (PR #461, súpis knižníc), **H11c** = Z1 + audit, čaká, kým Michal nainštaluje 2026.2 na oboch PC; **H18** (závesy, 3A, PR #462; predrecenzia čistá).
-**H18b-1** (D-150, PR #463) v maine; D-151/D-152 zásobník, H18b-2 mimo scope. **ŠÍRKA 50** (Michal 7.–8.10., [package](zdroje/bloky/HARDENING/PACKAGE_SIRKA50.md)): vetva `feat/sirka-50mm`, predrecenzia a PR čakajú.
+**H18b-1** (D-150, PR #463) v maine; D-151/D-152 zásobník, H18b-2 mimo scope. **ŠÍRKA 50** (Michal 7.–8.10., [package](zdroje/bloky/HARDENING/PACKAGE_SIRKA50.md)): PR #466 — predrecenzia a delta OK, GH kolo 1 vrátilo 1× P2 (opravená).
 **Otázky bez odpovede, platí návrh:** H12 Q1 (karta dielca ako Kusovník — zavedené v H12d) · H11 Q2 (starší SketchUp = nenačíta sa, jedna hláška) · H11 Q3 (kedy 2026.2) · H10b Q2 (rôzne rady sa zlúčia bez hlášky, ten istý rad = hláška) · H10a Q1 (cudzí globál = neuloží sa nič)
 · H9 Q1/Q2 (pri čítaní zo zálohy bez nálezu v Kontrole, bez tlačidla „Obnoviť zo zálohy") · H8 Q1/Q2 (veta o značke verzie, bez tlačidla) · H4b Q1/Q2 (vrátenie katalógu v ponuke „⋯" Materiálov, ikona posuvníkov pre Nastavenia rozpočtu).
 **H7: R-38 áno** (✅ H7a) · H7 Q1 (hlásiť poškodenie aj mimo zápisu — „nie") · H7 Q2 („neuložené k súboru" v hlavičke — **potvrdené** 2.10., H7b) · **Q1** (porez a montáž pri skle) bez odpovede · pri prvej rohovej v dielni overiť záves Sensys · **na smoke čakajú** D-132 (#367), D-133 (#368), D-134 (#369).
 
 ## Ďalší krok
 
-ŠÍRKA 50: predrecenzia → PR → GH kolo → merge, smoke 6 bodov v [PACKAGE_SIRKA50.md](zdroje/bloky/HARDENING/PACKAGE_SIRKA50.md) §10. Ďalej H17 (H14 Q1 „Obnoviť" čaká na Michala, H11c po 2026.2; exporty reálnej zákazky pošle Michal pred H17); uzáver bloku = minor verzia + smoke
+ŠÍRKA 50: delta opravy P2 → merge, smoke 6 bodov v [PACKAGE_SIRKA50.md](zdroje/bloky/HARDENING/PACKAGE_SIRKA50.md) §10. Ďalej H17 (H14 Q1 „Obnoviť" čaká na Michala, H11c po 2026.2; exporty reálnej zákazky pošle Michal pred H17); uzáver bloku = minor verzia + smoke
 (smoke H7: 6 bodov v [PACKAGE_H7.md](zdroje/bloky/HARDENING/PACKAGE_H7.md) §10, bod 5 voliteľne; bod 3 overí aj klik na export hneď po prepísaní názvu;
 smoke H6a + H6b + H6c: 9 + 6 + 5 bodov v [PACKAGE_H6.md](zdroje/bloky/HARDENING/PACKAGE_H6.md) §10 — Inspector na testovacom modeli; smoke H3a + H3b: 7 bodov v [PACKAGE_H3.md](zdroje/bloky/HARDENING/PACKAGE_H3.md) §10; H4a + H4b: body 1–11 v [PACKAGE_H4.md](zdroje/bloky/HARDENING/PACKAGE_H4.md) §10; vzhľad rozbaľovačiek a výberu nôh v SketchUpe overí smoke bod 7;
 H8: 4 body v [PACKAGE_H8.md](zdroje/bloky/HARDENING/PACKAGE_H8.md) §10 — reálna zákazka bez nového riadku a s rovnakými číslami; H9: 5 bodov v [PACKAGE_H9.md](zdroje/bloky/HARDENING/PACKAGE_H9.md) §10 — rovnaké čísla rozpočtu, hrán a nákupu, ochrana naživo voliteľne;

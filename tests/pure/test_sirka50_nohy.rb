@@ -95,6 +95,11 @@ module NxSirka50
     BOM.leg_stale_issue('S1', 42, narrow_cfg(over))
   end
 
+  # To iste, ale s odpovedou modelu `seed_managed_leg_rule?` (Codex #466 P2).
+  def stale_managed(managed)
+    BOM.leg_stale_issue('S1', 42, narrow_cfg, leg_rule_managed: managed)
+  end
+
   def lower(over = {})
     CB.normalize({ 'type' => 'lower', 'width' => 600.0, 'height' => 720.0, 'depth' => 560.0,
                    'thickness' => 18.0, 'floor_height' => 100.0 }.merge(over))
@@ -235,6 +240,69 @@ NxTest.test('SIRKA 50 (3): hranice v6 sa NEPOHLI (siroka a prichyt len pod v6)')
   noclip = c.narrow_cfg('width' => 600.0, 'hardware' => [c.leg_item(4)])
   NxTest.assert_equal(nil, c::BOM.leg_stale_issue('S1', 42, noclip.merge('rules_seed_version' => 7)),
                       'chybajuci prichyt je symptom LEN pod v6')
+end
+
+module NxSirka50
+  # Model so SNAPSHOTOM pravidiel — `HardwareRules.project_rules` cita len
+  # modelovy atribut (duck-type, vzor `test_kovg1b_nohy_pravidla.rb`).
+  class RulesModel
+    def initialize(rules, seed_version = 7)
+      raw = JSON.generate('std' => HR::STD, 'seed_version' => seed_version, 'rules' => rules)
+      @attrs = { Noxun::Engine::Store::DICT => { HR::MODEL_KEY => raw } }
+    end
+
+    def get_attribute(dict, key, default = nil)
+      (@attrs[dict] || {}).fetch(key, default)
+    end
+  end
+
+  module_function
+
+  def custom_v7_rule
+    mine = JSON.parse(JSON.generate(v7_leg_rule))
+    mine['bands'][0]['max'] = 1199.0 # vedome: 6 noh az od 1200, pod 200 dalej 4
+    mine
+  end
+end
+
+NxTest.test('SIRKA 50 (3) Codex #466 P2: seed_managed_leg_rule? — nedotknuty a aktualny ano, upraveny nie') do
+  c = NxSirka50
+  NxTest.assert(c::HR.seed_managed_leg_rule?(c::RulesModel.new([c.v7_leg_rule])), 'nedotknuty v7 = caka na Doplniť')
+  NxTest.assert(c::HR.seed_managed_leg_rule?(c::RulesModel.new([c.rule_of(c::LEG_RULE, c.rules)], 8)),
+                'aktualny seed = caka na prestavbu')
+  NxTest.refute(c::HR.seed_managed_leg_rule?(c::RulesModel.new([c.custom_v7_rule])), 'vedome upravene pasma')
+  NxTest.refute(c::HR.seed_managed_leg_rule?(c::RulesModel.new([c.v7_leg_rule.merge('enabled' => false)])),
+                'vypnute pravidlo')
+  NxTest.refute(c::HR.seed_managed_leg_rule?(c::RulesModel.new([])), 'zmazane pravidlo (ziadne nohy)')
+end
+
+NxTest.test('SIRKA 50 (3) Codex #466 P2: UPRAVENE pravidlo v7 — leg_stale mlci, Doplniť je no-op') do
+  c = NxSirka50
+  model = c::RulesModel.new([c.custom_v7_rule])
+  _, added, refreshed = c::HR.project_seed_plan(c::HR.project_rules(model))
+  NxTest.refute(refreshed.include?(c::LEG_RULE), '„Doplniť" vlastne pravidlo neprepise')
+  NxTest.refute(added.include?(c::LEG_RULE), 'ani nezdvoji')
+  NxTest.assert_equal(4, c.legs_at(150.0, c::HR.project_rules(model)), 'pravidlo pouzivatela dava uzkej 4 nohy')
+  NxTest.assert_equal(nil, c.stale_managed(c::HR.seed_managed_leg_rule?(model)),
+                      'ziadny trvaly ORANGE, ktory by akcia nezhasla')
+end
+
+NxTest.test('SIRKA 50 (3) Codex #466 P2: NEDOTKNUTE v7 — leg_stale svieti, po Doplniť + prestavbe zhasne') do
+  c = NxSirka50
+  model = c::RulesModel.new([c.v7_leg_rule])
+  NxTest.assert(c.stale_managed(c::HR.seed_managed_leg_rule?(model)), 'pred Doplniť: nalez')
+  out, _added, refreshed = c::HR.project_seed_plan(c::HR.project_rules(model))
+  NxTest.assert(refreshed.include?(c::LEG_RULE), 'Doplniť tvar obnovi')
+  after = c::RulesModel.new(out, 8)
+  NxTest.assert(c.stale_managed(c::HR.seed_managed_leg_rule?(after)),
+                'po Doplniť, pred prestavbou: skrinka ma stale 4 nohy -> nalez ostava')
+  rebuilt = c.narrow_cfg('rules_seed_version' => 8, 'hardware' => [c.leg_item(2), c.clip_item(1)])
+  NxTest.assert_equal(nil, c::BOM.leg_stale_issue('S1', 42, rebuilt,
+                                                  leg_rule_managed: c::HR.seed_managed_leg_rule?(after)),
+                      'po prestavbe zhasne')
+  src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'bom.rb'), encoding: 'UTF-8')
+  NxTest.assert(src.include?('leg_rule_managed: legs_managed') &&
+                src.include?('HardwareRules.seed_managed_leg_rule?(model)'), 'zber posiela odpoved modelu')
 end
 
 # ============================================================================

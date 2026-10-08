@@ -25,7 +25,8 @@
   `LEG_NARROW_SEED_VERSION` 8 a vetva úzkej skrinky v `leg_stale` (hranice v6 bez zmeny, veta 2/4/6). Polohy nôh = čistá `Construction.leg_layout`: valce sa nikdy
   nekreslia prekryté; úzka skrinka má valce v strede šírky, za soklom a na nosnom dne, pri nezmestení menej (aj 0) + info `legs_drawn_merged` (nákup
   podľa pravidla); skrinka od 200 mm sa kreslí bajtovo po starom (nezávislý recenzent Codex 3× P2 a predrecenzia 5× P3 opravené pred PR). Golden H12/H16 regenerované vedome (len schéma, minimum, seed).
-  Testy: headless 5370/0, 163 JS, mutácie M1–M7 zhodené; in-SU 3421 PASS/0 FAIL nad `ca606a01` (nová sekcia `run_sirka50`; prvý beh nad `29368874` zhodil
+  GH kolo 1: 1× P2 — vetva úzkej skrinky v `leg_stale` len pri pravidle nôh spravovanom seedom (`seed_managed_leg_rule?`), vedome upravené pravidlo ju zhasne.
+  Testy: headless 5373/0, 163 JS, mutácie M1–M10 zhodené; in-SU 3421 PASS/0 FAIL nad `ca606a01` (nová sekcia `run_sirka50`; prvý beh nad `29368874` zhodil
   CELA-B — config-aware klamp šírky pre každý korpus menil rollback neplatného Scale, preto vrátený).
   Nahradený STAV (v0.17.27): H18b-1 PR #463 ready → v maine; „Ďalší krok" H18b-1 delta/GH kolo → ŠÍRKA 50 predrecenzia a PR.
 
