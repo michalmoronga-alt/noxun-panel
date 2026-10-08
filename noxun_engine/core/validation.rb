@@ -1910,8 +1910,9 @@ module Noxun
       # podla vysky a pouzivatel nema co opravovat. ORANGE na kazdych dvierkach
       # zakazky bez hustot by bol hluk, ktory prekryje skutocne nalezy.
       # SIRKA 50 (audit FIX 2): `legs_drawn_merged` len KONSTATUJE, ze proxy
-      # noh sa pod uzku/plytku skrinku nakreslila s MENEJ valcami (prekryte by
-      # boli nezmysel) — pocet v nakupe je spravny a pouzivatel nema co opravit.
+      # noh sa pod UZKU skrinku nakreslila s MENEJ valcami (prekryte by boli
+      # nezmysel; skrinka od 200 mm sa kresli po starom a warning nema) —
+      # pocet v nakupe je spravny a pouzivatel nema co opravit.
       BUILD_INFO_ONLY = %w[legacy_slide_suppressed hinge_weight_unknown legs_drawn_merged].freeze
 
       def check_build(w, items, uni_parts = {})

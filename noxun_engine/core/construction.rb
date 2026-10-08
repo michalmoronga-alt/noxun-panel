@@ -218,8 +218,9 @@ module Noxun
                                                         suppress_slide_owners: drawer[:suppress],
                                                         manual_flap_owners: manual_flap_owners)
         warnings.concat(hw[:warnings])
-        # SIRKA 50 (audit FIX 2): nohy, ktore sa pod skrinku vedla seba
-        # nezmestia, sa NEKRESLIA prekryte — pocet v nakupe ostava podla
+        # SIRKA 50 (audit FIX 2): nohy, ktore sa pod UZKU skrinku nezmestia,
+        # sa nekreslia prekryte (skrinka od 200 mm sa kresli po starom a tam
+        # sa prekryt mozu — warning nedostane). Pocet v nakupe ostava podla
         # pravidla a plan to prizna (info, nie nalez Kontroly).
         legs_drawn_warning!(warnings, cfg, hw[:items])
 

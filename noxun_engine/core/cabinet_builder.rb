@@ -2669,10 +2669,12 @@ module Noxun
         end
 
         # Rozmiestnenie valcov pod dnom: polohy pocita `Construction.leg_layout`
-        # (2 rady s odsadenim LEG_INSET, 2 nohy uzkej skrinky v strede sirky
-        # vpredu + vzadu, nikdy prekryte valce; zadny rad podla
-        # `Construction.back_stop` — D-37, KON-A). Kresli sa najviac
-        # LEG_RENDER_MAX valcov; pocet v nakupe ostava z pravidla.
+        # (skrinka od 200 mm po starom: 2 rady s odsadenim LEG_INSET, plytka
+        # v jednom rade — tam sa valce prekryt MOZU, napr. 200 x 150 so 4
+        # nohami; UZKA skrinka: valce v strede sirky vpredu + vzadu, nikdy
+        # prekryte; zadny rad podla `Construction.back_stop` — D-37, KON-A).
+        # Kresli sa najviac LEG_RENDER_MAX valcov; pocet v nakupe ostava
+        # z pravidla.
         def draw_legs(ents, cfg, qty)
           h = cfg[:floor_height]
           r = LEG_DIAMETER / 2.0
