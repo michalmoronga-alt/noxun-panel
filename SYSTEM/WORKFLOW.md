@@ -85,7 +85,7 @@ Zámer: prispôsobiť agenta náročnosti dávky, rozložiť usage medzi poskyto
 pri volaní prepíše model, effort nie (zdroj: code.claude.com/docs/en/sub-agents, overené 7.10.2026). Preto typy agentov sú **profily**
 (pevná dvojica model + effort) a výber profilu = výber typu.
 
-**Triedy dávok** (hranice sú v CLAUDE.md — tu sa neopakujú; triedu určuje orchestrátor pri zadaní dávky):
+**Triedy dávok** (záväzné definície tried a prednosť Ť > S > Ľ sú v CLAUDE.md, sekcia „Roly a modely“; tu je ich mapovanie na profily; triedu určuje orchestrátor pri zadaní dávky):
 
 | Trieda | Čo spadá | Profil (typ agenta) |
 |---|---|---|
@@ -101,10 +101,10 @@ profilov: tabuľka Obsadenie rolí (časť 2) a frontmatter typu agenta — tu s
   (len bežné dávky, predrecenzia vždy slepým recenzentom Claude).
 - **Postup výberu:** trieda dávky → profil z tabuľky → kontrola kvót podľa existujúcich pravidiel (CLAUDE.md, Kvóty a štart okna;
   časť 6; tabuľka Náhradníci). Matica nemení hranice predrecenzie ani auditu — tie platia podľa CLAUDE.md pre každý profil rovnako.
-- **Eskalácia:** keď predrecenzia alebo review nájde v dávke Sonnetu P1, opravu robí profil Ť (`implementator`) s novým zadaním
-  (nie pokračovanie Sonnet implementátora).
+- **Eskalácia:** keď predrecenzia alebo review nájde v dávke Sonnetu P1 (alebo oprava mení koncept), opravu robí profil Ť (`implementator`)
+  s novým zadaním (nie pokračovanie Sonnet implementátora); pokračovaním sa opravujú len P2/P3, ktoré nemenia koncept.
 - **Shadow (benchmark):** beží **len pri voľných limitoch** — Claude session < 50 % a týždeň < 70 %, Grok týždeň < 70 % a prihlásený
-  (`grok models`). Rovnaké zadanie ako hlavná dávka, vlastná vetva `bench/<úloha>-<model>`, **nikdy sa nemerguje a nebrzdí merge**
+  (`grok models`), **Codex weekly zostatok ≥ 30 %** (hodnotí Codex recenzent; keď nie je, shadow sa nespúšťa). Rovnaké zadanie ako hlavná dávka, vlastná vetva `bench/<úloha>-<model>`, **nikdy sa nemerguje a nebrzdí merge**
   hlavnej dávky. Rozsah: **Ľ** bez shadow (pokiaľ orchestrátor nenavrhne inak) · **S** → Grok vždy + profil Ť (`implementator`) každá 3. dávka ·
   **Ť** → profil S (`implementator-stredny`) + Grok. Hodnotia dvaja slepí recenzenti (Claude + Codex), diffy zamaskované ako A/B/C. Zápis do
   benchmarku: repo `noxun-mods`, `benchmark/behy.jsonl` a `benchmark/vysledky/<Uxxx>.md`.
