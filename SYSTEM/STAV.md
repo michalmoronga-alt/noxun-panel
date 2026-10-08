@@ -6,7 +6,7 @@
 
 ## Stav
 
-**v0.17.28 · 8.10.2026 — ŠÍRKA 50, PR #? (predrecenzia čaká):** skrinka (dolná aj horná) od **50 mm**; úzka dolná (< 200 mm) má **2 nohy** v strede šírky, v nákupe 2 ks; panel
+**v0.17.28 · 8.10.2026 — ŠÍRKA 50, PR #466 (predrecenzia čaká):** skrinka (dolná aj horná) od **50 mm**; úzka dolná (< 200 mm) má **2 nohy** v strede šírky, v nákupe 2 ks; panel
 odmietne šírku, ktorá sa pri hrúbke nepostaví; Mierka neskončí tichým odmietnutím. **Schéma configu 23, seed pravidiel 8.** **Main pri štarte: v0.17.27, H18b-1, PR #463**:
 set krídla platí v nákupe; pod tým **H18** (PR #462, skutočne použitý výber závesov) a **H16** (PR #461, súpis [kniznice.md](../docs/architecture/kniznice.md), `LibraryRegistry`).
 Pod tým **H15a/H15b** (PR #459, #460): kovanie v súboroch `core/*_seed.rb` · **H11a** (PR #458): chyba súboru = jedna hláška; pád #1117 na 2026.2 rieši **H11c** · **H7a/H7b** (PR #456, #457): názov zákazky v hlavičke Štúdia · **H3–H6c, H8–H14b** (PR #435–#455): texty, nápovedy, čísla v Štúdiu, poškodené súbory a dve okná bez straty dát, SketchUp 2026+ — **čísla a exporty bez zmeny**.
