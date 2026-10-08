@@ -32,7 +32,9 @@ Antigravity — outside-in rešerš (nie v nočných behoch bez obsluhy) · slep
 | Rola | Aktuálne (26.9.2026) | Ako sa volá | Nástroje a ako overiť |
 |---|---|---|---|
 | orchestrátor | Claude Opus 5.5 | Claude Code, interaktívne (nie `claude -p`); na začiatku okna `powershell -NoProfile -File scripts\start_okna.ps1` ([skript](../scripts/start_okna.ps1)) | `claude --version`; model v okne cez `/model` |
-| implementátor | Claude subagent vo worktree — `opus` (= Claude Opus 5.5) | Agent tool, typ `implementator` ([definícia](../.claude/agents/implementator.md): model, effort `high`, `isolation: worktree`), na pozadí | report subagenta (vetva, SHA); trailer commitu nesie jeho model |
+| implementátor — profil Ť (ťažká dávka) | Claude subagent vo worktree — `opus` (= Claude Opus 5.5) | Agent tool, typ `implementator` ([definícia](../.claude/agents/implementator.md): model, effort `high`, `isolation: worktree`), na pozadí; výber profilu: Matica výberu nižšie | report subagenta (vetva, SHA); trailer commitu nesie jeho model |
+| implementátor — profil S (stredná dávka), od 7.10.2026 | Claude subagent vo worktree — `sonnet` | Agent tool, typ `implementator-stredny` ([definícia](../.claude/agents/implementator-stredny.md): effort `high`, `isolation: worktree`), na pozadí | ako pri profile Ť |
+| implementátor — profil Ľ (ľahká dávka), od 7.10.2026 | Claude subagent vo worktree — `sonnet` | Agent tool, typ `implementator-lahky` ([definícia](../.claude/agents/implementator-lahky.md): effort `medium`, `isolation: worktree`), na pozadí | ako pri profile Ť |
 | slepý recenzent | Claude subagent — `opus` (= Claude Opus 5.5) | Agent tool, typ `slepy-recenzent` ([definícia](../.claude/agents/slepy-recenzent.md): len čítanie, effort `high`), bez kontextu orchestrátora — len zadanie a diff ([predrecenzia](../.claude/skills/predrecenzia/SKILL.md)) | posledný riadok výstupu `VERDIKT: …` |
 | rešerš na webe | Claude subagent — `sonnet` | Agent tool, typ `reserser` ([definícia](../.claude/agents/reserser.md): effort `medium`, bez zápisu), na pozadí | report so zdrojmi (URL a dátum overenia) |
 | audítor audit-povinných | Codex `gpt-6-astra` | companion `task --background --model gpt-6-astra` ([codex-audit](../.claude/skills/codex-audit/SKILL.md)) · subagent `codex:codex-rescue` (plugin; v zadaní `--model`) | `codex --version` = npm balík z `%APPDATA%\npm`; companion `status <task-id>` |
@@ -41,7 +43,7 @@ Antigravity — outside-in rešerš (nie v nočných behoch bez obsluhy) · slep
 | rešerš outside-in | Antigravity `agy` — Gemini Flash (najvyšší v `agy models`); **nie v nočných behoch** | typ `agy-reserser` ([definícia](../.claude/agents/agy-reserser.md), do ~9 min) · dlhší beh `agy -p … --mode plan` na pozadí ([skill](../.claude/skills/antigravity-outside-in/SKILL.md)) | `agy --version`, `agy models`; web granty v `~/.gemini/config/config.json` |
 | rešerš / krížový audit | Grok Build CLI `grok-4.7` | subagent `grok-build:grok-delegate` (plugin; v zadaní `--model` a „len čítanie"); `/grok-build:review` a `/grok-build:critique` spúšťa Michal; CLI príkaz v repe `agent-register` | `grok --version`; prihlásenie predplatným; `/grok-build:check` |
 | denný register | Grok Bot, routine 8:00 → repo `michalmoronga-alt/agent-register` | cloudová routine; bot má prístup len k tomuto repu | `stav.json` s čerstvým dátumom; nové záznamy v `ZMENY.md` |
-| implementátor — **skúšobne (shadow)**, od 6.10.2026 | Grok Build CLI `grok-4.7` | rovnaké zadanie ako implementátor, vlastný worktree a vetva `bench/<úloha>-grok`, **nikdy sa nemerguje**; porovnanie slepou recenziou (benchmark v repe `noxun-mods`, priečinok `benchmark/`); pravidlá behov v časti 10 | `grok models` pred behom (prihlásenie vypršiava); výsledok v `behy.jsonl` |
+| implementátor — **skúšobne (shadow)**, od 6.10.2026 | Grok Build CLI `grok-4.7` | rovnaké zadanie ako implementátor, vlastný worktree a vetva `bench/<úloha>-grok`, **nikdy sa nemerguje**; porovnanie slepou recenziou (benchmark v repe `noxun-mods`); rozsah a podmienky: Matica výberu nižšie | `grok models` pred behom (prihlásenie vypršiava); výsledok v `behy.jsonl` |
 
 - **Model sa píše vždy výslovne** — `--model` pri Codexe a Groku (aj v zadaní pre `codex:codex-rescue` a `grok-build:grok-delegate`, ktoré
   bez neho bežia na predvolenom modeli), pri Agent tool typ agenta s modelom v definícii alebo `model:` — na predvolený model nástroja sa
@@ -68,13 +70,53 @@ na rad, až keď primárny agent roly nemôže a čakanie nepripadá do úvahy (
 | audítor audit-povinných | — | Grok, Antigravity, Sonnet | čaká / rozhodne Michal |
 | bežný audit a delta | slepý recenzent (Claude Opus) = náhradná brána | Antigravity | — |
 | review PR | náhradná brána: slepý subagent + delta | — | — |
-| implementátor | Codex `gpt-6.1-sol` vo worktree — **len bežné dávky** | Grok (kým neprejde shadow, časť 10), Antigravity | audit-povinné a výrobné/cenové dávky čakajú na reset |
+| implementátor (všetky profily) | Codex `gpt-6.1-sol` vo worktree — **len bežné dávky** | Grok (kým neprejde shadow, Matica výberu), Antigravity | audit-povinné a výrobné/cenové dávky čakajú na reset |
 | rešerš / krížový audit | rešeršér Sonnet | — | — |
 | rešerš outside-in | Grok | — | nikdy v nočných behoch |
 | rešerš na webe | Grok | — | — |
 
 - **Náhradný implementátor Codex:** predrecenziu jeho dávky robí **vždy slepý recenzent Claude** — Codex nesmie byť jediný, kto
   kontroluje kód Codexu. Model náhradníka sa píše výslovne (`--model`, N13).
+
+### Matica výberu (schválil Michal 7.10.2026)
+
+Zámer: prispôsobiť agenta náročnosti dávky, rozložiť usage medzi poskytovateľov, znížiť spotrebu a zvýšiť efektivitu bez straty kvality.
+**Effort sa pri volaní Agent tool nedá nastaviť** — len `effort:` v definícii typu (`low`/`medium`/`high`/`xhigh`/`max`); parameter `model:`
+pri volaní prepíše model, effort nie (zdroj: code.claude.com/docs/en/sub-agents, overené 7.10.2026). Preto typy agentov sú **profily**
+(pevná dvojica model + effort) a výber profilu = výber typu.
+
+**Triedy dávok** (záväzné definície tried a prednosť Ť > S > Ľ sú v CLAUDE.md, sekcia „Roly a modely“; tu je ich mapovanie na profily; triedu určuje orchestrátor pri zadaní dávky):
+
+| Trieda | Čo spadá | Profil (typ agenta) |
+|---|---|---|
+| **Ľ ľahká** | docs, texty, preklady, ikony, rozloženie, mechanické presuny, testy, presné zadanie bez vlastného rozhodovania | `implementator-lahky` ([definícia](../.claude/agents/implementator-lahky.md)) |
+| **S stredná** | bežná kódová dávka bez zmeny kontraktu (nová logika, bugfix mimo výroby, nový ovládací prvok UI), do ~300 riadkov kódu pluginu | `implementator-stredny` ([definícia](../.claude/agents/implementator-stredny.md)) |
+| **Ť ťažká** | audit-povinná dávka (trieda `codex-audit`), výrobná/cenová (obe definície v CLAUDE.md, Git workflow), nad 300 riadkov kódu pluginu, oprava P0/P1 | `implementator` ([definícia](../.claude/agents/implementator.md)) |
+
+**Prednosť tried:** triedu určuje najvyššia, do ktorej dávka spadá — **ktorékoľvek kritérium Ť prebíja S aj Ľ, kritérium S prebíja Ľ**
+(napr. presne zadaná migrácia schémy alebo oprava výrobnej ceny je Ť, aj keď zadanie nevyžaduje vlastné rozhodovanie). Model a effort
+profilov: tabuľka Obsadenie rolí (časť 2) a frontmatter typu agenta — tu sa neopakujú.
+
+- **Ostatné roly bez zmeny:** slepý recenzent (`slepy-recenzent`); náhradník implementátora Codex podľa tabuľky Náhradníci
+  (len bežné dávky, predrecenzia vždy slepým recenzentom Claude).
+- **Postup výberu:** trieda dávky → profil z tabuľky → kontrola kvót podľa existujúcich pravidiel (CLAUDE.md, Kvóty a štart okna;
+  časť 6; tabuľka Náhradníci). Matica nemení hranice predrecenzie ani auditu — tie platia podľa CLAUDE.md pre každý profil rovnako.
+- **Reklasifikácia:** hranica 300 riadkov pri zadaní je odhad; implementátor profilu Ľ/S pred návratom zmeria skutočný diff kódu pluginu
+  (bez testov a dokumentácie) a keď je nad 300, ohlási to orchestrátorovi — dávka sa reklasifikuje na Ť (povinná predrecenzia; opravy P1
+  a zmeny konceptu profil Ť).
+- **Eskalácia:** keď predrecenzia alebo review nájde v dávke Sonnetu P1 (alebo oprava mení koncept), opravu robí profil Ť (`implementator`)
+  s novým zadaním (nie pokračovanie Sonnet implementátora); pokračovaním sa opravujú len P2/P3, ktoré nemenia koncept.
+- **Shadow (benchmark):** beží **len pri voľných limitoch** — Claude session < 50 % a týždeň < 70 %, Grok týždeň < 70 % a prihlásený
+  (`grok models`), **Codex weekly zostatok ≥ 30 %** (hodnotí Codex recenzent; keď nie je, shadow sa nespúšťa). Rovnaké zadanie ako hlavná dávka (zadanie shadow behu začína slovom „SHADOW“ — implementátor ide režimom „Shadow beh“ bez PR, predrecenzie a zásahu do STAV/KRONIKA/PLAN), vlastná vetva `bench/<úloha>-<model>`, **nikdy sa nemerguje a nebrzdí merge**
+  hlavnej dávky. Rozsah: **Ľ** bez shadow (pokiaľ orchestrátor nenavrhne inak) · **S** → Grok vždy + profil Ť (`implementator`) každá 3. dávka ·
+  **Ť** → profil S (`implementator-stredny`) + Grok. Hodnotia dvaja slepí recenzenti (Claude + Codex), diffy zamaskované ako A/B/C. Zápis do
+  benchmarku: repo `noxun-mods`, `benchmark/behy.jsonl` a `benchmark/vysledky/<Uxxx>.md`.
+- **Povýšenie:** po 5 behoch na kombináciu model × trieda; keď priemer skóre je najviac 0,3 pod hlavným profilom a bez P0 aj P1 v týchto 5 behoch, orchestrátor
+  navrhne presun v matici — **rozhoduje Michal**.
+- **Návrhy orchestrátora:** orchestrátor smie navrhnúť zmenu matice alebo si vyžiadať model či nástroj mimo nej (napr. „ľahká úloha —
+  shadow Antigravity/Gemini + Sonnet `low`") — **vždy na potvrdenie Michala**; bez potvrdenia platí matica.
+- **Smer (zámer, nie platné obsadenie):** Claude = orchestrácia, zadania, workspace · Codex = audity, predrecenzie, devil's advocate ·
+  Grok = pravdepodobný hlavný worker ľahkých až stredných úloh, ak sa v shadow osvedčí.
 
 ## 3 · Veľký blok
 
@@ -383,8 +425,8 @@ odkazuje sem; postup krok za krokom: skill [retro](../.claude/skills/retro/SKILL
 ## 10 · Pripravované a odložené
 
 - **Backlog (N4):** runner, ktorý po teste sám vráti pôvodnú verziu pluginu — položka je v zásobníku [PLAN.md](PLAN.md) (Po V1 — zásobník).
-- **Grok ako implementátor — skúšobne (shadow, od 6.10.2026; riadok v časti 2):** len pri ~každej tretej strednej dávke a pri voľnom
-  limite Groku · výsledok sa nikdy nemerguje, porovná ho slepá recenzia · po 5 behoch na typ úlohy Michal rozhodne o povýšení (napr.
-  „implementátor stredných dávok" s review Codexom) · Grok občas aj ako shadow review PR (nálezy porovnať s GH Codexom). Prvý beh
-  (U001, mimo ENGINE): Claude 3,0 > Grok 2,5 > Codex Terra 1,5 — len smer, nie verdikt.
+- **Grok ako implementátor — skúšobne (shadow, od 6.10.2026; riadok v časti 2):** rozsah, podmienky voľných limitov, hodnotenie
+  a pravidlo povýšenia po 5 behoch sú v podsekcii **Matica výberu** (časť 2, schválil Michal 7.10.2026); výsledok sa nikdy nemerguje.
+  Prvý beh (U001, mimo ENGINE): Claude 3,0 > Grok 2,5 > Codex Terra 1,5 — len smer, nie verdikt. Grok občas aj ako shadow review PR
+  (nálezy porovnať s GH Codexom).
 - **Po V1:** spoločné pravidlá do `AGENTS.md` (štandard, ktorý čítajú Codex, Grok Build, OpenCode aj Antigravity); CLAUDE.md ho importuje.
