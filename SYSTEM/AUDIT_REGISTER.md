@@ -134,7 +134,7 @@ aj renderer ponuky závisia od UI vrstvy. [E:R-08 + F-05]
 **Návrh:** žiadny hromadný presun — vyrezať neutrálny `OutputPackage` (BOM + odhady + hardware + validácia +
 rozpočet), dialógy/fokus/statusy ostávajú v UI orchestrátore. **Podmienka poradia: až PO P0 bránach** (menia tie
 isté miesta). **Odhad: L.**
-**Prvý rez ✅ H17a (PR #?, v0.17.29):** spoločný úvod štyroch exportov `ExportPrep.start` + lenivý `ExportPrep::Context` (`ui/export_prep.rb`);
+**Prvý rez ✅ H17a (PR #467, v0.17.29):** spoločný úvod štyroch exportov `ExportPrep.start` + lenivý `ExportPrep::Context` (`ui/export_prep.rb`);
 brány druhu výstupu a dialógy ostali v exportoch. Ďalej: koniec exportu (H17b, voliteľná) a `OutputPackage` v jadre vrátane `push_state` (Po V1).
 
 ### R-16 · P2 · core · `core/budget.rb:164-200` + `core/cp_export.rb:305-370`

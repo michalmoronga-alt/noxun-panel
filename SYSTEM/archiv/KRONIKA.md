@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **H17a · spoločná príprava exportov `ExportPrep` (9.10.2026, PR #?, v0.17.29, blok 9 HARDENING, C-06, prvý rez R-15).** Michal 9.10.: H17-0 (nástroj porovnania
+- **H17a · spoločná príprava exportov `ExportPrep` (9.10.2026, PR #467, v0.17.29, blok 9 HARDENING, C-06, prvý rez R-15).** Michal 9.10.: H17-0 (nástroj porovnania
   exportov) **zrušené**, robí sa len refaktor ([package](../zdroje/bloky/HARDENING/PACKAGE_H17.md) §00 má prednosť; audit návrhu §15 platí). Nový modul `ui/export_prep.rb`:
   `ExportPrep.start` = generácia → flush → `ExportSettings.refresh` → brána `expect` **práve raz** (`merge: kind == :vepo`) → čerstvý zber → novšia schéma → chrbát
   (bez `rescue` a pickera); `ExportPrep::Context` s lenivými čítačkami (`project`/`merge`/`name_note` z brány, `collected`, `bom`, `smap`, `hw_exp`, `budget`, `control`),
