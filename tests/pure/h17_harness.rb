@@ -658,6 +658,27 @@ module NxH17
     g3_combos.to_h { |name, spec| [name, kinds.keys.to_h { |k| [k.to_s, json(compact(run(spec.merge(kind: k))))] }] }
   end
 
+  # --- strazca bez remiz (CI Linux, PR #467) -----------------------------------
+  # Ruby `sort_by` nie je stabilny: pri ROVNAKOM triediacom kluci rozhodne o poradi
+  # platforma (Windows a Linux rozne) a golden by sa lisil podla stroja. Kazdy
+  # zber vsetkych pripadov G1–G3 preto nesmie mat dva rozne riadky s rovnakym
+  # klucom v triedeniach, ktore urcuju bajty vystupu: riadky kusovnika
+  # (`Bom.aggregate_rows` — material, -dlzka, -sirka) a suhrn kovania zo zberu
+  # (`Bom.hardware_totals` — typ, podpis parametrov). -> ["pripad: kluc", ...]
+  def sort_ties
+    specs = g1_cases.merge(g2_triggers.transform_keys { |k| "G2 #{k}" })
+                    .merge(g3_combos.transform_keys { |k| "G3 #{k}" })
+    specs.each_with_object([]) do |(name, spec), out|
+      col = collected_for(spec)
+      bom = E::Bom.compute(col)
+      keys = Array(bom[:rows]).map { |g| [g['material_id'], -g['length'], -g['width']] }
+      hw = Array(bom[:hardware]).map { |g| [g['generic_type'], E::Bom.params_signature(g['params'])] }
+      [['kusovnik', keys], ['kovanie', hw]].each do |what, list|
+        list.group_by { |k| k }.each { |k, same| out << "#{name}: #{what} #{k.inspect}" if same.length > 1 }
+      end
+    end.uniq
+  end
+
   # --- G5 parita Kontroly: `counts` pushu Studia nad TOU ISTOU fixturou -------
   # (vzor harnessu H14 T0b — skutocny `StudioDialog.push_state`, stuby len
   # datovych zdrojov a payloadov inych sekcii).

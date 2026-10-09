@@ -56,6 +56,11 @@ module NxH17T
   end
 end
 
+NxTest.test('H17 T0: fixtura bez remiz v triedeni (kusovnik, kovanie) — golden rovnaky na Windows aj Linuxe') do
+  ties = NxH17.sort_ties
+  NxTest.assert(ties.empty?, "remiza v nestabilnom sort_by (poradie urci platforma): #{ties.first(3).join(' · ')}")
+end
+
 NxTest.test('H17 T0 G1: sastna cesta 4 exportov — subory, mena, vety, picker a poradie bajtovo ako main') do
   NxTest.skip!('vyzaduje headless sandbox') unless NxTest.headless?
   want = NxH17.golden('g1')

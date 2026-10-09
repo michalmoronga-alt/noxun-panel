@@ -30,6 +30,7 @@
   Testy: headless 5401/0, 163 JS, mutácie M1–M24 + M26–M29 zhodené (M17 aj pádom načítania); predrecenzia (slepý recenzent) **0 P1 / 0 P2 / 0 P3**; in-SU **3421 PASS / 0 FAIL** nad `715898e6`;
   **R9 K ↔ P:** Michal exportoval testovaciu zákazku s main v0.17.28 (K) a s vetvou v0.17.29 (P) — 6 VEPO CSV bajtovo zhodných, LOG a CSV kovania
   zhodné okrem `Verzia`/`Dátum` a času, obe XLSX s obsahom XML zhodným (iné len časy ZIP hlavičiek) → **P == K**.
+  **CI Linux (fix, Michal 9.10.):** fixtúra mala remízu v nestabilnom triedení kusovníka (rovnaký materiál a rozmer — poradie určí platforma) → CAB-002 bok 721, polica 561, strážca `NxH17.sort_ties`; golden znova na nezmenenom main `2114e1a3` (plugin bez zmeny).
   Nahradený STAV (v0.17.28): ŠÍRKA 50 PR #466 review kolo 1 → v maine; „Ďalší krok" ŠÍRKA 50 merge + smoke → H17a predrecenzia, K ↔ P, merge.
 
 - **ŠÍRKA 50 · skrinka od 50 mm + 2 nohy pod úzkou dolnou (8.10.2026, PR #466, v0.17.28).** Pokyn Michala 7.–8.10.: najmenšia šírka dolnej aj hornej skrinky 200 → **50 mm**,

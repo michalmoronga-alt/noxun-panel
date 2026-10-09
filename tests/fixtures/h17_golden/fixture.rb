@@ -68,6 +68,10 @@ module NxH17Fixture
   DUPLAK = { 'material_id' => 'EG_H1180_18', 'multiplier' => 2 }.freeze
 
   # [nazov, rola, dlzka, sirka, hrubka, material, vlastnik, hrany, vazba duplaku]
+  # BEZ REMIZ (CI Linux, PR #467): dva rozne riadky kusovnika nesmu mat rovnaky
+  # material a rozmer — `Bom` ich triedi nestabilnym `sort_by` a poradie remizy
+  # je na Windows a Linuxe ine. Preto CAB-002 bok s ABS K009 ma 721 (nie 720)
+  # a polica s dlhym nazvom 561 (nie 562). Strazi `NxH17.sort_ties`.
   PARTS = [
     ['Bok lavy', 'side_left', 720.0, 560.0, 18.0, 'EG_H1180_18', 'CAB-001',
      { 'L1' => 'ABS_H1180_20' }, nil],
@@ -79,11 +83,11 @@ module NxH17Fixture
     ['Chrbat', 'back', 716.0, 596.0, 3.0, 'HDF_W_3', 'CAB-001', {}, nil],
     ['Bok lavy', 'side_left', 720.0, 560.0, 18.0, 'EG_H1180_18', 'CAB-002',
      { 'L1' => 'ABS_H1180_20' }, nil],
-    ['Bok pravy', 'side_right', 720.0, 560.0, 18.0, 'EG_H1180_18', 'CAB-002',
+    ['Bok pravy', 'side_right', 721.0, 560.0, 18.0, 'EG_H1180_18', 'CAB-002',
      { 'L1' => 'ABS_K009_10' }, nil],
     ['Pracovna doska duplak', 'top', 1200.0, 600.0, 36.0, 'EG_H1180_36', 'CAB-002',
      { 'L1' => 'ABS_H1180_20', 'L2' => 'ABS_H1180_20' }, DUPLAK],
-    ['Polica s dlhym nazvom pre orez', 'shelf', 562.0, 530.0, 18.0, 'KR_K009_18', 'CAB-002',
+    ['Polica s dlhym nazvom pre orez', 'shelf', 561.0, 530.0, 18.0, 'KR_K009_18', 'CAB-002',
      { 'L1' => 'ABS_K009_10' }, nil],
     ['Chrbat', 'back', 716.0, 596.0, 3.0, 'HDF_W_3', 'CAB-002', {}, nil]
   ].freeze
