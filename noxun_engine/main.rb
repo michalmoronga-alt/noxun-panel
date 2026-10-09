@@ -572,6 +572,7 @@ module Noxun
       # je to autorita exportov, mutacii rozpoctu, prepinacov a textov (Studio aj
       # rail Inspectora ho citaju). Nacita sa PRED oknom Studio, ktore ho vola.
       AppLifecycle.require_part 'noxun_engine/ui/production_core'   # ST-1a: zdielane ciste jadro vystupov — PRED oknom Studio
+      AppLifecycle.require_part 'noxun_engine/ui/export_prep' # H17: spolocna priprava 4 exportov (vola ProductionCore za behu)
       AppLifecycle.require_part 'noxun_engine/ui/studio_dialog'     # ST-1a okno Studio (skelet + Kusovnik)
       AppLifecycle.require_part 'noxun_engine/ui/panel'
       AppLifecycle.require_part 'noxun_engine/ui/rules_dialog'     # V0.4 editor pravidiel kovania

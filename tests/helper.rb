@@ -199,6 +199,12 @@ unless NxTest::IN_SKETCHUP
     tools/snap_calc
     tools/legacy_cleanup
   ].each { |rel| require File.join(NxTest::ROOT, 'noxun_engine', rel) }
+  # H17 (R6, S21): VYNIMKA z „UI nie je v helperi". Styri exporty
+  # `ProductionCore.do_*` volaju `ExportPrep.start` — keby test, ktory si
+  # `ui/production_core` nacita sam, `ui/export_prep` zabudol, `NameError` by
+  # padol do `rescue` exportu a test „picker sa neotvoril / subor nevznikol"
+  # by presiel NAPRAZDNO. Pri nacitani nevola nic (ProductionCore az za behu).
+  require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'export_prep')
 end
 
 # --- 2A-4b: legacy (SCHEMA 1) katalog pre dual-mode testy ----------------------

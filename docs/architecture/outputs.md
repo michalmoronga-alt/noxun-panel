@@ -626,6 +626,10 @@ Kontrakt stráži `tests/pure/test_st1a_core.rb`, `tests/pure/test_st1a_studio.r
 **(2) tvrdé blokery** `export_blockers` (záporná zostava, nesúlad ponuky s rozpočtom, zliate ID skriniek); **(3) potvrditeľné riadky bez ceny** `export_confirmations` (dvojkrokový export, STANDARD §11.3).
 Rozdiel medzi (1) a (3) je vecný a zámerný: **blokuje sa NEKOMPATIBILNÁ VERZIA dát, nie rozpracovanosť rozpočtu** — tú štandard výslovne pripúšťa a rieši potvrdením. `do_export` (VEPO) ani `do_hw_csv` bránu (1) nemajú: rozpočtové dáta nenesú, takže ich orezanie neskresľuje (rovnaká výnimka ako pri VEPO v P0-HF; stráži to guard test).
 
+### export_prep.rb — spoločná príprava exportov (H17a)
+
+Rozpracované v dávke H17a — plný odsek doplní záverečný commit dávky.
+
 ## Bez vlastného odseku
 
 ### bom.rb

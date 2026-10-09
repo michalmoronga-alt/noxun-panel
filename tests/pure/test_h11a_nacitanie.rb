@@ -12,7 +12,7 @@
 #      casti skusene, 1 hlaska, init NEbezi; vsetko ok = init bezi a 0 hlasok;
 #      chybajuci / pokazeny / nedokonceny bootstrap = 1 hlaska o zakladnom
 #      subore a 0 casti.
-#   T6 staticky: zoznam 95 + 14 casti a poradie = zmrazena kopia z mainu
+#   T6 staticky: zoznam 96 + 14 casti a poradie = zmrazena kopia z mainu
 #      b2427ef1, kazda cesta existuje, ziadne `Sketchup.require 'noxun_engine/`
 #      ani `.rbe`/`.rbs`; `reset_for_tests!` plugin nevola.
 #
@@ -51,7 +51,7 @@ module NxH11aLoad
     core/usage_stats core/vepo_export core/sheet_estimate core/debug core/validation core/sheet_layout
     core/edge_check core/hover_edge core/grain_check core/direction_check core/edge_overlay
     core/supplier_settings core/export_settings core/budget_store core/appliance_binding core/budget
-    core/xlsx_writer core/cp_export core/price_refresh ui/production_core ui/studio_dialog ui/panel
+    core/xlsx_writer core/cp_export core/price_refresh ui/production_core ui/export_prep ui/studio_dialog ui/panel
     ui/rules_dialog ui/materials_dialog ui/materials_appearance_dialog ui/hardware_catalog_dialog
     ui/appliance_dialog ui/supplier_settings_dialog ui/templates_dialog tools/mower_calc
     tools/snap_calc tools/legacy_cleanup tools/tools tools/mower tools/snaper
@@ -349,10 +349,10 @@ end
 
 # --- T6: staticky zoznam --------------------------------------------------------
 
-NxTest.test('H11a T6: zoznam casti main.rb (95) a panel.rb (14) = zmrazena kopia, poradie sedi') do
+NxTest.test('H11a T6: zoznam casti main.rb (96) a panel.rb (14) = zmrazena kopia, poradie sedi') do
   main = NxH11aLoad.src('noxun_engine', 'main.rb')
   panel = NxH11aLoad.src('noxun_engine', 'ui', 'panel.rb')
-  NxTest.assert_equal(95, NxH11aLoad::MAIN_PARTS.length)
+  NxTest.assert_equal(96, NxH11aLoad::MAIN_PARTS.length) # H17: +ui/export_prep
   NxTest.assert_equal(NxH11aLoad::MAIN_PARTS, main.scan(NxH11aLoad::PART_RE).flatten)
   NxTest.assert_equal(NxH11aLoad::PANEL_PARTS, panel.scan(NxH11aLoad::PART_RE).flatten)
 end
