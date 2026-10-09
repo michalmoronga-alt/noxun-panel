@@ -1,0 +1,1215 @@
+{
+  "vepo_zadany_18_36": {
+    "export": "do_export",
+    "status": "VEPO export hotový: 3 súborov, 8 riadkov (12 ks) → «DIR»/kuchyna_novak · KONTROLA: 0× RED, 7× ORANGE (v LOGu)",
+    "error": false,
+    "statuses": 1,
+    "repush": 0,
+    "pickers": [
+      {
+        "picker": "select_directory",
+        "start": "«DIR»",
+        "name": null
+      }
+    ],
+    "files": [
+      {
+        "file": "kuchyna_novak/kuchyna_novak_biela_hdf_3.csv",
+        "text": "\"Chrbat s1 s2\";\"716\";\"\";\"596\";\"\";\"3\";\"2\";\"Biela HDF\";\"\"\r\n",
+        "version_hits": 0
+      },
+      {
+        "file": "kuchyna_novak/kuchyna_novak_export.log",
+        "text": "Noxun Engine — VEPO export LOG\r\nProjekt: Kuchyňa Novák (kuchyna_novak)\r\nVerzia:  «VERSION»\r\nDátum:   2026-10-01 14:05\r\n------------------------------------------------------------\r\nSkupiny exportu (3):\r\n  - kuchyna_novak_biela_hdf_3.csv (1 riadkov, 2 ks) [HDF_W_3]\r\n  - kuchyna_novak_h1180_st37_dtdl_18_36.csv (5 riadkov, 8 ks) [EG_H1180_18, EG_H1180_36]\r\n  - kuchyna_novak_k009_pw_dtdl_18_36.csv (2 riadkov, 2 ks) [KR_K009_18]\r\n------------------------------------------------------------\r\nRiadky vyradené z CSV (0):\r\n------------------------------------------------------------\r\nSkrátené názvy (2):\r\n  * Pracovna doska duplak -> Pracovna doska [kuchyna_novak_h1180_st37_dtdl_18_36.csv] — 1200×600×36, 1 ks @ CAB-002\r\n  * Polica s dlhym nazvom pre orez -> Polica s dlhym [kuchyna_novak_k009_pw_dtdl_18_36.csv] — 561×530×18, 1 ks @ CAB-002\r\n------------------------------------------------------------\r\nPoznámky pre VEPO (2 riadkov):\r\n  * Bok P s2 [kuchyna_novak_h1180_st37_dtdl_18_36.csv]: ABS K009 Pinia\r\n  * Polica 1 s1 [kuchyna_novak_k009_pw_dtdl_18_36.csv]: ABS H1180\r\n------------------------------------------------------------\r\nKONTROLA — 0 kritických (RED), 7 na kontrolu (ORANGE):\r\n  [ORANGE] Kovanie: 1 riadok bez ceny — medzisúčet je neúplný.\r\n  [ORANGE] Materiál: 1 riadok bez ceny — medzisúčet je neúplný.\r\n  [ORANGE] Štandardné riadky: 1 riadok bez ceny — medzisúčet je neúplný.\r\n  [ORANGE] Riadok „Vizualizácia + návrh“ nemá zadané m² — suma sa nedá vypočítať.\r\n  [ORANGE] Nohy (CAB-002) nemá priradený set — kovanie je bez kódov (nenacenené).\r\n  [ORANGE] Riadok VEPO „Pracovna doska duplak“ má 21 znakov, VEPO prijme najviac 20 — v objednávke pôjde ako „Pracovna doska“. Sú to dielce skrinky CAB-002, názov sa skrátil po celých slovách — plný tvar je v LOGu exportu.\r\n  [ORANGE] Riadok VEPO „Polica s dlhym nazvom pre orez“ má 30 znakov, VEPO prijme najviac 20 — v objednávke pôjde ako „Polica s dlhym“. Sú to dielce skrinky CAB-002, názov sa skrátil po celých slovách — plný tvar je v LOGu exportu.\r\n  Pozn.: RED je varovanie, export sa neblokuje.\r\n",
+        "version_hits": 1
+      },
+      {
+        "file": "kuchyna_novak/kuchyna_novak_h1180_st37_dtdl_18_36.csv",
+        "text": "\"Policka nad dvere d1\";\"800\";\"—\";\"300\";\"\";\"18\";\"2\";\"H1180 ST37 DTDL\";\"\"\r\n\"Bok P s2\";\"721\";\"—\";\"560\";\"\";\"18\";\"1\";\"H1180 ST37 DTDL\";\"ABS K009 Pinia\"\r\n\"Bok LP s1 s2\";\"720\";\"—\";\"560\";\"\";\"18\";\"3\";\"H1180 ST37 DTDL\";\"\"\r\n\"Dno s1\";\"564\";\"—\";\"560\";\"\";\"18\";\"1\";\"H1180 ST37 DTDL\";\"\"\r\n\"Pracovna doska\";\"1200\";\"=\";\"600\";\"\";\"36\";\"1\";\"H1180 ST37 DTDL\";\"\"\r\n",
+        "version_hits": 0
+      },
+      {
+        "file": "kuchyna_novak/kuchyna_novak_k009_pw_dtdl_18_36.csv",
+        "text": "\"Polica 1 s1\";\"562\";\"—\";\"530\";\"\";\"18\";\"1\";\"K009 PW DTDL\";\"ABS H1180\"\r\n\"Polica s dlhym\";\"561\";\"—\";\"530\";\"\";\"18\";\"1\";\"K009 PW DTDL\";\"\"\r\n",
+        "version_hits": 0
+      }
+    ],
+    "last_dir_before": "«DIR»",
+    "last_dir": "«DIR»",
+    "order": [
+      "ES.refresh",
+      "PC.export_expect_check(merge: true)",
+      "PC.fresh_collect",
+      "PC.newer_config_stop",
+      "PC.cut_stop",
+      "PC.hardware_expansion",
+      "PC.drawer_stop(:kit)",
+      "ES.last_dir",
+      "UI.select_directory",
+      "Bom.compute",
+      "PC.sheets_map",
+      "PC.budget_payload",
+      "PC.control_payload",
+      "VepoExport.build",
+      "VepoExport.write",
+      "ES.save_last_dir",
+      "PC.pending_name_note",
+      "PC.default_name_note",
+      "status"
+    ],
+    "counts": {
+      "edges_map": 3,
+      "fresh_collect": 1,
+      "hardware_catalog_items": 1,
+      "sheets_map": 1,
+      "vepo_edge_decors": 1,
+      "vepo_edge_thicknesses": 1,
+      "vepo_materials": 1,
+      "vepo_sheet_decors": 1
+    },
+    "expansions": 1
+  },
+  "vepo_zadany_bez_18_36": {
+    "export": "do_export",
+    "status": "VEPO export hotový: 4 súborov, 8 riadkov (12 ks) → «DIR»/kuchyna_novak · KONTROLA: 0× RED, 7× ORANGE (v LOGu)",
+    "error": false,
+    "statuses": 1,
+    "repush": 0,
+    "pickers": [
+      {
+        "picker": "select_directory",
+        "start": "«DIR»",
+        "name": null
+      }
+    ],
+    "files": [
+      {
+        "file": "kuchyna_novak/kuchyna_novak_biela_hdf_3.csv",
+        "text": "\"Chrbat s1 s2\";\"716\";\"\";\"596\";\"\";\"3\";\"2\";\"Biela HDF\";\"\"\r\n",
+        "version_hits": 0
+      },
+      {
+        "file": "kuchyna_novak/kuchyna_novak_export.log",
+        "text": "Noxun Engine — VEPO export LOG\r\nProjekt: Kuchyňa Novák (kuchyna_novak)\r\nVerzia:  «VERSION»\r\nDátum:   2026-10-01 14:05\r\n------------------------------------------------------------\r\nSkupiny exportu (4):\r\n  - kuchyna_novak_biela_hdf_3.csv (1 riadkov, 2 ks) [HDF_W_3]\r\n  - kuchyna_novak_h1180_st37_dtdl_18.csv (4 riadkov, 7 ks) [EG_H1180_18]\r\n  - kuchyna_novak_h1180_st37_dtdl_36.csv (1 riadkov, 1 ks) [EG_H1180_36]\r\n  - kuchyna_novak_k009_pw_dtdl_18.csv (2 riadkov, 2 ks) [KR_K009_18]\r\n------------------------------------------------------------\r\nRiadky vyradené z CSV (0):\r\n------------------------------------------------------------\r\nSkrátené názvy (2):\r\n  * Pracovna doska duplak -> Pracovna doska [kuchyna_novak_h1180_st37_dtdl_36.csv] — 1200×600×36, 1 ks @ CAB-002\r\n  * Polica s dlhym nazvom pre orez -> Polica s dlhym [kuchyna_novak_k009_pw_dtdl_18.csv] — 561×530×18, 1 ks @ CAB-002\r\n------------------------------------------------------------\r\nPoznámky pre VEPO (2 riadkov):\r\n  * Bok P s2 [kuchyna_novak_h1180_st37_dtdl_18.csv]: ABS K009 Pinia\r\n  * Polica 1 s1 [kuchyna_novak_k009_pw_dtdl_18.csv]: ABS H1180\r\n------------------------------------------------------------\r\nKONTROLA — 0 kritických (RED), 7 na kontrolu (ORANGE):\r\n  [ORANGE] Kovanie: 1 riadok bez ceny — medzisúčet je neúplný.\r\n  [ORANGE] Materiál: 1 riadok bez ceny — medzisúčet je neúplný.\r\n  [ORANGE] Štandardné riadky: 1 riadok bez ceny — medzisúčet je neúplný.\r\n  [ORANGE] Riadok „Vizualizácia + návrh“ nemá zadané m² — suma sa nedá vypočítať.\r\n  [ORANGE] Nohy (CAB-002) nemá priradený set — kovanie je bez kódov (nenacenené).\r\n  [ORANGE] Riadok VEPO „Pracovna doska duplak“ má 21 znakov, VEPO prijme najviac 20 — v objednávke pôjde ako „Pracovna doska“. Sú to dielce skrinky CAB-002, názov sa skrátil po celých slovách — plný tvar je v LOGu exportu.\r\n  [ORANGE] Riadok VEPO „Polica s dlhym nazvom pre orez“ má 30 znakov, VEPO prijme najviac 20 — v objednávke pôjde ako „Polica s dlhym“. Sú to dielce skrinky CAB-002, názov sa skrátil po celých slovách — plný tvar je v LOGu exportu.\r\n  Pozn.: RED je varovanie, export sa neblokuje.\r\n",
+        "version_hits": 1
+      },
+      {
+        "file": "kuchyna_novak/kuchyna_novak_h1180_st37_dtdl_18.csv",
+        "text": "\"Policka nad dvere d1\";\"800\";\"—\";\"300\";\"\";\"18\";\"2\";\"H1180 ST37 DTDL\";\"\"\r\n\"Bok P s2\";\"721\";\"—\";\"560\";\"\";\"18\";\"1\";\"H1180 ST37 DTDL\";\"ABS K009 Pinia\"\r\n\"Bok LP s1 s2\";\"720\";\"—\";\"560\";\"\";\"18\";\"3\";\"H1180 ST37 DTDL\";\"\"\r\n\"Dno s1\";\"564\";\"—\";\"560\";\"\";\"18\";\"1\";\"H1180 ST37 DTDL\";\"\"\r\n",
+        "version_hits": 0
+      },
+      {
+        "file": "kuchyna_novak/kuchyna_novak_h1180_st37_dtdl_36.csv",
+        "text": "\"Pracovna doska\";\"1200\";\"=\";\"600\";\"\";\"36\";\"1\";\"H1180 ST37 DTDL\";\"\"\r\n",
+        "version_hits": 0
+      },
+      {
+        "file": "kuchyna_novak/kuchyna_novak_k009_pw_dtdl_18.csv",
+        "text": "\"Polica 1 s1\";\"562\";\"—\";\"530\";\"\";\"18\";\"1\";\"K009 PW DTDL\";\"ABS H1180\"\r\n\"Polica s dlhym\";\"561\";\"—\";\"530\";\"\";\"18\";\"1\";\"K009 PW DTDL\";\"\"\r\n",
+        "version_hits": 0
+      }
+    ],
+    "last_dir_before": "«DIR»",
+    "last_dir": "«DIR»",
+    "order": [
+      "ES.refresh",
+      "PC.export_expect_check(merge: true)",
+      "PC.fresh_collect",
+      "PC.newer_config_stop",
+      "PC.cut_stop",
+      "PC.hardware_expansion",
+      "PC.drawer_stop(:kit)",
+      "ES.last_dir",
+      "UI.select_directory",
+      "Bom.compute",
+      "PC.sheets_map",
+      "PC.budget_payload",
+      "PC.control_payload",
+      "VepoExport.build",
+      "VepoExport.write",
+      "ES.save_last_dir",
+      "PC.pending_name_note",
+      "PC.default_name_note",
+      "status"
+    ],
+    "counts": {
+      "edges_map": 3,
+      "fresh_collect": 1,
+      "hardware_catalog_items": 1,
+      "sheets_map": 1,
+      "vepo_edge_decors": 1,
+      "vepo_edge_thicknesses": 1,
+      "vepo_materials": 1,
+      "vepo_sheet_decors": 1
+    },
+    "expansions": 1
+  },
+  "vepo_projekt_18_36": {
+    "export": "do_export",
+    "status": "VEPO export hotový: 3 súborov, 8 riadkov (12 ks) → «DIR»/projekt · KONTROLA: 0× RED, 7× ORANGE (v LOGu) · pomenované predvoleným názvom „projekt\" — názov zákazky zadáš v hlavičke Štúdia",
+    "error": false,
+    "statuses": 1,
+    "repush": 0,
+    "pickers": [
+      {
+        "picker": "select_directory",
+        "start": null,
+        "name": null
+      }
+    ],
+    "files": [
+      {
+        "file": "projekt/projekt_biela_hdf_3.csv",
+        "text": "\"Chrbat s1 s2\";\"716\";\"\";\"596\";\"\";\"3\";\"2\";\"Biela HDF\";\"\"\r\n",
+        "version_hits": 0
+      },
+      {
+        "file": "projekt/projekt_export.log",
+        "text": "Noxun Engine — VEPO export LOG\r\nProjekt: projekt (projekt)\r\nVerzia:  «VERSION»\r\nDátum:   2026-10-01 14:05\r\n------------------------------------------------------------\r\nSkupiny exportu (3):\r\n  - projekt_biela_hdf_3.csv (1 riadkov, 2 ks) [HDF_W_3]\r\n  - projekt_h1180_st37_dtdl_18_36.csv (5 riadkov, 8 ks) [EG_H1180_18, EG_H1180_36]\r\n  - projekt_k009_pw_dtdl_18_36.csv (2 riadkov, 2 ks) [KR_K009_18]\r\n------------------------------------------------------------\r\nRiadky vyradené z CSV (0):\r\n------------------------------------------------------------\r\nSkrátené názvy (2):\r\n  * Pracovna doska duplak -> Pracovna doska [projekt_h1180_st37_dtdl_18_36.csv] — 1200×600×36, 1 ks @ CAB-002\r\n  * Polica s dlhym nazvom pre orez -> Polica s dlhym [projekt_k009_pw_dtdl_18_36.csv] — 561×530×18, 1 ks @ CAB-002\r\n------------------------------------------------------------\r\nPoznámky pre VEPO (2 riadkov):\r\n  * Bok P s2 [projekt_h1180_st37_dtdl_18_36.csv]: ABS K009 Pinia\r\n  * Polica 1 s1 [projekt_k009_pw_dtdl_18_36.csv]: ABS H1180\r\n------------------------------------------------------------\r\nKONTROLA — 0 kritických (RED), 7 na kontrolu (ORANGE):\r\n  [ORANGE] Kovanie: 1 riadok bez ceny — medzisúčet je neúplný.\r\n  [ORANGE] Materiál: 1 riadok bez ceny — medzisúčet je neúplný.\r\n  [ORANGE] Štandardné riadky: 1 riadok bez ceny — medzisúčet je neúplný.\r\n  [ORANGE] Riadok „Vizualizácia + návrh“ nemá zadané m² — suma sa nedá vypočítať.\r\n  [ORANGE] Nohy (CAB-002) nemá priradený set — kovanie je bez kódov (nenacenené).\r\n  [ORANGE] Riadok VEPO „Pracovna doska duplak“ má 21 znakov, VEPO prijme najviac 20 — v objednávke pôjde ako „Pracovna doska“. Sú to dielce skrinky CAB-002, názov sa skrátil po celých slovách — plný tvar je v LOGu exportu.\r\n  [ORANGE] Riadok VEPO „Polica s dlhym nazvom pre orez“ má 30 znakov, VEPO prijme najviac 20 — v objednávke pôjde ako „Polica s dlhym“. Sú to dielce skrinky CAB-002, názov sa skrátil po celých slovách — plný tvar je v LOGu exportu.\r\n  Pozn.: RED je varovanie, export sa neblokuje.\r\n",
+        "version_hits": 1
+      },
+      {
+        "file": "projekt/projekt_h1180_st37_dtdl_18_36.csv",
+        "text": "\"Policka nad dvere d1\";\"800\";\"—\";\"300\";\"\";\"18\";\"2\";\"H1180 ST37 DTDL\";\"\"\r\n\"Bok P s2\";\"721\";\"—\";\"560\";\"\";\"18\";\"1\";\"H1180 ST37 DTDL\";\"ABS K009 Pinia\"\r\n\"Bok LP s1 s2\";\"720\";\"—\";\"560\";\"\";\"18\";\"3\";\"H1180 ST37 DTDL\";\"\"\r\n\"Dno s1\";\"564\";\"—\";\"560\";\"\";\"18\";\"1\";\"H1180 ST37 DTDL\";\"\"\r\n\"Pracovna doska\";\"1200\";\"=\";\"600\";\"\";\"36\";\"1\";\"H1180 ST37 DTDL\";\"\"\r\n",
+        "version_hits": 0
+      },
+      {
+        "file": "projekt/projekt_k009_pw_dtdl_18_36.csv",
+        "text": "\"Polica 1 s1\";\"562\";\"—\";\"530\";\"\";\"18\";\"1\";\"K009 PW DTDL\";\"ABS H1180\"\r\n\"Polica s dlhym\";\"561\";\"—\";\"530\";\"\";\"18\";\"1\";\"K009 PW DTDL\";\"\"\r\n",
+        "version_hits": 0
+      }
+    ],
+    "last_dir_before": null,
+    "last_dir": "«DIR»",
+    "order": [
+      "ES.refresh",
+      "PC.export_expect_check(merge: true)",
+      "PC.fresh_collect",
+      "PC.newer_config_stop",
+      "PC.cut_stop",
+      "PC.hardware_expansion",
+      "PC.drawer_stop(:kit)",
+      "ES.last_dir",
+      "UI.select_directory",
+      "Bom.compute",
+      "PC.sheets_map",
+      "PC.budget_payload",
+      "PC.control_payload",
+      "VepoExport.build",
+      "VepoExport.write",
+      "ES.save_last_dir",
+      "PC.pending_name_note",
+      "PC.default_name_note",
+      "status"
+    ],
+    "counts": {
+      "edges_map": 3,
+      "fresh_collect": 1,
+      "hardware_catalog_items": 1,
+      "sheets_map": 1,
+      "vepo_edge_decors": 1,
+      "vepo_edge_thicknesses": 1,
+      "vepo_materials": 1,
+      "vepo_sheet_decors": 1
+    },
+    "expansions": 1
+  },
+  "vepo_projekt_bez_18_36": {
+    "export": "do_export",
+    "status": "VEPO export hotový: 4 súborov, 8 riadkov (12 ks) → «DIR»/projekt · KONTROLA: 0× RED, 7× ORANGE (v LOGu) · pomenované predvoleným názvom „projekt\" — názov zákazky zadáš v hlavičke Štúdia",
+    "error": false,
+    "statuses": 1,
+    "repush": 0,
+    "pickers": [
+      {
+        "picker": "select_directory",
+        "start": null,
+        "name": null
+      }
+    ],
+    "files": [
+      {
+        "file": "projekt/projekt_biela_hdf_3.csv",
+        "text": "\"Chrbat s1 s2\";\"716\";\"\";\"596\";\"\";\"3\";\"2\";\"Biela HDF\";\"\"\r\n",
+        "version_hits": 0
+      },
+      {
+        "file": "projekt/projekt_export.log",
+        "text": "Noxun Engine — VEPO export LOG\r\nProjekt: projekt (projekt)\r\nVerzia:  «VERSION»\r\nDátum:   2026-10-01 14:05\r\n------------------------------------------------------------\r\nSkupiny exportu (4):\r\n  - projekt_biela_hdf_3.csv (1 riadkov, 2 ks) [HDF_W_3]\r\n  - projekt_h1180_st37_dtdl_18.csv (4 riadkov, 7 ks) [EG_H1180_18]\r\n  - projekt_h1180_st37_dtdl_36.csv (1 riadkov, 1 ks) [EG_H1180_36]\r\n  - projekt_k009_pw_dtdl_18.csv (2 riadkov, 2 ks) [KR_K009_18]\r\n------------------------------------------------------------\r\nRiadky vyradené z CSV (0):\r\n------------------------------------------------------------\r\nSkrátené názvy (2):\r\n  * Pracovna doska duplak -> Pracovna doska [projekt_h1180_st37_dtdl_36.csv] — 1200×600×36, 1 ks @ CAB-002\r\n  * Polica s dlhym nazvom pre orez -> Polica s dlhym [projekt_k009_pw_dtdl_18.csv] — 561×530×18, 1 ks @ CAB-002\r\n------------------------------------------------------------\r\nPoznámky pre VEPO (2 riadkov):\r\n  * Bok P s2 [projekt_h1180_st37_dtdl_18.csv]: ABS K009 Pinia\r\n  * Polica 1 s1 [projekt_k009_pw_dtdl_18.csv]: ABS H1180\r\n------------------------------------------------------------\r\nKONTROLA — 0 kritických (RED), 7 na kontrolu (ORANGE):\r\n  [ORANGE] Kovanie: 1 riadok bez ceny — medzisúčet je neúplný.\r\n  [ORANGE] Materiál: 1 riadok bez ceny — medzisúčet je neúplný.\r\n  [ORANGE] Štandardné riadky: 1 riadok bez ceny — medzisúčet je neúplný.\r\n  [ORANGE] Riadok „Vizualizácia + návrh“ nemá zadané m² — suma sa nedá vypočítať.\r\n  [ORANGE] Nohy (CAB-002) nemá priradený set — kovanie je bez kódov (nenacenené).\r\n  [ORANGE] Riadok VEPO „Pracovna doska duplak“ má 21 znakov, VEPO prijme najviac 20 — v objednávke pôjde ako „Pracovna doska“. Sú to dielce skrinky CAB-002, názov sa skrátil po celých slovách — plný tvar je v LOGu exportu.\r\n  [ORANGE] Riadok VEPO „Polica s dlhym nazvom pre orez“ má 30 znakov, VEPO prijme najviac 20 — v objednávke pôjde ako „Polica s dlhym“. Sú to dielce skrinky CAB-002, názov sa skrátil po celých slovách — plný tvar je v LOGu exportu.\r\n  Pozn.: RED je varovanie, export sa neblokuje.\r\n",
+        "version_hits": 1
+      },
+      {
+        "file": "projekt/projekt_h1180_st37_dtdl_18.csv",
+        "text": "\"Policka nad dvere d1\";\"800\";\"—\";\"300\";\"\";\"18\";\"2\";\"H1180 ST37 DTDL\";\"\"\r\n\"Bok P s2\";\"721\";\"—\";\"560\";\"\";\"18\";\"1\";\"H1180 ST37 DTDL\";\"ABS K009 Pinia\"\r\n\"Bok LP s1 s2\";\"720\";\"—\";\"560\";\"\";\"18\";\"3\";\"H1180 ST37 DTDL\";\"\"\r\n\"Dno s1\";\"564\";\"—\";\"560\";\"\";\"18\";\"1\";\"H1180 ST37 DTDL\";\"\"\r\n",
+        "version_hits": 0
+      },
+      {
+        "file": "projekt/projekt_h1180_st37_dtdl_36.csv",
+        "text": "\"Pracovna doska\";\"1200\";\"=\";\"600\";\"\";\"36\";\"1\";\"H1180 ST37 DTDL\";\"\"\r\n",
+        "version_hits": 0
+      },
+      {
+        "file": "projekt/projekt_k009_pw_dtdl_18.csv",
+        "text": "\"Polica 1 s1\";\"562\";\"—\";\"530\";\"\";\"18\";\"1\";\"K009 PW DTDL\";\"ABS H1180\"\r\n\"Polica s dlhym\";\"561\";\"—\";\"530\";\"\";\"18\";\"1\";\"K009 PW DTDL\";\"\"\r\n",
+        "version_hits": 0
+      }
+    ],
+    "last_dir_before": null,
+    "last_dir": "«DIR»",
+    "order": [
+      "ES.refresh",
+      "PC.export_expect_check(merge: true)",
+      "PC.fresh_collect",
+      "PC.newer_config_stop",
+      "PC.cut_stop",
+      "PC.hardware_expansion",
+      "PC.drawer_stop(:kit)",
+      "ES.last_dir",
+      "UI.select_directory",
+      "Bom.compute",
+      "PC.sheets_map",
+      "PC.budget_payload",
+      "PC.control_payload",
+      "VepoExport.build",
+      "VepoExport.write",
+      "ES.save_last_dir",
+      "PC.pending_name_note",
+      "PC.default_name_note",
+      "status"
+    ],
+    "counts": {
+      "edges_map": 3,
+      "fresh_collect": 1,
+      "hardware_catalog_items": 1,
+      "sheets_map": 1,
+      "vepo_edge_decors": 1,
+      "vepo_edge_thicknesses": 1,
+      "vepo_materials": 1,
+      "vepo_sheet_decors": 1
+    },
+    "expansions": 1
+  },
+  "csv_zadany": {
+    "export": "do_hw_csv",
+    "status": "Nákupný zoznam: 2 položiek + 1 nemapovaných (v CSV aj KONTROLE) → «DIR»/kovanie_kuchyna_novak.csv",
+    "error": true,
+    "statuses": 1,
+    "repush": 0,
+    "pickers": [
+      {
+        "picker": "savepanel",
+        "start": "«DIR»",
+        "name": "kovanie_kuchyna_novak.csv"
+      }
+    ],
+    "files": [
+      {
+        "file": "kovanie_kuchyna_novak.csv",
+        "text": "﻿\"NOXUN kovanie — nákupný zoznam\";\"Kuchyňa Novák\";\"2026-10-01 14:05\"\r\n\"kategória\";\"kód\";\"názov\";\"počet\";\"MJ\";\"cena € s DPH\";\"medzisúčet € s DPH\"\r\n\"ZAVESY\";\"BLUM-71B3550\";\"Záves Clip Top 110°\";\"4\";\"ks\";\"3,42\";\"13,68\"\r\n\"ZAVESY\";\"BLUM-TIPON\";\"TipOn krátky\";\"1\";\"ks\";\"\";\"\"\r\n\"SPOLU (len známe ceny)\";\"\";\"\";\"5\";\"\";\"\";\"13,68\"\r\n\r\n\"NEMAPOVANÉ (bez kódov — nenacenené)\";\"dôvod\";\"kde\";\"počet\";\"rozmer\";\"\";\"\"\r\n\"leg\";\"typ nemá priradený set\";\"CAB-002\";\"4\";\"\";\"\";\"\"\r\n",
+        "version_hits": 0
+      }
+    ],
+    "last_dir_before": "«DIR»",
+    "last_dir": "«DIR»",
+    "order": [
+      "ES.refresh",
+      "PC.export_expect_check(merge: false)",
+      "PC.fresh_collect",
+      "PC.newer_config_stop",
+      "PC.cut_stop",
+      "PC.hardware_expansion",
+      "PC.drawer_stop(:all)",
+      "PC.dup_partition",
+      "ES.last_dir",
+      "UI.savepanel",
+      "HardwareSets.purchase_csv",
+      "ES.save_last_dir",
+      "PC.pending_name_note",
+      "PC.default_name_note",
+      "status"
+    ],
+    "counts": {
+      "fresh_collect": 1
+    },
+    "expansions": 1
+  },
+  "csv_projekt": {
+    "export": "do_hw_csv",
+    "status": "Nákupný zoznam: 2 položiek + 1 nemapovaných (v CSV aj KONTROLE) → «DIR»/kovanie_projekt.csv · pomenované predvoleným názvom „projekt\" — názov zákazky zadáš v hlavičke Štúdia",
+    "error": true,
+    "statuses": 1,
+    "repush": 0,
+    "pickers": [
+      {
+        "picker": "savepanel",
+        "start": null,
+        "name": "kovanie_projekt.csv"
+      }
+    ],
+    "files": [
+      {
+        "file": "kovanie_projekt.csv",
+        "text": "﻿\"NOXUN kovanie — nákupný zoznam\";\"projekt\";\"2026-10-01 14:05\"\r\n\"kategória\";\"kód\";\"názov\";\"počet\";\"MJ\";\"cena € s DPH\";\"medzisúčet € s DPH\"\r\n\"ZAVESY\";\"BLUM-71B3550\";\"Záves Clip Top 110°\";\"4\";\"ks\";\"3,42\";\"13,68\"\r\n\"ZAVESY\";\"BLUM-TIPON\";\"TipOn krátky\";\"1\";\"ks\";\"\";\"\"\r\n\"SPOLU (len známe ceny)\";\"\";\"\";\"5\";\"\";\"\";\"13,68\"\r\n\r\n\"NEMAPOVANÉ (bez kódov — nenacenené)\";\"dôvod\";\"kde\";\"počet\";\"rozmer\";\"\";\"\"\r\n\"leg\";\"typ nemá priradený set\";\"CAB-002\";\"4\";\"\";\"\";\"\"\r\n",
+        "version_hits": 0
+      }
+    ],
+    "last_dir_before": null,
+    "last_dir": "«DIR»",
+    "order": [
+      "ES.refresh",
+      "PC.export_expect_check(merge: false)",
+      "PC.fresh_collect",
+      "PC.newer_config_stop",
+      "PC.cut_stop",
+      "PC.hardware_expansion",
+      "PC.drawer_stop(:all)",
+      "PC.dup_partition",
+      "ES.last_dir",
+      "UI.savepanel",
+      "HardwareSets.purchase_csv",
+      "ES.save_last_dir",
+      "PC.pending_name_note",
+      "PC.default_name_note",
+      "status"
+    ],
+    "counts": {
+      "fresh_collect": 1
+    },
+    "expansions": 1
+  },
+  "rozpocet_zadany": {
+    "export": "do_budget_xlsx",
+    "status": "Rozpočet uložený: 1282,00 € → «DIR»/Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx · POZOR: 3 riadkov rozpočtu nemá cenu — suma je podhodnotená (položky v dokumente sú, v cene nie) — export si potvrdil",
+    "error": true,
+    "statuses": 1,
+    "repush": 0,
+    "pickers": [
+      {
+        "picker": "savepanel",
+        "start": "«DIR»",
+        "name": "Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx"
+      }
+    ],
+    "files": [
+      {
+        "file": "Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx",
+        "sha256": "24414c4587b305b7588506880df706dfe8aed9b97c04c7372b95d68012a0961c",
+        "size": 13831
+      }
+    ],
+    "last_dir_before": "«DIR»",
+    "last_dir": "«DIR»",
+    "order": [
+      "ES.refresh",
+      "PC.export_expect_check(merge: false)",
+      "PC.fresh_collect",
+      "PC.newer_config_stop",
+      "PC.cut_stop",
+      "Bom.compute",
+      "PC.hardware_expansion",
+      "PC.sheets_map",
+      "PC.budget_payload",
+      "PC.budget_std_block",
+      "PC.drawer_stop(:all)",
+      "PC.dup_partition",
+      "PC.export_confirmations",
+      "ES.last_dir",
+      "UI.savepanel",
+      "XlsxWriter.write_book",
+      "XlsxWriter.write",
+      "ES.save_last_dir",
+      "PC.pending_name_note",
+      "PC.default_name_note",
+      "status"
+    ],
+    "counts": {
+      "edges_map": 2,
+      "fresh_collect": 1,
+      "hardware_catalog_items": 1,
+      "sheets_map": 1
+    },
+    "expansions": 1
+  },
+  "rozpocet_projekt": {
+    "export": "do_budget_xlsx",
+    "status": "Rozpočet uložený: 1282,00 € → «DIR»/Rozpocet projekt - AKT 1.10. 2026.xlsx · POZOR: 3 riadkov rozpočtu nemá cenu — suma je podhodnotená (položky v dokumente sú, v cene nie) — export si potvrdil · pomenované predvoleným názvom „projekt\" — názov zákazky zadáš v hlavičke Štúdia",
+    "error": true,
+    "statuses": 1,
+    "repush": 0,
+    "pickers": [
+      {
+        "picker": "savepanel",
+        "start": null,
+        "name": "Rozpocet projekt - AKT 1.10. 2026.xlsx"
+      }
+    ],
+    "files": [
+      {
+        "file": "Rozpocet projekt - AKT 1.10. 2026.xlsx",
+        "sha256": "2d3c2ea02ba318cf5d458247b91169f78f819af06374f781150797c5a212dc6a",
+        "size": 13823
+      }
+    ],
+    "last_dir_before": null,
+    "last_dir": "«DIR»",
+    "order": [
+      "ES.refresh",
+      "PC.export_expect_check(merge: false)",
+      "PC.fresh_collect",
+      "PC.newer_config_stop",
+      "PC.cut_stop",
+      "Bom.compute",
+      "PC.hardware_expansion",
+      "PC.sheets_map",
+      "PC.budget_payload",
+      "PC.budget_std_block",
+      "PC.drawer_stop(:all)",
+      "PC.dup_partition",
+      "PC.export_confirmations",
+      "ES.last_dir",
+      "UI.savepanel",
+      "XlsxWriter.write_book",
+      "XlsxWriter.write",
+      "ES.save_last_dir",
+      "PC.pending_name_note",
+      "PC.default_name_note",
+      "status"
+    ],
+    "counts": {
+      "edges_map": 2,
+      "fresh_collect": 1,
+      "hardware_catalog_items": 1,
+      "sheets_map": 1
+    },
+    "expansions": 1
+  },
+  "ponuka_zadany": {
+    "export": "do_cp_xlsx",
+    "status": "Cenová ponuka uložená: 1282,00 € · 7 riadkov · špecifikácia 6 položiek → «DIR»/Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx · POZOR: 3 riadkov rozpočtu nemá cenu — suma je podhodnotená (položky v dokumente sú, v cene nie) — export si potvrdil",
+    "error": true,
+    "statuses": 1,
+    "repush": 0,
+    "pickers": [
+      {
+        "picker": "savepanel",
+        "start": "«DIR»",
+        "name": "Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx"
+      }
+    ],
+    "files": [
+      {
+        "file": "Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx",
+        "sha256": "75dbb53b54ee6424dd6a18bc08f6079e9a5b3602282c399f1ea38e939e7c0d0b",
+        "size": 9743
+      }
+    ],
+    "last_dir_before": "«DIR»",
+    "last_dir": "«DIR»",
+    "order": [
+      "ES.refresh",
+      "PC.export_expect_check(merge: false)",
+      "PC.fresh_collect",
+      "PC.newer_config_stop",
+      "PC.cut_stop",
+      "Bom.compute",
+      "PC.sheets_map",
+      "PC.hardware_expansion",
+      "PC.budget_payload",
+      "PC.budget_std_block",
+      "CpExport.specification",
+      "PC.drawer_stop(:all)",
+      "PC.dup_partition",
+      "PC.export_confirmations",
+      "ES.last_dir",
+      "UI.savepanel",
+      "CpExport.firewall_hits",
+      "XlsxWriter.write_book",
+      "ES.save_last_dir",
+      "PC.pending_name_note",
+      "PC.default_name_note",
+      "status"
+    ],
+    "counts": {
+      "edges_map": 2,
+      "fresh_collect": 1,
+      "hardware_catalog_items": 1,
+      "sheets_map": 1
+    },
+    "expansions": 1
+  },
+  "ponuka_projekt": {
+    "export": "do_cp_xlsx",
+    "status": "Cenová ponuka uložená: 1282,00 € · 7 riadkov · špecifikácia 6 položiek → «DIR»/Cenova ponuka projekt - 1.10.2026.xlsx · POZOR: 3 riadkov rozpočtu nemá cenu — suma je podhodnotená (položky v dokumente sú, v cene nie) — export si potvrdil · pomenované predvoleným názvom „projekt\" — názov zákazky zadáš v hlavičke Štúdia",
+    "error": true,
+    "statuses": 1,
+    "repush": 0,
+    "pickers": [
+      {
+        "picker": "savepanel",
+        "start": null,
+        "name": "Cenova ponuka projekt - 1.10.2026.xlsx"
+      }
+    ],
+    "files": [
+      {
+        "file": "Cenova ponuka projekt - 1.10.2026.xlsx",
+        "sha256": "193b6fa618bdd042f6a762187f352d772ec399ba415f551109db5d8e0b323f8f",
+        "size": 9727
+      }
+    ],
+    "last_dir_before": null,
+    "last_dir": "«DIR»",
+    "order": [
+      "ES.refresh",
+      "PC.export_expect_check(merge: false)",
+      "PC.fresh_collect",
+      "PC.newer_config_stop",
+      "PC.cut_stop",
+      "Bom.compute",
+      "PC.sheets_map",
+      "PC.hardware_expansion",
+      "PC.budget_payload",
+      "PC.budget_std_block",
+      "CpExport.specification",
+      "PC.drawer_stop(:all)",
+      "PC.dup_partition",
+      "PC.export_confirmations",
+      "ES.last_dir",
+      "UI.savepanel",
+      "CpExport.firewall_hits",
+      "XlsxWriter.write_book",
+      "ES.save_last_dir",
+      "PC.pending_name_note",
+      "PC.default_name_note",
+      "status"
+    ],
+    "counts": {
+      "edges_map": 2,
+      "fresh_collect": 1,
+      "hardware_catalog_items": 1,
+      "sheets_map": 1
+    },
+    "expansions": 1
+  },
+  "vepo_auto_auto": {
+    "export": "do_export",
+    "status": "VEPO export hotový: 3 súborov, 8 riadkov (12 ks) → «DIR»/kuchyna_novak · KONTROLA: 0× RED, 7× ORANGE (v LOGu) · Zákazka: Kuchyna_Novak (podľa súboru)",
+    "error": false,
+    "statuses": 1,
+    "repush": 0,
+    "pickers": [
+      {
+        "picker": "select_directory",
+        "start": "«DIR»",
+        "name": null
+      }
+    ],
+    "files": [
+      {
+        "file": "kuchyna_novak/kuchyna_novak_biela_hdf_3.csv",
+        "text": "\"Chrbat s1 s2\";\"716\";\"\";\"596\";\"\";\"3\";\"2\";\"Biela HDF\";\"\"\r\n",
+        "version_hits": 0
+      },
+      {
+        "file": "kuchyna_novak/kuchyna_novak_export.log",
+        "text": "Noxun Engine — VEPO export LOG\r\nProjekt: Kuchyna_Novak (kuchyna_novak)\r\nVerzia:  «VERSION»\r\nDátum:   2026-10-01 14:05\r\n------------------------------------------------------------\r\nSkupiny exportu (3):\r\n  - kuchyna_novak_biela_hdf_3.csv (1 riadkov, 2 ks) [HDF_W_3]\r\n  - kuchyna_novak_h1180_st37_dtdl_18_36.csv (5 riadkov, 8 ks) [EG_H1180_18, EG_H1180_36]\r\n  - kuchyna_novak_k009_pw_dtdl_18_36.csv (2 riadkov, 2 ks) [KR_K009_18]\r\n------------------------------------------------------------\r\nRiadky vyradené z CSV (0):\r\n------------------------------------------------------------\r\nSkrátené názvy (2):\r\n  * Pracovna doska duplak -> Pracovna doska [kuchyna_novak_h1180_st37_dtdl_18_36.csv] — 1200×600×36, 1 ks @ CAB-002\r\n  * Polica s dlhym nazvom pre orez -> Polica s dlhym [kuchyna_novak_k009_pw_dtdl_18_36.csv] — 561×530×18, 1 ks @ CAB-002\r\n------------------------------------------------------------\r\nPoznámky pre VEPO (2 riadkov):\r\n  * Bok P s2 [kuchyna_novak_h1180_st37_dtdl_18_36.csv]: ABS K009 Pinia\r\n  * Polica 1 s1 [kuchyna_novak_k009_pw_dtdl_18_36.csv]: ABS H1180\r\n------------------------------------------------------------\r\nKONTROLA — 0 kritických (RED), 7 na kontrolu (ORANGE):\r\n  [ORANGE] Kovanie: 1 riadok bez ceny — medzisúčet je neúplný.\r\n  [ORANGE] Materiál: 1 riadok bez ceny — medzisúčet je neúplný.\r\n  [ORANGE] Štandardné riadky: 1 riadok bez ceny — medzisúčet je neúplný.\r\n  [ORANGE] Riadok „Vizualizácia + návrh“ nemá zadané m² — suma sa nedá vypočítať.\r\n  [ORANGE] Nohy (CAB-002) nemá priradený set — kovanie je bez kódov (nenacenené).\r\n  [ORANGE] Riadok VEPO „Pracovna doska duplak“ má 21 znakov, VEPO prijme najviac 20 — v objednávke pôjde ako „Pracovna doska“. Sú to dielce skrinky CAB-002, názov sa skrátil po celých slovách — plný tvar je v LOGu exportu.\r\n  [ORANGE] Riadok VEPO „Polica s dlhym nazvom pre orez“ má 30 znakov, VEPO prijme najviac 20 — v objednávke pôjde ako „Polica s dlhym“. Sú to dielce skrinky CAB-002, názov sa skrátil po celých slovách — plný tvar je v LOGu exportu.\r\n  Pozn.: RED je varovanie, export sa neblokuje.\r\n",
+        "version_hits": 1
+      },
+      {
+        "file": "kuchyna_novak/kuchyna_novak_h1180_st37_dtdl_18_36.csv",
+        "text": "\"Policka nad dvere d1\";\"800\";\"—\";\"300\";\"\";\"18\";\"2\";\"H1180 ST37 DTDL\";\"\"\r\n\"Bok P s2\";\"721\";\"—\";\"560\";\"\";\"18\";\"1\";\"H1180 ST37 DTDL\";\"ABS K009 Pinia\"\r\n\"Bok LP s1 s2\";\"720\";\"—\";\"560\";\"\";\"18\";\"3\";\"H1180 ST37 DTDL\";\"\"\r\n\"Dno s1\";\"564\";\"—\";\"560\";\"\";\"18\";\"1\";\"H1180 ST37 DTDL\";\"\"\r\n\"Pracovna doska\";\"1200\";\"=\";\"600\";\"\";\"36\";\"1\";\"H1180 ST37 DTDL\";\"\"\r\n",
+        "version_hits": 0
+      },
+      {
+        "file": "kuchyna_novak/kuchyna_novak_k009_pw_dtdl_18_36.csv",
+        "text": "\"Polica 1 s1\";\"562\";\"—\";\"530\";\"\";\"18\";\"1\";\"K009 PW DTDL\";\"ABS H1180\"\r\n\"Polica s dlhym\";\"561\";\"—\";\"530\";\"\";\"18\";\"1\";\"K009 PW DTDL\";\"\"\r\n",
+        "version_hits": 0
+      }
+    ],
+    "last_dir_before": "«DIR»",
+    "last_dir": "«DIR»",
+    "order": [
+      "ES.refresh",
+      "PC.export_expect_check(merge: true)",
+      "PC.fresh_collect",
+      "PC.newer_config_stop",
+      "PC.cut_stop",
+      "PC.hardware_expansion",
+      "PC.drawer_stop(:kit)",
+      "ES.last_dir",
+      "UI.select_directory",
+      "Bom.compute",
+      "PC.sheets_map",
+      "PC.budget_payload",
+      "PC.control_payload",
+      "VepoExport.build",
+      "VepoExport.write",
+      "ES.save_last_dir",
+      "PC.pending_name_note",
+      "PC.default_name_note",
+      "status"
+    ],
+    "counts": {
+      "edges_map": 3,
+      "fresh_collect": 1,
+      "hardware_catalog_items": 1,
+      "sheets_map": 1,
+      "vepo_edge_decors": 1,
+      "vepo_edge_thicknesses": 1,
+      "vepo_materials": 1,
+      "vepo_sheet_decors": 1
+    },
+    "expansions": 1
+  },
+  "csv_auto_auto": {
+    "export": "do_hw_csv",
+    "status": "Nákupný zoznam: 2 položiek + 1 nemapovaných (v CSV aj KONTROLE) → «DIR»/kovanie_kuchyna_novak.csv · Zákazka: Kuchyna_Novak (podľa súboru)",
+    "error": true,
+    "statuses": 1,
+    "repush": 0,
+    "pickers": [
+      {
+        "picker": "savepanel",
+        "start": "«DIR»",
+        "name": "kovanie_kuchyna_novak.csv"
+      }
+    ],
+    "files": [
+      {
+        "file": "kovanie_kuchyna_novak.csv",
+        "text": "﻿\"NOXUN kovanie — nákupný zoznam\";\"Kuchyna_Novak\";\"2026-10-01 14:05\"\r\n\"kategória\";\"kód\";\"názov\";\"počet\";\"MJ\";\"cena € s DPH\";\"medzisúčet € s DPH\"\r\n\"ZAVESY\";\"BLUM-71B3550\";\"Záves Clip Top 110°\";\"4\";\"ks\";\"3,42\";\"13,68\"\r\n\"ZAVESY\";\"BLUM-TIPON\";\"TipOn krátky\";\"1\";\"ks\";\"\";\"\"\r\n\"SPOLU (len známe ceny)\";\"\";\"\";\"5\";\"\";\"\";\"13,68\"\r\n\r\n\"NEMAPOVANÉ (bez kódov — nenacenené)\";\"dôvod\";\"kde\";\"počet\";\"rozmer\";\"\";\"\"\r\n\"leg\";\"typ nemá priradený set\";\"CAB-002\";\"4\";\"\";\"\";\"\"\r\n",
+        "version_hits": 0
+      }
+    ],
+    "last_dir_before": "«DIR»",
+    "last_dir": "«DIR»",
+    "order": [
+      "ES.refresh",
+      "PC.export_expect_check(merge: false)",
+      "PC.fresh_collect",
+      "PC.newer_config_stop",
+      "PC.cut_stop",
+      "PC.hardware_expansion",
+      "PC.drawer_stop(:all)",
+      "PC.dup_partition",
+      "ES.last_dir",
+      "UI.savepanel",
+      "HardwareSets.purchase_csv",
+      "ES.save_last_dir",
+      "PC.pending_name_note",
+      "PC.default_name_note",
+      "status"
+    ],
+    "counts": {
+      "fresh_collect": 1
+    },
+    "expansions": 1
+  },
+  "rozpocet_auto_auto": {
+    "export": "do_budget_xlsx",
+    "status": "Rozpočet uložený: 1282,00 € → «DIR»/Rozpocet Kuchyna_Novak - AKT 1.10. 2026.xlsx · POZOR: 3 riadkov rozpočtu nemá cenu — suma je podhodnotená (položky v dokumente sú, v cene nie) — export si potvrdil · Zákazka: Kuchyna_Novak (podľa súboru)",
+    "error": true,
+    "statuses": 1,
+    "repush": 0,
+    "pickers": [
+      {
+        "picker": "savepanel",
+        "start": "«DIR»",
+        "name": "Rozpocet Kuchyna_Novak - AKT 1.10. 2026.xlsx"
+      }
+    ],
+    "files": [
+      {
+        "file": "Rozpocet Kuchyna_Novak - AKT 1.10. 2026.xlsx",
+        "sha256": "159984b6a37893248651644350e55f3ebe945e6cd908ddac3dbde4fb8fc688e1",
+        "size": 13829
+      }
+    ],
+    "last_dir_before": "«DIR»",
+    "last_dir": "«DIR»",
+    "order": [
+      "ES.refresh",
+      "PC.export_expect_check(merge: false)",
+      "PC.fresh_collect",
+      "PC.newer_config_stop",
+      "PC.cut_stop",
+      "Bom.compute",
+      "PC.hardware_expansion",
+      "PC.sheets_map",
+      "PC.budget_payload",
+      "PC.budget_std_block",
+      "PC.drawer_stop(:all)",
+      "PC.dup_partition",
+      "PC.export_confirmations",
+      "ES.last_dir",
+      "UI.savepanel",
+      "XlsxWriter.write_book",
+      "XlsxWriter.write",
+      "ES.save_last_dir",
+      "PC.pending_name_note",
+      "PC.default_name_note",
+      "status"
+    ],
+    "counts": {
+      "edges_map": 2,
+      "fresh_collect": 1,
+      "hardware_catalog_items": 1,
+      "sheets_map": 1
+    },
+    "expansions": 1
+  },
+  "ponuka_auto_auto": {
+    "export": "do_cp_xlsx",
+    "status": "Cenová ponuka uložená: 1282,00 € · 7 riadkov · špecifikácia 6 položiek → «DIR»/Cenova ponuka Kuchyna_Novak - 1.10.2026.xlsx · POZOR: 3 riadkov rozpočtu nemá cenu — suma je podhodnotená (položky v dokumente sú, v cene nie) — export si potvrdil · Zákazka: Kuchyna_Novak (podľa súboru)",
+    "error": true,
+    "statuses": 1,
+    "repush": 0,
+    "pickers": [
+      {
+        "picker": "savepanel",
+        "start": "«DIR»",
+        "name": "Cenova ponuka Kuchyna_Novak - 1.10.2026.xlsx"
+      }
+    ],
+    "files": [
+      {
+        "file": "Cenova ponuka Kuchyna_Novak - 1.10.2026.xlsx",
+        "sha256": "597e3ab30812f8b70b780fad5d58e088681dc2ee8a2b16b1ddab20a23229b51e",
+        "size": 9739
+      }
+    ],
+    "last_dir_before": "«DIR»",
+    "last_dir": "«DIR»",
+    "order": [
+      "ES.refresh",
+      "PC.export_expect_check(merge: false)",
+      "PC.fresh_collect",
+      "PC.newer_config_stop",
+      "PC.cut_stop",
+      "Bom.compute",
+      "PC.sheets_map",
+      "PC.hardware_expansion",
+      "PC.budget_payload",
+      "PC.budget_std_block",
+      "CpExport.specification",
+      "PC.drawer_stop(:all)",
+      "PC.dup_partition",
+      "PC.export_confirmations",
+      "ES.last_dir",
+      "UI.savepanel",
+      "CpExport.firewall_hits",
+      "XlsxWriter.write_book",
+      "ES.save_last_dir",
+      "PC.pending_name_note",
+      "PC.default_name_note",
+      "status"
+    ],
+    "counts": {
+      "edges_map": 2,
+      "fresh_collect": 1,
+      "hardware_catalog_items": 1,
+      "sheets_map": 1
+    },
+    "expansions": 1
+  },
+  "csv_podla_suboru": {
+    "export": "do_hw_csv",
+    "status": "Nákupný zoznam: 2 položiek + 1 nemapovaných (v CSV aj KONTROLE) → «DIR»/kovanie_kupelna_horna.csv",
+    "error": true,
+    "statuses": 1,
+    "repush": 0,
+    "pickers": [
+      {
+        "picker": "savepanel",
+        "start": "«DIR»",
+        "name": "kovanie_kupelna_horna.csv"
+      }
+    ],
+    "files": [
+      {
+        "file": "kovanie_kupelna_horna.csv",
+        "text": "﻿\"NOXUN kovanie — nákupný zoznam\";\"Kupelna Horna\";\"2026-10-01 14:05\"\r\n\"kategória\";\"kód\";\"názov\";\"počet\";\"MJ\";\"cena € s DPH\";\"medzisúčet € s DPH\"\r\n\"ZAVESY\";\"BLUM-71B3550\";\"Záves Clip Top 110°\";\"4\";\"ks\";\"3,42\";\"13,68\"\r\n\"ZAVESY\";\"BLUM-TIPON\";\"TipOn krátky\";\"1\";\"ks\";\"\";\"\"\r\n\"SPOLU (len známe ceny)\";\"\";\"\";\"5\";\"\";\"\";\"13,68\"\r\n\r\n\"NEMAPOVANÉ (bez kódov — nenacenené)\";\"dôvod\";\"kde\";\"počet\";\"rozmer\";\"\";\"\"\r\n\"leg\";\"typ nemá priradený set\";\"CAB-002\";\"4\";\"\";\"\";\"\"\r\n",
+        "version_hits": 0
+      }
+    ],
+    "last_dir_before": "«DIR»",
+    "last_dir": "«DIR»",
+    "order": [
+      "ES.refresh",
+      "PC.export_expect_check(merge: false)",
+      "PC.fresh_collect",
+      "PC.newer_config_stop",
+      "PC.cut_stop",
+      "PC.hardware_expansion",
+      "PC.drawer_stop(:all)",
+      "PC.dup_partition",
+      "ES.last_dir",
+      "UI.savepanel",
+      "HardwareSets.purchase_csv",
+      "ES.save_last_dir",
+      "PC.pending_name_note",
+      "PC.default_name_note",
+      "status"
+    ],
+    "counts": {
+      "fresh_collect": 1
+    },
+    "expansions": 1
+  },
+  "csv_nazov_nad_120": {
+    "export": "do_hw_csv",
+    "status": "Nákupný zoznam: 2 položiek + 1 nemapovaných (v CSV aj KONTROLE) → «DIR»/kovanie_dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.csv",
+    "error": true,
+    "statuses": 1,
+    "repush": 0,
+    "pickers": [
+      {
+        "picker": "savepanel",
+        "start": "«DIR»",
+        "name": "kovanie_dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.csv"
+      }
+    ],
+    "files": [
+      {
+        "file": "kovanie_dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.csv",
+        "text": "﻿\"NOXUN kovanie — nákupný zoznam\";\"DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD\";\"2026-10-01 14:05\"\r\n\"kategória\";\"kód\";\"názov\";\"počet\";\"MJ\";\"cena € s DPH\";\"medzisúčet € s DPH\"\r\n\"ZAVESY\";\"BLUM-71B3550\";\"Záves Clip Top 110°\";\"4\";\"ks\";\"3,42\";\"13,68\"\r\n\"ZAVESY\";\"BLUM-TIPON\";\"TipOn krátky\";\"1\";\"ks\";\"\";\"\"\r\n\"SPOLU (len známe ceny)\";\"\";\"\";\"5\";\"\";\"\";\"13,68\"\r\n\r\n\"NEMAPOVANÉ (bez kódov — nenacenené)\";\"dôvod\";\"kde\";\"počet\";\"rozmer\";\"\";\"\"\r\n\"leg\";\"typ nemá priradený set\";\"CAB-002\";\"4\";\"\";\"\";\"\"\r\n",
+        "version_hits": 0
+      }
+    ],
+    "last_dir_before": "«DIR»",
+    "last_dir": "«DIR»",
+    "order": [
+      "ES.refresh",
+      "PC.export_expect_check(merge: false)",
+      "PC.fresh_collect",
+      "PC.newer_config_stop",
+      "PC.cut_stop",
+      "PC.hardware_expansion",
+      "PC.drawer_stop(:all)",
+      "PC.dup_partition",
+      "ES.last_dir",
+      "UI.savepanel",
+      "HardwareSets.purchase_csv",
+      "ES.save_last_dir",
+      "PC.pending_name_note",
+      "PC.default_name_note",
+      "status"
+    ],
+    "counts": {
+      "fresh_collect": 1
+    },
+    "expansions": 1
+  },
+  "rozpocet_nazov_nad_120": {
+    "export": "do_budget_xlsx",
+    "status": "Rozpočet uložený: 1282,00 € → «DIR»/Rozpocet DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD - AKT 1.10. 2026.xlsx · POZOR: 3 riadkov rozpočtu nemá cenu — suma je podhodnotená (položky v dokumente sú, v cene nie) — export si potvrdil",
+    "error": true,
+    "statuses": 1,
+    "repush": 0,
+    "pickers": [
+      {
+        "picker": "savepanel",
+        "start": "«DIR»",
+        "name": "Rozpocet DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD - AKT 1.10. 2026.xlsx"
+      }
+    ],
+    "files": [
+      {
+        "file": "Rozpocet DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD - AKT 1.10. 2026.xlsx",
+        "sha256": "f5e94b54fef56edbb98ed8306c489152734c8fc3028b8ae7648467027b5e27f1",
+        "size": 13936
+      }
+    ],
+    "last_dir_before": "«DIR»",
+    "last_dir": "«DIR»",
+    "order": [
+      "ES.refresh",
+      "PC.export_expect_check(merge: false)",
+      "PC.fresh_collect",
+      "PC.newer_config_stop",
+      "PC.cut_stop",
+      "Bom.compute",
+      "PC.hardware_expansion",
+      "PC.sheets_map",
+      "PC.budget_payload",
+      "PC.budget_std_block",
+      "PC.drawer_stop(:all)",
+      "PC.dup_partition",
+      "PC.export_confirmations",
+      "ES.last_dir",
+      "UI.savepanel",
+      "XlsxWriter.write_book",
+      "XlsxWriter.write",
+      "ES.save_last_dir",
+      "PC.pending_name_note",
+      "PC.default_name_note",
+      "status"
+    ],
+    "counts": {
+      "edges_map": 2,
+      "fresh_collect": 1,
+      "hardware_catalog_items": 1,
+      "sheets_map": 1
+    },
+    "expansions": 1
+  },
+  "ponuka_nazov_nad_120": {
+    "export": "do_cp_xlsx",
+    "status": "Cenová ponuka uložená: 1282,00 € · 7 riadkov · špecifikácia 6 položiek → «DIR»/Cenova ponuka DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD - 1.10.2026.xlsx · POZOR: 3 riadkov rozpočtu nemá cenu — suma je podhodnotená (položky v dokumente sú, v cene nie) — export si potvrdil",
+    "error": true,
+    "statuses": 1,
+    "repush": 0,
+    "pickers": [
+      {
+        "picker": "savepanel",
+        "start": "«DIR»",
+        "name": "Cenova ponuka DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD - 1.10.2026.xlsx"
+      }
+    ],
+    "files": [
+      {
+        "file": "Cenova ponuka DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD - 1.10.2026.xlsx",
+        "sha256": "9a8844172558e426e02f15014501f237df9dfc7a05a05a63855a6949eb01e397",
+        "size": 9953
+      }
+    ],
+    "last_dir_before": "«DIR»",
+    "last_dir": "«DIR»",
+    "order": [
+      "ES.refresh",
+      "PC.export_expect_check(merge: false)",
+      "PC.fresh_collect",
+      "PC.newer_config_stop",
+      "PC.cut_stop",
+      "Bom.compute",
+      "PC.sheets_map",
+      "PC.hardware_expansion",
+      "PC.budget_payload",
+      "PC.budget_std_block",
+      "CpExport.specification",
+      "PC.drawer_stop(:all)",
+      "PC.dup_partition",
+      "PC.export_confirmations",
+      "ES.last_dir",
+      "UI.savepanel",
+      "CpExport.firewall_hits",
+      "XlsxWriter.write_book",
+      "ES.save_last_dir",
+      "PC.pending_name_note",
+      "PC.default_name_note",
+      "status"
+    ],
+    "counts": {
+      "edges_map": 2,
+      "fresh_collect": 1,
+      "hardware_catalog_items": 1,
+      "sheets_map": 1
+    },
+    "expansions": 1
+  },
+  "csv_skutocna_expanzia": {
+    "export": "do_hw_csv",
+    "status": "Nákupný zoznam: 7 položiek → «DIR»/kovanie_kuchyna_novak.csv",
+    "error": false,
+    "statuses": 1,
+    "repush": 0,
+    "pickers": [
+      {
+        "picker": "savepanel",
+        "start": "«DIR»",
+        "name": "kovanie_kuchyna_novak.csv"
+      }
+    ],
+    "files": [
+      {
+        "file": "kovanie_kuchyna_novak.csv",
+        "text": "﻿\"NOXUN kovanie — nákupný zoznam\";\"Kuchyňa Novák\";\"2026-10-01 14:05\"\r\n\"kategória\";\"kód\";\"názov\";\"počet\";\"MJ\";\"cena € s DPH\";\"medzisúčet € s DPH\"\r\n\"ZAVESY\";\"104717\";\"HETTICH 9071205 Sensys záves naložený 110° TH skrutka SiSy\";\"4\";\"ks\";\"4,18\";\"16,72\"\r\n\"ZAVESY\";\"105408\";\"HETTICH 9088251 Sensys krytka pre misku TH\";\"4\";\"ks\";\"0,25\";\"1,00\"\r\n\"ZAVESY\";\"105425\";\"HETTICH 9088250 Sensys krytka ramienka logo Hettich\";\"4\";\"ks\";\"0,19\";\"0,76\"\r\n\"ZAVESY\";\"106412\";\"HETTICH 9071656 Sensys montážna podložka krížová D1,5 excenter hmoždinka\";\"4\";\"ks\";\"0,97\";\"3,88\"\r\n\"NOHY\";\"9078\";\"Häfele 637.76.353 noha AXILO H100\";\"4\";\"ks\";\"0,72\";\"2,88\"\r\n\"NOHY\";\"9079\";\"Häfele 637.76.333 platnička AXILO 79×92×2,5 mm čierna\";\"4\";\"ks\";\"0,50\";\"2,00\"\r\n\"NOHY\";\"950\";\"Häfele 637.38.054 príchyt sokla AXILO (k drevenému soklu)\";\"1\";\"ks\";\"0,35\";\"0,35\"\r\n\"SPOLU (len známe ceny)\";\"\";\"\";\"25\";\"\";\"\";\"27,59\"\r\n",
+        "version_hits": 0
+      }
+    ],
+    "last_dir_before": "«DIR»",
+    "last_dir": "«DIR»",
+    "order": [
+      "ES.refresh",
+      "PC.export_expect_check(merge: false)",
+      "PC.fresh_collect",
+      "PC.newer_config_stop",
+      "PC.cut_stop",
+      "PC.hardware_expansion",
+      "PC.drawer_stop(:all)",
+      "PC.dup_partition",
+      "ES.last_dir",
+      "UI.savepanel",
+      "HardwareSets.purchase_csv",
+      "ES.save_last_dir",
+      "PC.pending_name_note",
+      "PC.default_name_note",
+      "status"
+    ],
+    "counts": {
+      "fresh_collect": 1
+    },
+    "expansions": 1
+  },
+  "rozpocet_skutocna_expanzia": {
+    "export": "do_budget_xlsx",
+    "status": "Rozpočet uložený: 1296,00 € → «DIR»/Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx · POZOR: 2 riadkov rozpočtu nemá cenu — suma je podhodnotená (položky v dokumente sú, v cene nie) — export si potvrdil",
+    "error": true,
+    "statuses": 1,
+    "repush": 0,
+    "pickers": [
+      {
+        "picker": "savepanel",
+        "start": "«DIR»",
+        "name": "Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx"
+      }
+    ],
+    "files": [
+      {
+        "file": "Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx",
+        "sha256": "b96fc93386506d6f00ab05d03db57aade0e649df8e94193fdebfc4cbceef2ad2",
+        "size": 15817
+      }
+    ],
+    "last_dir_before": "«DIR»",
+    "last_dir": "«DIR»",
+    "order": [
+      "ES.refresh",
+      "PC.export_expect_check(merge: false)",
+      "PC.fresh_collect",
+      "PC.newer_config_stop",
+      "PC.cut_stop",
+      "Bom.compute",
+      "PC.hardware_expansion",
+      "PC.sheets_map",
+      "PC.budget_payload",
+      "PC.budget_std_block",
+      "PC.drawer_stop(:all)",
+      "PC.dup_partition",
+      "PC.export_confirmations",
+      "ES.last_dir",
+      "UI.savepanel",
+      "XlsxWriter.write_book",
+      "XlsxWriter.write",
+      "ES.save_last_dir",
+      "PC.pending_name_note",
+      "PC.default_name_note",
+      "status"
+    ],
+    "counts": {
+      "edges_map": 2,
+      "fresh_collect": 1,
+      "sheets_map": 1
+    },
+    "expansions": 1
+  },
+  "rozpocet_ceny_podla_planu": {
+    "export": "do_budget_xlsx",
+    "status": "Rozpočet uložený: 1282,00 € → «DIR»/Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx · POZOR: 3 riadkov rozpočtu nemá cenu — suma je podhodnotená (položky v dokumente sú, v cene nie) — export si potvrdil",
+    "error": true,
+    "statuses": 1,
+    "repush": 1,
+    "pickers": [
+      {
+        "picker": "savepanel",
+        "start": "«DIR»",
+        "name": "Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx"
+      }
+    ],
+    "files": [
+      {
+        "file": "Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx",
+        "sha256": "c63b1d7b0fc6bfa8974319cb4cd29dbf759fd706b089b629193da90771a1f970",
+        "size": 13962
+      }
+    ],
+    "last_dir_before": "«DIR»",
+    "last_dir": "«DIR»",
+    "order": [
+      "ES.refresh",
+      "PC.export_expect_check(merge: false)",
+      "PC.fresh_collect",
+      "PC.newer_config_stop",
+      "PC.cut_stop",
+      "Bom.compute",
+      "PC.hardware_expansion",
+      "PC.sheets_map",
+      "PC.budget_payload",
+      "PC.budget_std_block",
+      "PC.drawer_stop(:all)",
+      "PC.dup_partition",
+      "PC.export_confirmations",
+      "ES.last_dir",
+      "UI.savepanel",
+      "XlsxWriter.write_book",
+      "XlsxWriter.write",
+      "ES.save_last_dir",
+      "repush",
+      "PC.pending_name_note",
+      "PC.default_name_note",
+      "status"
+    ],
+    "counts": {
+      "edges_map": 2,
+      "fresh_collect": 1,
+      "hardware_catalog_items": 1,
+      "sheets_map": 1
+    },
+    "expansions": 1
+  },
+  "ponuka_ceny_podla_planu": {
+    "export": "do_cp_xlsx",
+    "status": "Cenová ponuka uložená: 1282,00 € · 7 riadkov · špecifikácia 6 položiek → «DIR»/Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx · POZOR: 3 riadkov rozpočtu nemá cenu — suma je podhodnotená (položky v dokumente sú, v cene nie) — export si potvrdil",
+    "error": true,
+    "statuses": 1,
+    "repush": 1,
+    "pickers": [
+      {
+        "picker": "savepanel",
+        "start": "«DIR»",
+        "name": "Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx"
+      }
+    ],
+    "files": [
+      {
+        "file": "Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx",
+        "sha256": "75dbb53b54ee6424dd6a18bc08f6079e9a5b3602282c399f1ea38e939e7c0d0b",
+        "size": 9743
+      }
+    ],
+    "last_dir_before": "«DIR»",
+    "last_dir": "«DIR»",
+    "order": [
+      "ES.refresh",
+      "PC.export_expect_check(merge: false)",
+      "PC.fresh_collect",
+      "PC.newer_config_stop",
+      "PC.cut_stop",
+      "Bom.compute",
+      "PC.sheets_map",
+      "PC.hardware_expansion",
+      "PC.budget_payload",
+      "PC.budget_std_block",
+      "CpExport.specification",
+      "PC.drawer_stop(:all)",
+      "PC.dup_partition",
+      "PC.export_confirmations",
+      "ES.last_dir",
+      "UI.savepanel",
+      "CpExport.firewall_hits",
+      "XlsxWriter.write_book",
+      "ES.save_last_dir",
+      "repush",
+      "PC.pending_name_note",
+      "PC.default_name_note",
+      "status"
+    ],
+    "counts": {
+      "edges_map": 2,
+      "fresh_collect": 1,
+      "hardware_catalog_items": 1,
+      "sheets_map": 1
+    },
+    "expansions": 1
+  }
+}

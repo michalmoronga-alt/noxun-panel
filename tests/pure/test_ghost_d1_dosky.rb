@@ -1020,13 +1020,22 @@ NxTest.test('GHOST-D1 vystupy: to iste plati pre SKRINKU bez cabinet_id') do
 end
 
 NxTest.test('GHOST-D1 vystupy: VEPO uz vynimku NEMA — brana bezi PRED vyberom priecinka') do
+  # H17a (R5): brana zije v SPOLOCNEJ priprave `ExportPrep.start` — VEPO ju ma
+  # tym, ze telo zacina `ExportPrep.start(..., :vepo, ...)` PRED vyberom
+  # priecinka. Spravanie (picker sa pri novsej skrinke/doske neotvori v KAZDOM
+  # exporte z `KINDS`) dokazuje matica G2 `test_h17_golden.rb` (novsia_*).
   pc = NxD1.src('noxun_engine', 'ui', 'production_core.rb')
+  prep = NxD1.src('noxun_engine', 'ui', 'export_prep.rb')
   body = pc[/def do_export\(model, data, generation:, status:, repush:\).*?\n      def /m].to_s
-  NxTest.assert(body.include?('newer_stop = newer_config_stop(collected)'), 'VEPO ma branu')
-  NxTest.assert(body.index('newer_config_stop') < body.index('UI.select_directory'),
+  i_start = body.index('ExportPrep.start(model, data, :vepo,')
+  NxTest.assert(i_start, 'VEPO ma branu (spolocna priprava)')
+  NxTest.assert(i_start < body.index('UI.select_directory'),
                 'brana bezi PRED vyberom priecinka (picker sa ani neotvori)')
-  NxTest.assert(body.index('fresh_collect(model)') < body.index('newer_config_stop'),
-                'a nad CERSTVYM zberom')
-  NxTest.assert_equal(4, pc.scan('newer_stop = newer_config_stop(collected)').length,
-                      'branu maju VSETKY STYRI exporty')
+  start = prep[/def start\(.*?\n      end\n/m].to_s
+  NxTest.assert(start.index('ctx = Context.new(model, kind, gate)') < start.index('newer_config_stop(ctx.collected)'),
+                'a nad CERSTVYM zberom (kontext)')
+  NxTest.assert(prep.include?("memo(:collected) { ProductionCore.fresh_collect(@model) }"), 'zber je cerstvy')
+  NxTest.assert_equal(1, prep.scan('newer_stop = ProductionCore.newer_config_stop(ctx.collected)').length,
+                      'branu maju VSETKY exporty — z jedneho miesta')
+  NxTest.assert_equal(0, pc.scan('newer_stop = newer_config_stop(collected)').length, 'ziadna kopia v tele exportu')
 end

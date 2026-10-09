@@ -379,23 +379,33 @@ NxTest.test('H7b T-B11: brany generacie a flush idu PRED `expect` (ich hlasky sa
   end
 end
 
-NxTest.test('H7b T-B11: poradie v tele 4 exportov — refresh → expect → zber → vyber suboru; 18 + 36 len VEPO') do
+NxTest.test('H7b T-B11: poradie uvodu 4 exportov — refresh → expect → zber → vyber suboru; 18 + 36 len VEPO') do
+  # H17a (R5): uvod zije v `ExportPrep.start` (poradie v NOM, nie v tele);
+  # telo kazdeho exportu ho vola so svojim klucom PRED vyberom suboru.
+  # Spravanie dokazuju behaviorálne testy vyssie (generacia prva, flush pred
+  # `expect`) a G2/G4 `test_h17_golden.rb` (iné 18 + 36: VEPO stoji, ostatne prejdu;
+  # `export_expect_check` prave raz na export).
   src = NxH7B.core_src
+  prep = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'export_prep.rb'), encoding: 'UTF-8')
+  start = prep[/def start\(.*?\n      end\n/m].to_s
+  i_gen = start.index("data['gen'].to_i == generation.to_i")
+  i_flush = start.index("data['flush_blocked']")
+  i_ref = start.index('ExportSettings.refresh')
+  i_exp = start.index('ProductionCore.export_expect_check(model, data, merge: kind == :vepo)')
+  i_col = start.index('ctx = Context.new(model, kind, gate)')
+  NxTest.assert([i_gen, i_flush, i_ref, i_exp, i_col].none?(&:nil?), 'vsetky kroky su v priprave')
+  NxTest.assert(i_gen < i_flush && i_flush < i_ref && i_ref < i_exp && i_exp < i_col,
+                'poradie generacia → flush → refresh → expect → zber (kontext)')
+  kinds = { do_export: :vepo, do_hw_csv: :hw_csv, do_budget_xlsx: :budget, do_cp_xlsx: :offer }
   NxH7B::EXPORTS.each do |exp|
     body = NxH7B.method_body(src, exp)
     NxTest.refute(body.empty?, "#{exp}: telo sa naslo")
-    i_gen = body.index("data['gen'].to_i == generation.to_i")
-    i_flush = body.index("data['flush_blocked']")
-    i_ref = body.index('ExportSettings.refresh')
-    i_exp = body.index('export_expect_check(model, data')
-    i_col = body.index('fresh_collect(model)')
+    i_start = body.index("ExportPrep.start(model, data, #{kinds.fetch(exp).inspect},")
     i_ui = body.index('UI.savepanel') || body.index('UI.select_directory')
-    NxTest.assert([i_gen, i_flush, i_ref, i_exp, i_col, i_ui].none?(&:nil?), "#{exp}: vsetky kroky su v tele")
-    NxTest.assert(i_gen < i_flush && i_flush < i_ref && i_ref < i_exp && i_exp < i_col && i_col < i_ui,
-                  "#{exp}: poradie generacia → flush → refresh → expect → zber → vyber suboru")
-    NxTest.assert_equal(exp == :do_export, body.include?('export_expect_check(model, data, merge: true)'),
-                        "#{exp}: 18 + 36 sa porovnava len vo VEPO")
+    NxTest.assert(i_start && i_ui && i_start < i_ui, "#{exp}: priprava → vyber suboru")
+    NxTest.refute(body.include?('export_expect_check('), "#{exp}: brana `expect` nie je v tele (len v priprave)")
   end
+  NxTest.assert_equal(:vepo, Noxun::Engine::ExportPrep::KINDS.key('do_export'), '18 + 36 sa porovnava len vo VEPO')
 end
 
 # =============================================================================

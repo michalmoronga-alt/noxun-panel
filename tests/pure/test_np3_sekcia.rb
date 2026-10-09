@@ -459,9 +459,12 @@ NxTest.test('NP-3 push: plan z TOHO ISTEHO zberu (ziadny druhy sken), ten isty p
   NxTest.assert(bp.include?('lay = layout || layout_for(collected, bom, smap, exp)'), 'bez planu si ho spocita sam')
   NxTest.assert(bp.include?('sheet_layout: lay'))
   # vsetkych 5 volajucich ide cez budget_payload (plan tak nesu vsetci)
+  # H17a (R5): VEPO, XLSX rozpoctu a XLSX ponuky volaju rozpocet z JEDNEHO
+  # miesta — citacky `ExportPrep::Context#budget`; v jadre ostal prepocet cien.
   pc = f.src('ui/production_core.rb')
-  NxTest.assert_equal(4, pc.scan(/(?<!def )budget_payload\(model, bom, collected/).length,
-                      'VEPO, XLSX rozpoctu, XLSX ponuky, prepocet cien')
+  NxTest.assert_equal(1, pc.scan(/(?<!def )budget_payload\(model, bom, collected/).length, 'prepocet cien')
+  NxTest.assert_equal(1, f.src('ui/export_prep.rb').scan('ProductionCore.budget_payload(@model, bom, collected').length,
+                      'VEPO, XLSX rozpoctu, XLSX ponuky (kontext exportu)')
   NxTest.assert_equal(1, f.src('ui/studio_dialog.rb').scan('ProductionCore.budget_payload(').length, 'push Studia')
 end
 

@@ -168,20 +168,31 @@ end
 NxTest.test('ŠT-1c (audit #15): CSV kovania dostal GENERACNY GUARD — vedoma zmena') do
   body = S1C_CORE_RB[/def do_hw_csv\(model, data.*?\n      end\n/m].to_s
   NxTest.refute(body.empty?, 'telo exportu sa nasiel')
-  NxTest.assert(body.include?("data['gen'].to_i == generation.to_i"),
+  # H17a (R5): guardy generacie a flush, brana `expect` a cerstvy zber ziju
+  # v `ExportPrep.start` / `Context` (jedno miesto pre vsetky exporty). Telo
+  # CSV ich ma tym, ze zacina pripravou; spravanie (repush, cervena veta,
+  # picker 0) dokazuje matica G2 `test_h17_golden.rb` (generacia, flush).
+  prep = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'export_prep.rb'), encoding: 'UTF-8')
+  start = prep[/def start\(.*?\n      end\n/m].to_s
+  NxTest.assert(body.include?('ExportPrep.start(model, data, :hw_csv, generation: generation, status: status, repush: repush)') &&
+                  body.include?('return unless ctx'),
+                'telo CSV zacina spolocnou pripravou a jej odmietnutie respektuje')
+  NxTest.assert(start.include?("data['gen'].to_i == generation.to_i"),
                 'stare data okna export NEVYROBIA (nakupny dokument)')
-  NxTest.assert(body.include?('repush.call'),
+  NxTest.assert(start.include?('repush.call'),
                 'odmietnutie nie je tiche — okno sa obnovi')
-  NxTest.assert(body.include?("data['flush_blocked']"),
+  NxTest.assert(start.include?("data['flush_blocked']"),
                 'a cervene pole panela export zastavi (flush guard ostal)')
-  # H7b / review #457: nazov ide zo servera cez branu `expect` (`gate[:project]`).
-  NxTest.assert(body.include?('project = gate[:project]') && !body.include?("data['project']"),
+  # H7b / review #457: nazov ide zo servera cez branu `expect` (H17a: `ctx.project`).
+  NxTest.assert(body.include?('project = ctx.project') && !body.include?("data['project']"),
                 'nazov projektu je SERVEROVA autorita (z DOM nechodi)')
-  NxTest.assert(body.include?('fresh_collect(model)'),
+  NxTest.assert(body.include?('collected = ctx.collected') &&
+                  prep.include?('memo(:collected) { ProductionCore.fresh_collect(@model) }'),
                 'zoznam sa pocita z CERSTVEHO modelu, nie z payloadu okna')
   # Review P3: komentar nesmie slubovat ochranu, ktoru guard nema — prestavba
   # skrinky z Inspectora generaciu NEZDVIHA (chyta ju az cerstvy zber nizsie).
-  note = S1C_CORE_RB[/VEDOMA ZMENA \(audit #15\).*?def do_hw_csv/m].to_s
+  # H17a (R5): komentar sa presunul k `ExportPrep.start` (krok 1).
+  note = prep[/1\. generacia okna\. VEDOMA ZMENA \(audit #15\).*?def start/m].to_s
   NxTest.refute(note.empty?, 'komentar guardu sa nasiel')
   NxTest.refute(note.include?('prestavana skrinka'),
                 'komentar netvrdi, ze guard chyta prestavbu skrinky (nechyta)')

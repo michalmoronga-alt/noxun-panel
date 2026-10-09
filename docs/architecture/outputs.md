@@ -245,21 +245,22 @@ a **prečo + kde to opraviť**. Zoznamy ID majú **jedno znenie stropu** („tri
 zákazku so schémou vyššou než vlastná normálne **vyexportovala**, len bez toho, čomu nerozumie (pole configu je pre ňu neviditeľné), takže objednávka aj cena boli neúplné a nikto to
 nemal ako zbadať. Zdrojom je aditívny `Bom.collect` kľúč **`newer_configs`** (`ProductionCore.newer_configs(collected)`). Potvrdiť sa to nedá: chýbajúce dáta sa nedajú „vziať na
 vedomie", dá sa len aktualizovať plugin. **GHOST-D1 zmena: VEPO už výnimku NEMÁ.** Odkedy má aj **doska** vlastný kontrakt configu (`BoardBuilder::BOARD_CONFIG_SCHEMA`), môže
-objekt z novšej verzie niesť **výrobné** pole, ktoré tento plugin nevidí — takže rezací výstup by bol ticho neúplný rovnako ako nákup. `do_export` (VEPO) preto volá
-`newer_config_stop` **hneď po `fresh_collect` a pred `UI.select_directory`** (pri blokáde sa picker ani neotvorí). Že sú to práve **štyri** výstupy, stráži guard test
-v `tests/pure/test_kovh1_adhoc.rb`.
+objekt z novšej verzie niesť **výrobné** pole, ktoré tento plugin nevidí — takže rezací výstup by bol ticho neúplný rovnako ako nákup. Od H17a bránu volá **spoločná
+príprava** [`ExportPrep.start`](#export_preprb--spoločná-príprava-exportov-h17a) hneď po čerstvom zbere — pre **každý** export z `ExportPrep::KINDS` vrátane VEPO, pred
+výberom súboru či priečinka (pri blokáde sa picker ani neotvorí). Že ju má každý registrovaný výstup, stráži `tests/pure/test_kovh1_adhoc.rb` (telo začína `start`)
+a matica G2 `tests/pure/test_h17_golden.rb`.
 
-**Táto brána sa vyhodnocuje HNEĎ po `fresh_collect`** — cez `newer_config_stop(collected)`, teda **pred expanziou, pred rozpočtom aj pred ich skorými návratmi** (review #283
+**Táto brána sa vyhodnocuje HNEĎ po čerstvom zbere v `ExportPrep.start`** — cez `newer_config_stop(ctx.collected)`, teda **pred expanziou, pred rozpočtom aj pred ich skorými návratmi** (review #283
 P2-B). Dôvod: zákazka z novšej verzie nemusí vyexpandovať ani jeden **známy** nákupný riadok (alebo jej rozpočet vôbec nevznikne), takže skorý návrat „model nemá žiadne
 kovanie" / „rozpočet sa nepodarilo zostaviť" by bránu **predbehol** a používateľ by sa nedozvedel ani ID skriniek, ani to, že má aktualizovať plugin. `newer:` preto do
-**neskorého** `export_blockers` (spolu s `dups:`/`cp:`) už nechodí — skladá ho výhradne `newer_config_stop`, jedno miesto pre všetky štyri exporty.
+**neskorého** `export_blockers` (spolu s `dups:`/`cp:`) už nechodí — skladá ho výhradne `newer_config_stop`, volaný z jedného miesta (`ExportPrep.start`) pre všetky exporty.
 
-**D-143 (KON-0, v0.13.1) — JEDNA VÝROBNÁ BRÁNA CHRBTA V DRÁŽKE: `cut_stop(collected)`.** Hneď za `newer_config_stop` vo **všetkých štyroch** exportoch (VEPO, nákupný CSV,
-rozpočet XLSX, ponuka XLSX) — pred expanziou, rozpočtom aj pred výberom súboru/priečinka, takže picker sa pri blokáde ani neotvorí. Na rozdiel od registra kovania
+**D-143 (KON-0, v0.13.1) — JEDNA VÝROBNÁ BRÁNA CHRBTA V DRÁŽKE: `cut_stop(collected)`.** Hneď za `newer_config_stop` v spoločnej príprave `ExportPrep.start`, teda pre
+**každý** export (VEPO, nákupný CSV, rozpočet XLSX, ponuka XLSX) — pred expanziou, rozpočtom aj pred výberom súboru/priečinka, takže picker sa pri blokáde ani neotvorí. Na rozdiel od registra kovania
 **stojí aj VEPO**: chybný rozmer do nárezu je chyba rezacích dát a z nich aj plochy v rozpočte a ponuke. Zdrojom je **jeden zoznam** `Bom::CUT_BLOCKERS` nad
 `collected[:cut_issues]` — z toho istého zoznamu robí Kontrola RED (`Validation.check_cut_issues`, kategória `back_cut`), takže riadok a veta brány nemôžu tvrdiť dve veci.
 `cut_blockers` skladá jednu vetu na kód v poradí registra s ID v strope `ids_text` („tri + a ďalšie N"); ORANGE `back_origin_unknown` bránu nemá. Dôkaz „každý dôvod ×
-každý export = nula volaní pickera aj zápisu" drží `tests/pure/test_kon0_d143.rb`. **Hromadná prestavba** zastaraných skriniek má v jadre len **čistý plán a texty**
+každý export = nula volaní pickera aj zápisu" drží `tests/pure/test_kon0_d143.rb` a matica G2 (`chrbat_*`) v `tests/pure/test_h17_golden.rb`. **Hromadná prestavba** zastaraných skriniek má v jadre len **čistý plán a texty**
 (`back_stale_entry` / `back_stale_skip_reason` / `back_stale_plan` / `back_stale_scan` — čítanie; vzor D-131); zápis je `Panel.back_rebuild_stale` (brána 1b-3).
 **KON-A (v0.13.2, audit NOTE 8):** register má piaty kód **`back_rail_stale`** (D-144, veta „chrbát pri výstuhách na výšku zo staršej verzie (môže prechádzať
 zadnou výstuhou)") a **výber kandidátov** hromadnej prestavby sa pýta **spoločného predikátu** `Bom.rebuild_stale?` (D-143 ALEBO D-144) — `rebuild_stale` na náleze
@@ -283,7 +284,7 @@ jediného drawer poľa nález nerobia (legacy cesta je CONTENT-identická aj po 
 Skladá to `drawer_blockers(collected, expansion, scope:)`: `scope: :all` číta z `hardware_issues` konflikty stavby **aj** `ALL_EXPORT_BLOCKERS` (uložený nosič
 `drawer_conflicts` a `drawer_stale`, nižšie) a k tomu kit z expanzie; `scope: :kit` (VEPO) číta z nálezov len `ALL_EXPORT_BLOCKERS` a kit. Poradie dôvodov určuje register (deterministicky, bez ohľadu na poradie zberu) a text stavia
 `Recipes::BLOCKER_LABELS` + `ids_text` (ten istý strop „tri ID + a ďalšie N"). Hotovú hlášku vydáva **`drawer_stop`**, ktorý beží — rovnako ako `newer_config_stop` —
-**pred pickerom**; VEPO si preto expanziu kovania počíta **hneď po zbere** a nižšie ju už len použije (žiadny druhý prepočet). Keď expanziu nemáme (chyba katalógu/setov)
+**pred pickerom**; VEPO si preto expanziu kovania prečíta z kontextu (`ctx.hw_exp`) **ešte pred výberom priečinka** a po ňom ju kontrola aj rozpočet len použijú z pamäte kontextu (žiadny druhý prepočet; výnimkou je dnešný fallback `budget_payload` pri `nil` — odsek `export_prep.rb`). Keď expanziu nemáme (chyba katalógu/setov)
 a zákazka **má** položku, ktorej úplnosť dokazuje AŽ expanzia, brána je **fail-closed** (`hardware_expansion_unproven?`) — nedokázateľný stav zastavujeme, rovnako ako neznámu expanziu duplicít.
 Takéto položky sú **dve**: **receptová** (`source: recipe` — dielce sú rezané na konkrétnu NL, takže bez expanzie sa nedá overiť kit) a **VÝKLOP**
 (`generic_type: lift` — výklop je ZOSTAVA a jej úplnosť dokáže len expanzia). Predikát sa preto zovšeobecnil z `drawer_expansion_unproven?` (Codex #332
@@ -469,8 +470,8 @@ PRED** vetvou karty čela: pri kovaní je cieľom riadok, nie karta. `hw_focus_t
 o tom, kam nález vedie, by sa rozišla). `select_target_item` dostal štvrtý voliteľný argument: pri adrese Kovania vyberá **vlastníka (korpus)** z rovnakého dôvodu ako pri čele —
 sekcia Kovanie žije len nad označenou skrinkou. Nález bez adresy sa správa presne ako pred D4.
 
-**Nastavenia exportu (názov zákazky, 18 + 36, posledný priečinok) žijú od H7a v jadre** — odsek [`export_settings.rb`](#export_settingsrb). Jadro ich len volá: štyri exporty
-čítajú `ExportSettings.refresh` → `project_name` / `merge_18_36` / `last_dir` a po zápise súboru `save_last_dir` (výsledok **zámerne ignorujú** — zlyhaný posledný priečinok nemá
+**Nastavenia exportu (názov zákazky, 18 + 36, posledný priečinok) žijú od H7a v jadre** — odsek [`export_settings.rb`](#export_settingsrb). Jadro ich len volá: spoločná
+príprava `ExportPrep.start` (H17) zavolá `ExportSettings.refresh` a bránu `expect` (tá číta `project_name` / `merge_18_36`), exporty čítajú `last_dir` a po zápise súboru `save_last_dir` (výsledok **zámerne ignorujú** — zlyhaný posledný priečinok nemá
 zastaviť hotový export, dôvod je v logu); **`pending_name_note(model)`** (text exportu, preto ostal tu) pripojí na koniec záverečnej vety všetkých štyroch exportov upozornenie,
 keď názov zákazky čaká na prenos k súboru (`ExportSettings.name_pending?`, farba statusu sa nemení).
 
@@ -483,14 +484,14 @@ funkciami exportov (`VepoExport.project_slug`, **`hw_csv_file_name`** — jedin�
 sa nemenia (golden H7a T0a/T0c bez regenerácie). **`default_name_note(model, project)`** — veta „ · pomenované predvoleným názvom „projekt" — názov zákazky zadáš
 v hlavičke Štúdia" na konci záverečnej vety štyroch exportov, keď sa súbor pomenoval predvoleným „projekt" (farba ani tok sa nemenia; s `pending_name_note` sa
 vylučuje; výnimku prehltne — nikdy nezhodí hotový export). **Brána `expect` (§16 B2, §17 C1 + spresnenie H7b):** `export_expect_check(model, data, merge:)` →
-`ExportSettings.expect_check` beží v každom zo štyroch exportov **po** bránach generácie a `flush_blocked` a po `ExportSettings.refresh`, **pred** zberom modelu a
-výberom súboru. `expect` = `{ project, merge, source }` (`source` = zdroj názvu, ktorý hlavička ukazovala). Nesúlad názvu, keď je na **niektorej** strane zadaný
+`ExportSettings.expect_check` beží od H17a **v `ExportPrep.start`, raz na export** (každý export z `ExportPrep::KINDS`) **po** bránach generácie a `flush_blocked`
+a po `ExportSettings.refresh`, **pred** zberom modelu a výberom súboru (druhé volanie by mohlo vidieť stav po prenose názvu k súboru — G4 stráži „práve raz"). `expect` = `{ project, merge, source }` (`source` = zdroj názvu, ktorý hlavička ukazovala). Nesúlad názvu, keď je na **niektorej** strane zadaný
 názov (`set`), alebo nesúlad 18 + 36 (**len VEPO**, `merge: true`, vždy prísne) = neutrálna červená veta, ktorá hovorí len fakt („Okno ukazovalo „X", platí „Y". Export sa
 nespustil…"; pri 18 + 36 „Okno ukazovalo 18 + 36: …, platí: …") a export sa **nespustí**; chýbajúci či neplatný `expect` (aj bez `source`) a výnimka pri overovaní = **fail-closed**. **Automatický → automatický**
 (okno ukazovalo „projekt" alebo meno súboru a platí opäť automatický názov — typicky nový model sa medzitým uložil, Ctrl+S okno nepushuje) sa **toleruje**: export
 prebehne pod skutočným menom a stav to povie („ · Zákazka: Klinika (podľa súboru)", `:note`). Brána vracia aj **overené** `:project` (normalizovaný — **ten istý** názov
 ukazuje hlavička, tooltip aj pomenuje všetky 4 exporty; pri názve do 120 znakov bajtovo bez zmeny, nad 120 znakov orezaný — vedomá zmena hraničného prípadu, review
-#457) a `:merge` — všetky štyri exporty ich použijú aj po zbere a výbere súboru (druhá inštancia SketchUpu ich medzitým nezmení). Žiadny čakací stav ani automatické pokračovanie. Volajúci mimo okien
+#457) a `:merge` — nesie ich kontext exportu (`ctx.project`, `ctx.merge`, `ctx.name_note`) a všetky exporty ich použijú aj po zbere a výbere súboru (druhá inštancia SketchUpu ich medzitým nezmení). Žiadny čakací stav ani automatické pokračovanie. Volajúci mimo okien
 Štúdia v kóde pluginu nie sú (výnimka C1 sa nepoužila); testy a `su_runner` posielajú `expect` ako okno (`NxTest.export_expect`, `h7b_expect`).
 
 **`materials_meta`/`edges_meta` (audit #4)** sú kontrakt skupín Kusovníka: per `material_id` (resp. `abs_id`) label, katalógová farba ako **pole `[r,g,b]`** (nie CSS reťazec —
@@ -625,6 +626,55 @@ Kontrakt stráži `tests/pure/test_st1a_core.rb`, `tests/pure/test_st1a_studio.r
 **(1) kompatibilita dát** — `budget_std_block(budget)` číta VÝHRADNE príznak `budget['budget_std']` z payloadu (nikdy sa nepýta modelu druhýkrát: hárok musí stáť na tých istých dátach, z akých vznikli jeho čísla) a pri novšom/poškodenom markeri export zastaví hláškou zo `BudgetStore`;
 **(2) tvrdé blokery** `export_blockers` (záporná zostava, nesúlad ponuky s rozpočtom, zliate ID skriniek); **(3) potvrditeľné riadky bez ceny** `export_confirmations` (dvojkrokový export, STANDARD §11.3).
 Rozdiel medzi (1) a (3) je vecný a zámerný: **blokuje sa NEKOMPATIBILNÁ VERZIA dát, nie rozpracovanosť rozpočtu** — tú štandard výslovne pripúšťa a rieši potvrdením. `do_export` (VEPO) ani `do_hw_csv` bránu (1) nemajú: rozpočtové dáta nenesú, takže ich orezanie neskresľuje (rovnaká výnimka ako pri VEPO v P0-HF; stráži to guard test).
+
+### export_prep.rb — spoločná príprava exportov (H17a)
+
+**Prvý rez R-15 (C-06, blok 9 HARDENING, v0.17.29).** `Noxun::Engine::ExportPrep` (`ui/export_prep.rb`, `module_function`) je **jeden úvod** všetkých exportov Štúdia —
+VEPO (`do_export`), CSV kovania (`do_hw_csv`), XLSX rozpočtu (`do_budget_xlsx`) a XLSX cenovej ponuky (`do_cp_xlsx`). Do H17a ho každý export opisoval sám (~25 riadkov × 4)
+a nový výstup by musel opísať aj bránu `expect`, novšiu schému a chrbát — zabudnutá brána = súbor pod iným názvom alebo ticho neúplný výrobný súbor. **Pre používateľa sa
+nezmenilo nič** (bajty súborov, mená, vety, farby, poradie brán) — dôkazom je golden T0 `tests/fixtures/h17_golden/` zachytený na nezmenenom kóde a neregenerovaný.
+
+**`KINDS`** = `{ vepo: 'do_export', hw_csv: 'do_hw_csv', budget: 'do_budget_xlsx', offer: 'do_cp_xlsx' }` (zmrazený) — inventár exportov; množina funkcií pluginu
+s `UI.savepanel` / `UI.select_directory` sa mu musí rovnať. **`GEN_MSG`**, **`FLUSH_MSG`** — vety úvodu (doslovný presun).
+
+**`start(model, data, kind, generation:, status:, repush:)` → `Context` alebo `nil`.** Poradie je **záväzné** (= dnešné): (1) `kind` mimo `KINDS` → `ArgumentError` (chyba
+programu, padne do `rescue` exportu); (2) generácia okna → `repush` + `GEN_MSG` červeno → `nil` (VEDOMÁ ZMENA audit #15 — CSV kovania guard predtým nemal; čo chytá a čo nie,
+je v komentári pri `start`); (3) `flush_blocked` → `FLUSH_MSG` → `nil`; (4) `ExportSettings.refresh`; (5) **`ProductionCore.export_expect_check(model, data, merge: kind == :vepo)`
+— práve raz** (čítanie názvu ho môže preniesť k súboru, druhé volanie by videlo iný stav); `:stop` → veta → `nil`; (6) `Context.new(model, kind, gate)` + čerstvý zber;
+(7) `newer_config_stop` → veta → `nil`; (8) `cut_stop` → veta → `nil`; (9) → `ctx`. **Žiadny `rescue`**, picker ani zápis súboru; generáciu ani okno nemení. Volanie je
+**prvý príkaz** tela exportu (vnútri `def … rescue`): `ctx = ExportPrep.start(...)` · `return unless ctx`. Návratová hodnota `do_*` pri zastavení nie je kontrakt
+(nečíta ju `StudioDialog`, `panel.rb`, `su_runner` ani test).
+
+**`Context` — lenivé dáta JEDNÉHO exportu.** `gate` (zmrazený Hash z `start`) a čítačky **`project`** = `gate[:project]` (overený, normalizovaný názov — jediný zdroj mena
+a obsahu súboru), **`merge`** = `gate[:merge]` (18 + 36, len VEPO), **`name_note`** = `gate[:note]` (veta automatický → automatický názov). Čítačky **s pamäťou vrátane `nil`**:
+`collected` = `ProductionCore.fresh_collect(model)` · `bom` = `Bom.compute(collected)` · `smap` = `ProductionCore.sheets_map` · `hw_exp` =
+`ProductionCore.hardware_expansion(model, collected)` · `budget` = `ProductionCore.budget_payload(model, bom, collected, nil, hw_exp, smap)` (bez `estimate`/`layout` — rozpočet
+si ich spočíta sám, výsledok je zhodný a výnimka odhadu patrí do `rescue` rozpočtu) · `control` = `ProductionCore.control_payload(collected, hardware_expansion: hw_exp,
+budget: budget, sheets: smap)`. Volania idú **cez prijímač modulu**, takže ich stuby testov zachytia. **Pamäť `nil` platí pre čítačku, nie pre `budget_payload`:** keď
+`hw_exp` vráti `nil`, rozpočet dostane ten istý `nil` a jeho fallback `hw_exp || hardware_expansion(…)` expanziu zopakuje — ako pred H17 (`nil → nil` aj `nil → platná`
+= 2 skutočné expanzie, rozpočet z druhej); kontext ho **nesmie obísť**. **Poradie prvých čítaní je kontrakt exportu**, nie kontextu (argumenty `budget` sa vyhodnotia
+v poradí `bom` → `hw_exp` → `smap`). Kontext vzniká len v `start`, nikdy sa nezdieľa s oknom ani medzi exportmi (čerstvý zber = poistka proti prestavbe bez zdvihu generácie).
+
+| Export | Po `start` (ostáva v tele, v dnešnom poradí) |
+|---|---|
+| VEPO | `drawer_stop(ctx.collected, ctx.hw_exp, scope: :kit)` → `last_dir` + overenie + `select_directory` → `ctx.bom`, `ctx.control` → `build(project: ctx.project, merge_18_36: ctx.merge, …)` → „Niet čo exportovať" → `write` → `save_last_dir` → veta + `pending_name_note` + `default_name_note(model, ctx.project)` + `ctx.name_note` |
+| CSV kovania | `ctx.hw_exp` → `nil` / prázdne → `drawer_stop` → duplicity → `hw_csv_file_name(ctx.project)` → `savepanel` → CSV + BOM → `save_last_dir` → veta + to isté |
+| XLSX rozpočtu | `ctx.bom` → `ctx.hw_exp` → `ctx.budget` → `nil` → `budget_std_block` → kovanie → duplicity → potvrdenie → `BudgetXlsx.file_name(ctx.project, now)` → `savepanel` → zápis → `save_last_dir` → `repush` pri `plan_prices` → veta + to isté |
+| XLSX ponuky | `ctx.bom` → `ctx.smap` → `ctx.hw_exp` → `ctx.budget` → `nil` → `budget_std_block` → `cp`, `spec` → kovanie → duplicity + `cp` → potvrdenie → `CpXlsx.file_name(ctx.project, now)` → `savepanel` → hárky, firewall → zápis → `save_last_dir` → `repush` → veta + to isté |
+
+Každý export si nechal svoj `rescue` (štyri rôzne vety) a komentáre „prečo" pri bránach druhu výstupu; komentáre úvodu (1b-6c, H7b §16 B2/§17 C1, KOV-H1, GHOST-D1, D-143,
+audit #15) sú pri `start`. **Brány druhu výstupu sa NEzjednocujú** (kit VEPO `:kit`, duplicity, `budget_std_block`, potvrdenie cien, firewall, „nedá sa zostaviť") — jedno
+nerozlíšené „export povolený" by správanie zmenilo (CX R-15). Koniec exportu (`last_dir`, `save_last_dir`, vety názvu) je zatiaľ v exportoch — voliteľná H17b.
+
+**Prečo `ui/`:** úvod volá `ProductionCore` (vety statusu, `repush`) a `core/` nesmie volať `ui/`; pamäť kontextu by v `production_core.rb` narazila na zákaz inštančných
+premenných modulu. Načítanie: `main.rb` hneď za `ui/production_core`, pred `ui/studio_dialog` (zmrazený zoznam H11a = 96 častí); `tests/helper.rb` ho načíta ako **výnimku**
+z „UI nie je v helperi" — test, ktorý si `ui/production_core` načíta sám, by bez neho prešiel naprázdno (`NameError` v `rescue` exportu).
+
+**Nový výstup** (výkresy, etikety, CNC) = riadok v `KINDS` + `ProductionCore.do_<výstup>`, ktorý začne `ExportPrep.start` — postup v
+[rozsirovacie-body.md](rozsirovacie-body.md) (scenár 8). **Strážcovia:** `tests/pure/test_h17_export_prep.rb` — R4 a (úvod len v `start`), R4 b (exporty s pickerom ==
+`KINDS`, inventár matice G2 == `KINDS`), R4 c (bez stavu), R4 d (načítanie), R4 e (dáta a názov len z `ctx`), R4 f (rozdielne brany), T1 (kontext), T2 (`start`);
+`tests/pure/test_h17_golden.rb` — G1 bajty šťastnej cesty, G2 matica odmietnutí (každý spúšťač × každý export z `KINDS`), G3 súbeh brán, G4 poradie krokov
+(`export_expect_check` práve raz), G5 parita Kontroly (VEPO LOG == push Štúdia), G6 parita Nárezového plánu (`layout_block_reasons`).
 
 ## Bez vlastného odseku
 
@@ -1104,7 +1154,8 @@ pred `ui/production_core`; pri načítaní na súbor nesiaha. Verejné: `path` �
 · H7b: `clean_project_name` / **`normalize_project_name`** (jediná normalizácia názvu: orez, strop 120, prázdne = predvolený — používa ju zápis aj porovnanie) ·
 `name_source` · **`expect_check(model, expect, merge:)`** → `{ stop:, note:, project:, merge: }` (neplatný tvar `EXPECT_STALE` „Okno je zastarané — zatvor a otvor
 Štúdio a klikni znova.", výnimka `EXPECT_FAILED`; tolerancia automatický → automatický, `AUTO_SOURCES`; obe strany porovnania idú cez `normalize_project_name`,
-takže ručný záznam dlhší ako 120 znakov nevyrobí trvalý falošný nesúlad) · `expect_mismatch` (len `:stop`).
+takže ručný záznam dlhší ako 120 znakov nevyrobí trvalý falošný nesúlad; **volá ju jediné miesto pluginu — `ProductionCore.export_expect_check` z `ExportPrep.start`,
+raz na export** (H17a), výsledok nesie kontext exportu) · `expect_mismatch` (len `:stop`).
 
 **Ochrana R-38 (rodina H9/R-37 — `HardwareRules.write_gate`, `JsonFileStore.degraded?`, `preserve_valid_backup`).** Predikát tvaru `doc_shape_ok?` posudzuje **len kontajnery**:
 objekt, neprázdny (`{}` plugin nikdy nezapísal — od V0.5 C je každý zápis zlúčenie s neprázdnymi `attrs`), `project_names` ak je, tak objekt; hodnoty (napr. `merge_18_36: "nie"`)
@@ -1186,7 +1237,7 @@ XLSX rozpočtu, XLSX cenovej ponuky) a mapa `project_names` — a menil sa read-
 zápis jednej vedel zmazať zákazku pomenovanú v druhej; `JsonFileStore` rieši **atomicitu** (tmp+rename, `.bak`), **nie súbeh** — a jeho sekundová cache navyše skryje čerstvý zápis
 suseda. Každý zápis preto ide cez **`update`**: `Materials.with_catalog_lock` (jeden sidecar `.lock` nad tým istým priečinkom, reentrantný — detail v
 [materials.md](materials.md)) + čítanie súboru **nanovo vnútri zámku** (`JsonFileStore.reload!`); blok dostane čerstvé nastavenia a vráti hash na zlúčenie, `nil` = netreba
-zapisovať. **Čítania sa nezamykajú** (hot push panela by zámok platil zbytočne), ale **štyri exporty si na začiatku vypýtajú čerstvý súbor** (`refresh`) — hotový
+zapisovať. **Čítania sa nezamykajú** (hot push panela by zámok platil zbytočne), ale **každý export si na začiatku vypýta čerstvý súbor** (`refresh` v spoločnej príprave `ExportPrep.start`) — hotový
 CSV/XLSX sa už ďalším čítaním nezahojí. Zámok sa cez export **zámerne nedrží**: cesta otvára modálny `savepanel` a druhá inštancia by čakala, kým používateľ klikne.
 
 **Štyri pravidlá tých dverí, každé zaplatené nálezom auditu:** *(1)* zápisová cesta číta **strikto** (`read_for_write`) — lenivé `{}` z neprečítateľného súboru by sa

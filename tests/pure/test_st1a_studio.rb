@@ -29,6 +29,8 @@ ST1B_CORE_RB   = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'produc
 # H7a: nastavenia exportu (nazov zakazky, 18 + 36, posledny priecinok) ziju v jadre.
 ST1B_SETTINGS_RB = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'export_settings.rb'),
                              encoding: 'UTF-8')
+# H17a: spolocna priprava exportov (brana `expect`, overeny nazov a 18 + 36).
+ST1B_PREP_RB = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'export_prep.rb'), encoding: 'UTF-8')
 ST1B_PANEL_RB  = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel.rb'), encoding: 'UTF-8')
 ST1B_MAIN_RB   = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'main.rb'), encoding: 'UTF-8')
 ST1B_STUDIO_JS = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'studio.js'),
@@ -718,8 +720,9 @@ end
 NxTest.test('ST-1a: VSETKY STYRI exporty citaju nazov zo SERVERA — z DOM uz nechodi') do
   # Presne toto bol BLOCKER #1: dokial nazov posielal DOM, dve okna mali dve
   # pravdy a ta ista zakazka sa v dvoch vystupoch volala inak.
-  # H7b: VEPO cita nazov do premennej (ide aj do vety po exporte R-B3).
-  NxTest.assert(ST1B_CORE_RB.include?('project: project,'),
+  # H7b: VEPO cita nazov v Ruby (ide aj do vety po exporte R-B3).
+  # H17a (R5): z kontextu exportu (`ctx.project` = overeny v brane `expect`).
+  NxTest.assert(ST1B_CORE_RB.include?('project: ctx.project,'),
                 'VEPO export cita nazov v Ruby')
   # ŠT-1c PR A: telo CSV kovania sa prestahovalo do jadra; PR B1 tam presunula
   # aj oba XLSX exporty. VSETKY STYRI teda citaju nazov v ZDIELANOM jadre —
@@ -729,8 +732,12 @@ NxTest.test('ST-1a: VSETKY STYRI exporty citaju nazov zo SERVERA — z DOM uz ne
   # po brane — a ziadny export si ho necita vlastnou cestou.
   NxTest.assert_equal(0, ST1B_CORE_RB.scan(/project = ExportSettings\.project_name\(model\)/).length,
                       'ziadny export necita nazov mimo brany')
-  NxTest.assert_equal(4, ST1B_CORE_RB.scan(/project = gate\[:project\]/).length,
-                      'VEPO, CSV kovania, XLSX rozpoctu aj XLSX cenovej ponuky citaju nazov v jadre (overeny v brane)')
+  # H17a (R5): brana `expect` je v `ExportPrep.start`; nazov nesie kontext
+  # (`project` = `gate[:project]`) — exporty `gate` nevidia, citaju `ctx.project`.
+  NxTest.assert_equal(0, ST1B_CORE_RB.scan('gate[').length, 'ziadny export necita branu priamo')
+  NxTest.assert(ST1B_PREP_RB.include?("def project\n          @gate[:project]"), 'kontext nesie overeny nazov')
+  NxTest.assert_equal(3, ST1B_CORE_RB.scan(/project = ctx\.project\b/).length,
+                      'CSV kovania, XLSX rozpoctu aj XLSX cenovej ponuky citaju nazov z kontextu (overeny v brane)')
   NxTest.assert(ST1B_SETTINGS_RB.include?('project = project_name(model)'), 'brana cita nazov v jadre')
   # Komentare (ktore o zaniknutej ceste hovoria) sa vynechavaju — hlada sa KOD.
   strip = ->(src) { src.lines.map { |l| l.sub(/#.*$/, '') }.join }
@@ -752,7 +759,9 @@ NxTest.test('ST-1a: merge 18+36 je GLOBALNE nastavenie a chodi v KAZDOM pushi (a
   NxTest.assert(ST1B_SETTINGS_RB.include?("read['merge_18_36'] != false"),
                 'default je zapnute')
   # Predrecenzia H7b P3: hodnota OVERENA v brane `expect` (server ju cita sam).
-  NxTest.assert(ST1B_CORE_RB.include?('merge = gate[:merge]') && ST1B_SETTINGS_RB.include?('now = merge_18_36'),
+  # H17a (R5): hodnotu nesie kontext exportu (`ctx.merge` = `gate[:merge]`).
+  NxTest.assert(ST1B_CORE_RB.include?('merge_18_36: ctx.merge') && ST1B_PREP_RB.include?("def merge\n          @gate[:merge]") &&
+                ST1B_SETTINGS_RB.include?('now = merge_18_36'),
                 'export cita merge zo SERVERA, nie z checkboxu')
   # H7b (R-B1): payload aj echo sklada JEDNA funkcia jadra (`vepo_payload`).
   NxTest.assert(ST1B_STUDIO_RB.include?('vepo: ProductionCore.vepo_payload(model)') &&
@@ -868,8 +877,15 @@ end
 NxTest.test('ST-1a: gen mismatch = RE-PUSH a status, nikdy ticho') do
   body = ST1B_CORE_RB[/def do_export\(model, data.*?\n      end\n/m].to_s
   NxTest.assert(!body.empty?, 'zdielane telo exportu sa nasiel')
-  NxTest.assert(body.include?('repush.call'), 'stary DOM klik obnovi okno')
-  NxTest.assert(body.include?('Dáta okna sa medzitým zmenili'), 'a povie preco')
+  # H17a (R5): guard generacie zije v `ExportPrep.start` (vsetky exporty);
+  # spravanie (repush 1, cervena veta, picker 0) dokazuje G2 `generacia`.
+  NxTest.assert(body.include?('ExportPrep.start(model, data, :vepo, generation: generation, status: status, repush: repush)'),
+                'telo exportu zacina spolocnou pripravou')
+  start = ST1B_PREP_RB[/def start\(.*?\n      end\n/m].to_s
+  i_gen = start.index('data[\'gen\'].to_i == generation.to_i')
+  NxTest.assert(i_gen && start.index('repush.call', i_gen), 'stary DOM klik obnovi okno')
+  NxTest.assert(start.index('status.call(GEN_MSG, true)', i_gen) && ST1B_PREP_RB.include?("GEN_MSG = 'Dáta okna sa medzitým zmenili"),
+                'a povie preco')
   # Review P2: vyber koncil TICHYM no-opom — pouzivatel klikol, nic sa
   # neoznacilo a okno mlcalo.
   sel = ST1B_CORE_RB[/def do_select\(model, data.*?\n      end\n/m].to_s

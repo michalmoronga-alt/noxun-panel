@@ -17,6 +17,22 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **H17a · spoločná príprava exportov `ExportPrep` (9.10.2026, PR #467, v0.17.29, blok 9 HARDENING, C-06, prvý rez R-15).** Michal 9.10.: H17-0 (nástroj porovnania
+  exportov) **zrušené**, robí sa len refaktor ([package](../zdroje/bloky/HARDENING/PACKAGE_H17.md) §00 má prednosť; audit návrhu §15 platí). Nový modul `ui/export_prep.rb`:
+  `ExportPrep.start` = generácia → flush → `ExportSettings.refresh` → brána `expect` **práve raz** (`merge: kind == :vepo`) → čerstvý zber → novšia schéma → chrbát
+  (bez `rescue` a pickera); `ExportPrep::Context` s lenivými čítačkami (`project`/`merge`/`name_note` z brány, `collected`, `bom`, `smap`, `hw_exp`, `budget`, `control`),
+  pamäť vrátane `nil` — fallback expanzie v `budget_payload` ostal (nil → nil aj nil → platná = 2 expanzie ako main). `do_export`, `do_hw_csv`, `do_budget_xlsx`,
+  `do_cp_xlsx` začínajú `ExportPrep.start`; brány druhu výstupu a ich poradie ostali v exportoch, poradie prvých čítaní dnešné (ponuka kusovník → katalóg dosiek →
+  expanzia → rozpočet). `main.rb` +1 časť (H11a `MAIN_PARTS` 95 → 96), `tests/helper.rb` ho načíta (výnimka „UI nie je v helperi"). **Pre používateľa bez zmeny:**
+  golden T0 `tests/fixtures/h17_golden/` (G1 bajty 22 prípadov vrátane skutočnej expanzie nad seedom headless, G2 matica 45 spúšťačov × `KINDS`, G3 11 súbehov, G4 poradie,
+  G5 parita Kontroly, G6 parita Nárezového plánu) vznikol v 1. commite na nezmenenom kóde a po prepnutí sa **neregeneroval**. Prepísaní strážcovia R5 (ekvivalent, nie
+  zmazanie): ghost_d1, kovh1, kon0_d143, kovc2b, h7b T-B11, st1a (názov, 18 + 36, generácia), st1b, st1c a navyše np3 (počet volaní `budget_payload`, mimo zoznamu §0.3).
+  Testy: headless 5402/0, 163 JS, mutácie M1–M24 + M26–M29 zhodené (M17 aj pádom načítania); predrecenzia (slepý recenzent) **0 P1 / 0 P2 / 0 P3**; in-SU **3421 PASS / 0 FAIL** nad `715898e6`;
+  **R9 K ↔ P:** Michal exportoval testovaciu zákazku s main v0.17.28 (K) a s vetvou v0.17.29 (P) — 6 VEPO CSV bajtovo zhodných, LOG a CSV kovania
+  zhodné okrem `Verzia`/`Dátum` a času, obe XLSX s obsahom XML zhodným (iné len časy ZIP hlavičiek) → **P == K**.
+  **CI Linux (fix, Michal 9.10.):** fixtúra mala remízu v nestabilnom triedení kusovníka (rovnaký materiál a rozmer — poradie určí platforma) → CAB-002 bok 721, polica 561, strážca `NxH17.sort_ties`; golden znova na nezmenenom main `2114e1a3` (plugin bez zmeny).
+  Nahradený STAV (v0.17.28): ŠÍRKA 50 PR #466 review kolo 1 → v maine; „Ďalší krok" ŠÍRKA 50 merge + smoke → H17a predrecenzia, K ↔ P, merge.
+
 - **ŠÍRKA 50 · skrinka od 50 mm + 2 nohy pod úzkou dolnou (8.10.2026, PR #466, v0.17.28).** Pokyn Michala 7.–8.10.: najmenšia šírka dolnej aj hornej skrinky 200 → **50 mm**,
   skrinka užšia než 200 mm má **2 nohy** v strede šírky (vpredu + vzadu), v nákupe 2 ks; jedna dávka (audit BLOCKER 1), [package](../zdroje/bloky/HARDENING/PACKAGE_SIRKA50.md).
   **`CONFIG_SCHEMA` 22 → 23** (vzor 15: starší plugin by 50–199 ticho klampol na 200), aktivačné konštanty bez zmeny; panel zrkadlí `validate!` (šírka ≤ 2 × hrúbka + 10 =

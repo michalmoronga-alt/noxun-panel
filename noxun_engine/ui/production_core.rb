@@ -242,9 +242,10 @@ module Noxun
         t.empty? ? File.basename(model.path.to_s, '.*') : t
       end
 
-      # Audit H7 §16 B2 / §17 C1: brana `expect` v styroch exportoch — po
-      # branach generacie a `flush_blocked` a po `ExportSettings.refresh`, PRED
-      # zberom a vyberom suboru. -> `ExportSettings.expect_check` Hash:
+      # Audit H7 §16 B2 / §17 C1: brana `expect` exportov — vola ju JEDINE
+      # `ExportPrep.start` (H17), raz na export: po branach generacie
+      # a `flush_blocked` a po `ExportSettings.refresh`, PRED zberom a vyberom
+      # suboru. -> `ExportSettings.expect_check` Hash:
       # `:stop` (veta = export sa nespusti, echo hlavicky posle okno po
       # navrate), `:note` (automaticky nazov sa medzitym zmenil — veta na
       # koniec statusu), `:project`/`:merge` = OVERENE hodnoty (VEPO ich pouzije
@@ -982,8 +983,9 @@ module Noxun
       end
 
       # KOV-H1 (review #283 P2-B): hotova hlaska brany novsej schemy, alebo nil.
-      # Vola sa HNED po `fresh_collect` vo VSETKYCH TROCH exportoch — pred
-      # expanziou, pred rozpoctom aj pred ich skorymi navratmi. Dovod: zakazka
+      # Vola sa HNED po cerstvom zbere v spolocnej priprave exportov
+      # (`ExportPrep.start`, H17) — pred expanziou, pred rozpoctom aj pred ich
+      # skorymi navratmi. Dovod: zakazka
       # z novsej verzie nemusi vyexpandovat ani jeden znamy riadok (alebo jej
       # rozpocet vobec nevznikne), takze skory navrat by branu PREDBEHOL a
       # pouzivatel by dostal „model nema kovanie" namiesto zoznamu skriniek
@@ -1008,8 +1010,9 @@ module Noxun
       # (`Validation.check_cut_issues`). Na rozdiel od registra kovania plati
       # pre VSETKY STYRI exporty VRATANE VEPO: chybny rozmer do narezu je chyba
       # REZACICH dat (a z nich plochy v rozpocte aj ponuke), nie len nakupu.
-      # Vola sa HNED po `newer_config_stop` — pred expanziou, pred rozpoctom aj
-      # pred vyberom suboru/priecinka (picker sa pri blokade ani neotvori).
+      # Vola sa HNED po `newer_config_stop` v `ExportPrep.start` (H17) — pred
+      # expanziou, pred rozpoctom aj pred vyberom suboru/priecinka (picker sa
+      # pri blokade ani neotvori).
       # Poradie viet = poradie registra; ID su v strope „tri + a ďalšie N".
       CUT_BLOCKER_TEXTS = {
         Bom::CUT_INVALID => ['poškodený rozmer do nárezu', 'prestav skrinku'],
@@ -1681,44 +1684,13 @@ module Noxun
       # musel obchadzat cudzi okenny stav.
 
       # V0.5 C: export VEPO — vstup po relay z panela (edity flushnute) alebo
-      # priamo (panel nezije). Poradie: gen check -> flush guard -> CERSTVY
-      # BOM + brana novsej schemy -> vyber priecinka -> build -> atomicky
+      # priamo (panel nezije). Poradie: spolocna priprava `ExportPrep.start`
+      # (generacia, flush, `expect` s 18 + 36, cerstvy zber, novsia schema,
+      # chrbat) -> kit zasuviek -> vyber priecinka -> build -> atomicky
       # zapis -> ulozit settings.
       def do_export(model, data, generation:, status:, repush:)
-        unless data['gen'].to_i == generation.to_i
-          repush.call
-          return status.call('Dáta okna sa medzitým zmenili — skús export znova.', true)
-        end
-        if data['flush_blocked']
-          return status.call('V paneli sú neplatné polia (červené) — oprav ich a exportuj znova.', true)
-        end
-
-        ExportSettings.refresh # 1b-6c: nazov aj 18/36 z CERSTVEHO suboru
-        # H7b (§16 B2, §17 C1): okno musi vidiet to, co plati — nazov AJ 18 + 36
-        # (len VEPO ich oba pouziva). Nesulad / stary klient = export sa nespusti.
-        gate = export_expect_check(model, data, merge: true)
-        return status.call(gate[:stop], true) if gate[:stop]
-
-        # Nalez 5: JEDEN cerstvy RAW zber -> nad nim compute AJ kontrola;
-        # validaciu EXPLICITNE odovzdame do build (prefix statusu + sekcia
-        # KONTROLA v LOGu z TOHO ISTEHO vysledku).
-        #
-        # Review #1 (ŠT-1b): kontrola sa tu pocita ZDIELANOU `control_payload`,
-        # teda VRATANE upozorneni rozpoctu. Bez toho by LOG a status exportu
-        # hlasili ine cislo nez semafor sekcie Kontrola a badge navigacie —
-        # a pouzivatel by nevedel, ktore z dvoch cisel plati.
-        #
-        # GHOST-D1: zber (a s nim BRANA NOVSEJ SCHEMY) bezi PRED vyberom
-        # priecinka. VEPO uz vynimku NEMA: skrinka ci doska z novsej verzie
-        # moze niest VYROBNE pole, ktoré tento plugin nevidi, takze aj rezaci
-        # vystup by bol ticho neuplny (predtym branu dostavali len tri cenove
-        # a nakupne exporty). Picker sa pri blokade ani neotvori.
-        collected = fresh_collect(model)
-        newer_stop = newer_config_stop(collected)
-        return status.call(newer_stop, true) if newer_stop
-        # D-143 (KON-0): vyrobna brana chrbta v drazke — VSETKY STYRI exporty.
-        cut_msg = cut_stop(collected)
-        return status.call(cut_msg, true) if cut_msg
+        ctx = ExportPrep.start(model, data, :vepo, generation: generation, status: status, repush: repush)
+        return unless ctx
 
         # KOV-C2b: VEPO uz ma branu zasuviek — ale LEN pre chybajuci kit
         # (`scope: :kit`). Dielce su rezane na konkretnu NL, takze bez kitu tej
@@ -1726,8 +1698,7 @@ module Noxun
         # v takom pripade nevydala ziadnu geometriu). Expanzia sa preto pocita
         # UZ TU — picker sa pri blokade ani neotvori (vzor `newer_config_stop`)
         # a nizsie sa uz LEN pouzije (ziadny druhy prepocet).
-        hw_exp = hardware_expansion(model, collected)
-        drawer_stop_msg = drawer_stop(collected, hw_exp, scope: :kit)
+        drawer_stop_msg = drawer_stop(ctx.collected, ctx.hw_exp, scope: :kit)
         return status.call(drawer_stop_msg, true) if drawer_stop_msg
 
         last = ExportSettings.last_dir
@@ -1735,21 +1706,24 @@ module Noxun
         dir = UI.select_directory(title: 'Priečinok pre VEPO export', directory: start_dir)
         return status.call('Export zrušený.') if dir.nil? || dir.to_s.empty?
 
-        bom = Bom.compute(collected)
-        smap = sheets_map
-        control = control_payload(collected, hardware_expansion: hw_exp,
-                                             budget: budget_payload(model, bom, collected,
-                                                                    nil, hw_exp, smap),
-                                             sheets: smap)
+        # Nalez 5: JEDEN cerstvy RAW zber -> nad nim kusovnik AJ kontrola;
+        # validaciu EXPLICITNE odovzdame do build (prefix statusu + sekcia
+        # KONTROLA v LOGu z TOHO ISTEHO vysledku). Kusovnik a kontrola sa citaju
+        # az PO vybere priecinka (pri zruseni sa nepocitaju).
+        #
+        # Review #1 (ŠT-1b): kontrola sa pocita ZDIELANOU `control_payload`,
+        # teda VRATANE upozorneni rozpoctu (`ctx.control`). Bez toho by LOG
+        # a status exportu hlasili ine cislo nez semafor sekcie Kontrola a badge
+        # navigacie — a pouzivatel by nevedel, ktore z dvoch cisel plati.
+        bom = ctx.bom
+        control = ctx.control
         # audit #1: nazov projektu aj merge su SERVEROVE — z DOM uz nechodia.
         # Predrecenzia H7b P3: hodnoty OVERENE v brane `expect` (pred vyberom
         # priecinka) — druha instancia SketchUpu ich pocas modalneho vyberu
         # mohla zmenit a VEPO by odislo s inym 18 + 36, nez okno ukazovalo.
-        merge = gate[:merge]
-        project = gate[:project]
         result = VepoExport.build(
           bom[:rows],
-          project: project,
+          project: ctx.project,
           materials: vepo_materials,
           edge_thicknesses: vepo_edge_thicknesses,
           validation: control,
@@ -1758,7 +1732,7 @@ module Noxun
           sheet_decors: vepo_sheet_decors,
           version: Engine::VERSION,
           generated_at: Time.now.strftime('%Y-%m-%d %H:%M'),
-          merge_18_36: merge
+          merge_18_36: ctx.merge
         )
         if result['groups'].empty? && result['errors'].empty?
           return status.call('Niet čo exportovať — model nemá výrobné dielce.', true)
@@ -1772,7 +1746,7 @@ module Noxun
         ExportSettings.save_last_dir(dir)
         # H7a (§15 A1): nazov caka na prenos k suboru -> veta na konci statusu.
         # H7b (R-B3): export pomenovany predvolenym „projekt" -> veta (vylucuju sa).
-        pending = "#{pending_name_note(model)}#{default_name_note(model, project)}#{gate[:note]}"
+        pending = "#{pending_name_note(model)}#{default_name_note(model, ctx.project)}#{ctx.name_note}"
         if result['groups'].empty?
           return status.call("Export nevytvoril žiadny CSV — #{result['errors'].length} chybných riadkov. " \
                              "Dôvody v LOGu: #{target}#{ctrl}#{pending}", true)
@@ -1789,45 +1763,17 @@ module Noxun
       # --- ŠT-1c: CSV nakupneho zoznamu kovania (Š7) ------------------------
       #
       # Telo sa sem prestahovalo spolu s tabom Kovanie zaniknuteho okna Vyroba
-      # (dnes sekcia `buy` v Studiu). Poradie je vzor VEPO exportu: gen guard
-      # -> flush guard -> CERSTVY zber modelu -> vyber suboru -> zapis.
-      #
-      # VEDOMA ZMENA (audit #15): export dostal GENERACNY GUARD, ktory predtym
-      # NEMAL — ako jediny zo styroch exportov. Zosuladenie, nie nova ochrana:
-      # CO GUARD NAOZAJ CHYTA je klik z okna, ktoreho payload uz neplati —
-      # medzitym PREPNUTY DOKUMENT (`on_model_changed` zdvihne generaciu) alebo
-      # push, ktory si okno medzitym vyziadalo odinakial (refresh, zmena
-      # katalogu, zapis z ineho okna). CO NECHYTA: prestavbu skrinky
-      # z Inspectora — tá generaciu NEZDVIHA. Na tú je poistkou to, ze zoznam
-      # sa aj tak pocita z CERSTVEHO zberu (`fresh_collect` nizsie) az v tejto
-      # metode, nie z toho, co drzi DOM. Odmietnutie nie je tiche — okno sa
-      # obnovi a povie to.
+      # (dnes sekcia `buy` v Studiu). Poradie je vzor VEPO exportu: spolocna
+      # priprava `ExportPrep.start` (generacia, flush, `expect`, CERSTVY zber,
+      # novsia schema, chrbat) -> kovanie -> vyber suboru -> zapis. Generacny
+      # guard dostal tento export ako posledny (VEDOMA ZMENA audit #15 — dovod
+      # pri `ExportPrep.start`).
       def do_hw_csv(model, data, generation:, status:, repush:)
-        unless data['gen'].to_i == generation.to_i
-          repush.call
-          return status.call('Dáta okna sa medzitým zmenili — skús export znova.', true)
-        end
-        if data['flush_blocked']
-          return status.call('V paneli sú neplatné polia (červené) — oprav ich a exportuj znova.', true)
-        end
+        ctx = ExportPrep.start(model, data, :hw_csv, generation: generation, status: status, repush: repush)
+        return unless ctx
 
-        ExportSettings.refresh # 1b-6c: nazov zakazky z CERSTVEHO suboru
-        # H7b (§16 B2, §17 C1): nazov, ktory okno ukazuje, musi platit.
-        gate = export_expect_check(model, data)
-        return status.call(gate[:stop], true) if gate[:stop]
-        collected = fresh_collect(model)
-        # KOV-H1 / review #283 P2-B: brana NOVSEJ SCHEMY musi padnut HNED po
-        # zbere — pred expanziou aj pred „niet co exportovat". Skrinka z novsej
-        # verzie totiz nemusi vyexpandovat ani jeden znamy riadok a skory navrat
-        # by ju prekryl hlaskou o prazdnom modeli: pouzivatel by sa nedozvedel
-        # ani ID skriniek, ani to, ze ma aktualizovat plugin.
-        newer_stop = newer_config_stop(collected)
-        return status.call(newer_stop, true) if newer_stop
-        # D-143 (KON-0): vyrobna brana chrbta v drazke — VSETKY STYRI exporty.
-        cut_msg = cut_stop(collected)
-        return status.call(cut_msg, true) if cut_msg
-
-        exp = hardware_expansion(model, collected)
+        collected = ctx.collected
+        exp = ctx.hw_exp
         return status.call('Nákupný zoznam sa nedá zostaviť (pozri Ruby konzolu).', true) if exp.nil?
 
         if Array(exp['rows']).empty? && Array(exp['unmapped']).empty?
@@ -1846,10 +1792,10 @@ module Noxun
         return status.call(export_blocked_status(blockers), true) unless blockers.empty?
 
         # audit #1: nazov projektu je SERVEROVA autorita (jeden nazov pre
-        # VSETKY styri exporty) — z DOM uz nechodi.
+        # VSETKY exporty) — z DOM uz nechodi.
         # Review #457 P2: nazov OVERENY v brane `expect` (ako VEPO) — druha
         # instancia ho po brane (pocas zberu) zmenit nemoze.
-        project = gate[:project]
+        project = ctx.project
         fname = hw_csv_file_name(project)
         target = UI.savepanel('Uložiť nákupný zoznam kovania', ExportSettings.last_dir, fname)
         return status.call('Export zrušený.') if target.nil? || target.to_s.empty?
@@ -1863,7 +1809,7 @@ module Noxun
         dup = dup_id_suffix(warn_dups)
         status.call("Nákupný zoznam: #{n} položiek" \
                     "#{un.positive? ? " + #{un} nemapovaných (v CSV aj KONTROLE)" : ''} → #{target}#{dup}" \
-                    "#{pending_name_note(model)}#{default_name_note(model, project)}#{gate[:note]}",
+                    "#{pending_name_note(model)}#{default_name_note(model, project)}#{ctx.name_note}",
                     un.positive? || !dup.empty?)
       rescue StandardError => e
         Engine.log_error(e, 'ProductionCore.do_hw_csv')
@@ -3273,36 +3219,22 @@ module Noxun
       end
 
       # V0.6 E-b: XLSX rozpocet v „Luciinom formate". Rovnaky flush/generation
-      # handshake ako VEPO — cisla harku musia sediet s modelom PO flushi
-      # rozpisaneho editu panela, nie s tym, co drzi DOM okna.
+      # handshake ako VEPO (`ExportPrep.start`) — cisla harku musia sediet
+      # s modelom PO flushi rozpisaneho editu panela, nie s tym, co drzi DOM
+      # okna. Brana novsej schemy je v priprave PRED vsetkym ostatnym — aj pred
+      # „rozpocet sa nepodarilo zostavit" a pred `budget_std_block`, ktore by
+      # nekompatibilnu zakazku prekryli inou hlaskou (KOV-H1 / review #283 P2-B).
       def do_budget_xlsx(model, data, generation:, status:, repush:)
-        unless data['gen'].to_i == generation.to_i
-          repush.call
-          return status.call('Dáta okna sa medzitým zmenili — skús export znova.', true)
-        end
-        if data['flush_blocked']
-          return status.call('V paneli sú neplatné polia (červené) — oprav ich a exportuj znova.', true)
-        end
+        ctx = ExportPrep.start(model, data, :budget, generation: generation, status: status, repush: repush)
+        return unless ctx
 
-        ExportSettings.refresh # 1b-6c: nazov zakazky z CERSTVEHO suboru
-        # H7b (§16 B2, §17 C1): nazov, ktory okno ukazuje, musi platit.
-        gate = export_expect_check(model, data)
-        return status.call(gate[:stop], true) if gate[:stop]
-        collected = fresh_collect(model)
-        # KOV-H1 / review #283 P2-B: brana novsej schemy PRED vsetkym ostatnym —
-        # aj pred „rozpocet sa nepodarilo zostavit" a pred `budget_std_block`,
-        # ktore by nekompatibilnu zakazku prekryli inou hlaskou.
-        newer_stop = newer_config_stop(collected)
-        return status.call(newer_stop, true) if newer_stop
-        # D-143 (KON-0): vyrobna brana chrbta v drazke — VSETKY STYRI exporty.
-        cut_msg = cut_stop(collected)
-        return status.call(cut_msg, true) if cut_msg
-
-        bom = Bom.compute(collected)
-        # Expanzia sa pocita RAZ a odovzda sa rozpoctu (inak by ju zostavil
-        # sam) — brana z nej cita, ci duplicitne ID naozaj zlieva vlastnikov.
-        hw_exp = hardware_expansion(model, collected)
-        budget = budget_payload(model, bom, collected, nil, hw_exp)
+        collected = ctx.collected
+        # Poradie citani (§15 A3): kusovnik -> expanzia -> rozpocet (katalog dosiek
+        # cita rozpocet az po expanzii). Expanzia sa pocita RAZ a odovzda sa
+        # rozpoctu — brana z nej cita, ci duplicitne ID naozaj zlieva vlastnikov.
+        ctx.bom
+        hw_exp = ctx.hw_exp
+        budget = ctx.budget
         return status.call('Rozpočet sa nepodarilo zostaviť (pozri Ruby konzolu).', true) if budget.nil?
 
         # 1d/R-14: KOMPATIBILITNA BRANA — pred vsetkymi ostatnymi. Pri novsom
@@ -3327,7 +3259,7 @@ module Noxun
           return stop_for_confirmation(unpriced, status: status, repush: repush)
         end
 
-        project = gate[:project] # audit #1 + review #457: nazov overeny v brane `expect`
+        project = ctx.project # audit #1 + review #457: nazov overeny v brane `expect`
         now = Time.now
         target = UI.savepanel('Uložiť rozpočet (XLSX)', ExportSettings.last_dir,
                               BudgetXlsx.file_name(project, now))
@@ -3349,7 +3281,7 @@ module Noxun
         repush.call if budget['plan_prices'] == true
         status.call("Rozpočet uložený: #{fmt_eur(totals['total'])} → #{target}#{warn}#{dup}" \
                     "#{plan_export_note(budget)}#{pending_name_note(model)}#{default_name_note(model, project)}" \
-                    "#{gate[:note]}",
+                    "#{ctx.name_note}",
                     !warn.empty? || !dup.empty?)
       rescue StandardError => e
         Engine.log_error(e, 'ProductionCore.do_budget_xlsx')
@@ -3357,7 +3289,8 @@ module Noxun
       end
 
       # V0.6 E-b2: ZAKAZNICKA CENOVA PONUKA (XLSX, 2 harky). Rovnaky
-      # flush/generation handshake ako rozpocet — CP je VIEW nad TYM ISTYM
+      # flush/generation handshake ako rozpocet (`ExportPrep.start`, s branou
+      # novsej schemy pred vsetkym ostatnym) — CP je VIEW nad TYM ISTYM
       # payloadom, takze cisla musia sediet s modelom PO flushi editov panela.
       #
       # FIREWALL: pred zapisom sa cely vysledny harok prejde blocklistom
@@ -3365,30 +3298,16 @@ module Noxun
       # KONTROLA pri VEPO), ale ide do statusu aj do logu — Michal musi
       # vediet, ze do zakaznickeho dokumentu presiel interny pojem.
       def do_cp_xlsx(model, data, generation:, status:, repush:)
-        unless data['gen'].to_i == generation.to_i
-          repush.call
-          return status.call('Dáta okna sa medzitým zmenili — skús export znova.', true)
-        end
-        if data['flush_blocked']
-          return status.call('V paneli sú neplatné polia (červené) — oprav ich a exportuj znova.', true)
-        end
+        ctx = ExportPrep.start(model, data, :offer, generation: generation, status: status, repush: repush)
+        return unless ctx
 
-        ExportSettings.refresh # 1b-6c: nazov zakazky z CERSTVEHO suboru
-        # H7b (§16 B2, §17 C1): nazov, ktory okno ukazuje, musi platit.
-        gate = export_expect_check(model, data)
-        return status.call(gate[:stop], true) if gate[:stop]
-        collected = fresh_collect(model)
-        # KOV-H1 / review #283 P2-B: TA ISTA brana ako pri rozpocte — najprv.
-        newer_stop = newer_config_stop(collected)
-        return status.call(newer_stop, true) if newer_stop
-        # D-143 (KON-0): vyrobna brana chrbta v drazke — VSETKY STYRI exporty.
-        cut_msg = cut_stop(collected)
-        return status.call(cut_msg, true) if cut_msg
-
-        bom = Bom.compute(collected)
-        smap = sheets_map
-        hw_exp = hardware_expansion(model, collected)
-        budget = budget_payload(model, bom, collected, nil, hw_exp, smap)
+        collected = ctx.collected
+        # Poradie citani (§15 A3): kusovnik -> katalog dosiek -> expanzia ->
+        # rozpocet. Katalog dosiek dostane rozpocet aj specifikacia (jedno citanie).
+        ctx.bom
+        smap = ctx.smap
+        hw_exp = ctx.hw_exp
+        budget = ctx.budget
         return status.call('Rozpočet sa nepodarilo zostaviť (pozri Ruby konzolu).', true) if budget.nil?
 
         # 1d/R-14: TA ISTA kompatibilitna brana ako pri XLSX rozpoctu — ponuka
@@ -3422,7 +3341,7 @@ module Noxun
           return stop_for_confirmation(unpriced, status: status, repush: repush)
         end
 
-        project = gate[:project] # audit #1 + review #457: nazov overeny v brane `expect`
+        project = ctx.project # audit #1 + review #457: nazov overeny v brane `expect`
         now = Time.now
         target = UI.savepanel('Uložiť cenovú ponuku (XLSX)', ExportSettings.last_dir,
                               CpXlsx.file_name(project, now))
@@ -3438,7 +3357,7 @@ module Noxun
         # (len Michalovi, nie zakaznikovi) a okno sa obnovi z exportovaneho stavu.
         repush.call if budget['plan_prices'] == true
         status.call("#{cp_status(cp, spec, target, warnings)}#{plan_export_note(budget)}" \
-                    "#{pending_name_note(model)}#{default_name_note(model, project)}#{gate[:note]}",
+                    "#{pending_name_note(model)}#{default_name_note(model, project)}#{ctx.name_note}",
                     !warnings.empty?)
       rescue StandardError => e
         Engine.log_error(e, 'ProductionCore.do_cp_xlsx')

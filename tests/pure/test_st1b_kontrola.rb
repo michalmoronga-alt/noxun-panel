@@ -97,9 +97,14 @@ NxTest.test('ŠT-1b (review #1): aj VEPO export cita to iste cislo kontroly') do
   # semafor sekcie. Teraz ide tou istou zdielanou cestou.
   body = S1B_CORE_RB[/def do_export\(model, data.*?\n      end\n/m].to_s
   NxTest.refute(body.empty?, 'telo exportu sa nasiel')
-  NxTest.assert(body.include?('control_payload('),
+  # H17a (R5): kontrolu pocita citacka kontextu exportu `ExportPrep::Context#control`
+  # (zdielana `control_payload` VRATANE rozpoctu); paritu cisla LOG == sekcia
+  # Kontrola dokazuje G5 v `test_h17_golden.rb`.
+  prep = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'export_prep.rb'), encoding: 'UTF-8')
+  NxTest.assert(body.include?('control = ctx.control') &&
+                  prep.include?('ProductionCore.control_payload(collected, hardware_expansion: hw_exp, budget: budget, sheets: smap)'),
                 'export pocita kontrolu ZDIELANOU cestou')
-  NxTest.assert(body.include?('budget: budget_payload('),
+  NxTest.assert(prep.include?('memo(:budget) { ProductionCore.budget_payload('),
                 'a to VRATANE rozpoctovych nalezov (inak by hlasil mensie cislo)')
   NxTest.refute(body.include?('Validation.run('),
                 'ziadny vlastny vypocet kontroly v exporte')

@@ -1,0 +1,6831 @@
+{
+  "generacia": {
+    "vepo": {
+      "export": "do_export",
+      "status": "Dáta okna sa medzitým zmenili — skús export znova.",
+      "error": true,
+      "statuses": 1,
+      "repush": 1,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "repush",
+        "status"
+      ],
+      "counts": {
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Dáta okna sa medzitým zmenili — skús export znova.",
+      "error": true,
+      "statuses": 1,
+      "repush": 1,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "repush",
+        "status"
+      ],
+      "counts": {
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Dáta okna sa medzitým zmenili — skús export znova.",
+      "error": true,
+      "statuses": 1,
+      "repush": 1,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "repush",
+        "status"
+      ],
+      "counts": {
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Dáta okna sa medzitým zmenili — skús export znova.",
+      "error": true,
+      "statuses": 1,
+      "repush": 1,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "repush",
+        "status"
+      ],
+      "counts": {
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    }
+  },
+  "flush": {
+    "vepo": {
+      "export": "do_export",
+      "status": "V paneli sú neplatné polia (červené) — oprav ich a exportuj znova.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "status"
+      ],
+      "counts": {
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "V paneli sú neplatné polia (červené) — oprav ich a exportuj znova.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "status"
+      ],
+      "counts": {
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "V paneli sú neplatné polia (červené) — oprav ich a exportuj znova.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "status"
+      ],
+      "counts": {
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "V paneli sú neplatné polia (červené) — oprav ich a exportuj znova.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "status"
+      ],
+      "counts": {
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    }
+  },
+  "expect_chyba": {
+    "vepo": {
+      "export": "do_export",
+      "status": "Okno je zastarané — zatvor a otvor Štúdio a klikni znova.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: true)",
+        "status"
+      ],
+      "counts": {
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Okno je zastarané — zatvor a otvor Štúdio a klikni znova.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "status"
+      ],
+      "counts": {
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Okno je zastarané — zatvor a otvor Štúdio a klikni znova.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "status"
+      ],
+      "counts": {
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Okno je zastarané — zatvor a otvor Štúdio a klikni znova.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "status"
+      ],
+      "counts": {
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    }
+  },
+  "expect_prazdny": {
+    "vepo": {
+      "export": "do_export",
+      "status": "Okno je zastarané — zatvor a otvor Štúdio a klikni znova.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: true)",
+        "status"
+      ],
+      "counts": {
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Okno je zastarané — zatvor a otvor Štúdio a klikni znova.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "status"
+      ],
+      "counts": {
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Okno je zastarané — zatvor a otvor Štúdio a klikni znova.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "status"
+      ],
+      "counts": {
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Okno je zastarané — zatvor a otvor Štúdio a klikni znova.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "status"
+      ],
+      "counts": {
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    }
+  },
+  "expect_merge_nie_bool": {
+    "vepo": {
+      "export": "do_export",
+      "status": "Okno je zastarané — zatvor a otvor Štúdio a klikni znova.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: true)",
+        "status"
+      ],
+      "counts": {
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Okno je zastarané — zatvor a otvor Štúdio a klikni znova.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "status"
+      ],
+      "counts": {
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Okno je zastarané — zatvor a otvor Štúdio a klikni znova.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "status"
+      ],
+      "counts": {
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Okno je zastarané — zatvor a otvor Štúdio a klikni znova.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "status"
+      ],
+      "counts": {
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    }
+  },
+  "expect_neznamy_zdroj": {
+    "vepo": {
+      "export": "do_export",
+      "status": "Okno je zastarané — zatvor a otvor Štúdio a klikni znova.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: true)",
+        "status"
+      ],
+      "counts": {
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Okno je zastarané — zatvor a otvor Štúdio a klikni znova.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "status"
+      ],
+      "counts": {
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Okno je zastarané — zatvor a otvor Štúdio a klikni znova.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "status"
+      ],
+      "counts": {
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Okno je zastarané — zatvor a otvor Štúdio a klikni znova.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "status"
+      ],
+      "counts": {
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    }
+  },
+  "expect_iny_nazov": {
+    "vepo": {
+      "export": "do_export",
+      "status": "Okno ukazovalo „Iná zákazka\", platí „Kuchyňa Novák\". Export sa nespustil, skontroluj názov a klikni znova.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: true)",
+        "status"
+      ],
+      "counts": {
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Okno ukazovalo „Iná zákazka\", platí „Kuchyňa Novák\". Export sa nespustil, skontroluj názov a klikni znova.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "status"
+      ],
+      "counts": {
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Okno ukazovalo „Iná zákazka\", platí „Kuchyňa Novák\". Export sa nespustil, skontroluj názov a klikni znova.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "status"
+      ],
+      "counts": {
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Okno ukazovalo „Iná zákazka\", platí „Kuchyňa Novák\". Export sa nespustil, skontroluj názov a klikni znova.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "status"
+      ],
+      "counts": {
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    }
+  },
+  "expect_zadany_vs_auto": {
+    "vepo": {
+      "export": "do_export",
+      "status": "Okno ukazovalo „Kuchyna_Novak\", platí „Kuchyňa Novák\". Export sa nespustil, skontroluj názov a klikni znova.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: true)",
+        "status"
+      ],
+      "counts": {
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Okno ukazovalo „Kuchyna_Novak\", platí „Kuchyňa Novák\". Export sa nespustil, skontroluj názov a klikni znova.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "status"
+      ],
+      "counts": {
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Okno ukazovalo „Kuchyna_Novak\", platí „Kuchyňa Novák\". Export sa nespustil, skontroluj názov a klikni znova.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "status"
+      ],
+      "counts": {
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Okno ukazovalo „Kuchyna_Novak\", platí „Kuchyňa Novák\". Export sa nespustil, skontroluj názov a klikni znova.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "status"
+      ],
+      "counts": {
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    }
+  },
+  "expect_ine_18_36": {
+    "vepo": {
+      "export": "do_export",
+      "status": "Okno ukazovalo 18 + 36: vypnuté, platí: zapnuté. Export sa nespustil, skontroluj nastavenie a klikni znova.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: true)",
+        "status"
+      ],
+      "counts": {
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Nákupný zoznam: 2 položiek + 1 nemapovaných (v CSV aj KONTROLE) → «DIR»/kovanie_kuchyna_novak.csv",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "kovanie_kuchyna_novak.csv"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "ES.last_dir",
+        "UI.savepanel",
+        "HardwareSets.purchase_csv",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "kovanie_kuchyna_novak.csv",
+          "709660ade49924bcd0d1bd1cb6295b3c0740a1489404867f29881f407a864b03"
+        ]
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Rozpočet uložený: 1282,00 € → «DIR»/Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx · POZOR: 3 riadkov rozpočtu nemá cenu — suma je podhodnotená (položky v dokumente sú, v cene nie) — export si potvrdil",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.hardware_expansion",
+        "PC.sheets_map",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "PC.export_confirmations",
+        "ES.last_dir",
+        "UI.savepanel",
+        "XlsxWriter.write_book",
+        "XlsxWriter.write",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx",
+          "24414c4587b305b7588506880df706dfe8aed9b97c04c7372b95d68012a0961c"
+        ]
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Cenová ponuka uložená: 1282,00 € · 7 riadkov · špecifikácia 6 položiek → «DIR»/Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx · POZOR: 3 riadkov rozpočtu nemá cenu — suma je podhodnotená (položky v dokumente sú, v cene nie) — export si potvrdil",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.hardware_expansion",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "CpExport.specification",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "PC.export_confirmations",
+        "ES.last_dir",
+        "UI.savepanel",
+        "CpExport.firewall_hits",
+        "XlsxWriter.write_book",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx",
+          "75dbb53b54ee6424dd6a18bc08f6079e9a5b3602282c399f1ea38e939e7c0d0b"
+        ]
+      ]
+    }
+  },
+  "expect_vynimka": {
+    "vepo": {
+      "export": "do_export",
+      "status": "Export sa nespustil — nastavenia exportu sa nepodarilo overiť, skús znova.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: true)",
+        "status"
+      ],
+      "counts": {
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Export sa nespustil — nastavenia exportu sa nepodarilo overiť, skús znova.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "status"
+      ],
+      "counts": {
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Export sa nespustil — nastavenia exportu sa nepodarilo overiť, skús znova.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "status"
+      ],
+      "counts": {
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Export sa nespustil — nastavenia exportu sa nepodarilo overiť, skús znova.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "status"
+      ],
+      "counts": {
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    }
+  },
+  "novsia_skrinka": {
+    "vepo": {
+      "export": "do_export",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: Skrinka CAB-009 je z novšej verzie pluginu — kusovník aj exporty (VEPO, nákup kovania, rozpočet, cenová ponuka) by boli neúplné; aktualizuj plugin.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: true)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: Skrinka CAB-009 je z novšej verzie pluginu — kusovník aj exporty (VEPO, nákup kovania, rozpočet, cenová ponuka) by boli neúplné; aktualizuj plugin.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: Skrinka CAB-009 je z novšej verzie pluginu — kusovník aj exporty (VEPO, nákup kovania, rozpočet, cenová ponuka) by boli neúplné; aktualizuj plugin.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: Skrinka CAB-009 je z novšej verzie pluginu — kusovník aj exporty (VEPO, nákup kovania, rozpočet, cenová ponuka) by boli neúplné; aktualizuj plugin.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    }
+  },
+  "novsia_doska": {
+    "vepo": {
+      "export": "do_export",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: Doska BRD-007 je z novšej verzie pluginu — kusovník aj exporty (VEPO, nákup kovania, rozpočet, cenová ponuka) by boli neúplné; aktualizuj plugin.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: true)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: Doska BRD-007 je z novšej verzie pluginu — kusovník aj exporty (VEPO, nákup kovania, rozpočet, cenová ponuka) by boli neúplné; aktualizuj plugin.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: Doska BRD-007 je z novšej verzie pluginu — kusovník aj exporty (VEPO, nákup kovania, rozpočet, cenová ponuka) by boli neúplné; aktualizuj plugin.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: Doska BRD-007 je z novšej verzie pluginu — kusovník aj exporty (VEPO, nákup kovania, rozpočet, cenová ponuka) by boli neúplné; aktualizuj plugin.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    }
+  },
+  "vynimka_zber": {
+    "vepo": {
+      "export": "do_export",
+      "status": "Chyba exportu: H17 porucha zberu",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: true)",
+        "PC.fresh_collect!",
+        "status"
+      ],
+      "counts": {
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Export zlyhal: H17 porucha zberu",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect!",
+        "status"
+      ],
+      "counts": {
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Export rozpočtu zlyhal: H17 porucha zberu",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect!",
+        "status"
+      ],
+      "counts": {
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Export cenovej ponuky zlyhal: H17 porucha zberu",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect!",
+        "status"
+      ],
+      "counts": {
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    }
+  },
+  "expanzia_nil_recept": {
+    "vepo": {
+      "export": "do_export",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: nákupný zoznam kovania sa nedá zostaviť, takže sa nedá overiť kit zásuviek (pozri Ruby konzolu).",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: true)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:kit)",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Nákupný zoznam sa nedá zostaviť (pozri Ruby konzolu).",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: nákupný zoznam kovania sa nedá zostaviť, takže sa nedá overiť kit zásuviek ani zostava výklopov (pozri Ruby konzolu).",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.hardware_expansion",
+        "PC.sheets_map",
+        "PC.hardware_expansion",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "PC.drawer_stop(:all)",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 2,
+      "files": [
+
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: nákupný zoznam kovania sa nedá zostaviť, takže sa nedá overiť kit zásuviek ani zostava výklopov (pozri Ruby konzolu).",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.hardware_expansion",
+        "PC.hardware_expansion",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "CpExport.specification",
+        "PC.drawer_stop(:all)",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 2,
+      "files": [
+
+      ]
+    }
+  },
+  "expanzia_nil_vyklop": {
+    "vepo": {
+      "export": "do_export",
+      "status": "VEPO export hotový: 3 súborov, 8 riadkov (12 ks) → «DIR»/kuchyna_novak · KONTROLA: 0× RED, 5× ORANGE (v LOGu)",
+      "error": false,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "select_directory",
+          "start": "«DIR»",
+          "name": null
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: true)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:kit)",
+        "ES.last_dir",
+        "UI.select_directory",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.hardware_expansion",
+        "PC.budget_payload",
+        "PC.control_payload",
+        "VepoExport.build",
+        "VepoExport.write",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 3,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1,
+        "vepo_edge_decors": 1,
+        "vepo_edge_thicknesses": 1,
+        "vepo_materials": 1,
+        "vepo_sheet_decors": 1
+      },
+      "expansions": 2,
+      "files": [
+        [
+          "kuchyna_novak/kuchyna_novak_biela_hdf_3.csv",
+          "27381cae15d1b76d7f9df2d6f19db73b60d89a2a92c6f4662cbdb1161b85046b"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_export.log",
+          "c96e418b9a2316d6cb8c5fe4124c06d86ac21c6949681c35776c41d4629f4dcd"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_h1180_st37_dtdl_18_36.csv",
+          "f28766bd3ac4189af8f5a9e2cc469ca35cba708924cfb7c27a1db156940da88d"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_k009_pw_dtdl_18_36.csv",
+          "1a987d3bc2f2f1ab91843f3ea8df4de5296091c7ceb86b1a6f0a36bffdc9a85c"
+        ]
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Nákupný zoznam sa nedá zostaviť (pozri Ruby konzolu).",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: nákupný zoznam kovania sa nedá zostaviť, takže sa nedá overiť kit zásuviek ani zostava výklopov (pozri Ruby konzolu).",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.hardware_expansion",
+        "PC.sheets_map",
+        "PC.hardware_expansion",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "PC.drawer_stop(:all)",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 2,
+      "files": [
+
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: nákupný zoznam kovania sa nedá zostaviť, takže sa nedá overiť kit zásuviek ani zostava výklopov (pozri Ruby konzolu).",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.hardware_expansion",
+        "PC.hardware_expansion",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "CpExport.specification",
+        "PC.drawer_stop(:all)",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 2,
+      "files": [
+
+      ]
+    }
+  },
+  "expanzia_nil": {
+    "vepo": {
+      "export": "do_export",
+      "status": "VEPO export hotový: 3 súborov, 8 riadkov (12 ks) → «DIR»/kuchyna_novak · KONTROLA: 0× RED, 5× ORANGE (v LOGu)",
+      "error": false,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "select_directory",
+          "start": "«DIR»",
+          "name": null
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: true)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:kit)",
+        "ES.last_dir",
+        "UI.select_directory",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.hardware_expansion",
+        "PC.budget_payload",
+        "PC.control_payload",
+        "VepoExport.build",
+        "VepoExport.write",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 3,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1,
+        "vepo_edge_decors": 1,
+        "vepo_edge_thicknesses": 1,
+        "vepo_materials": 1,
+        "vepo_sheet_decors": 1
+      },
+      "expansions": 2,
+      "files": [
+        [
+          "kuchyna_novak/kuchyna_novak_biela_hdf_3.csv",
+          "27381cae15d1b76d7f9df2d6f19db73b60d89a2a92c6f4662cbdb1161b85046b"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_export.log",
+          "c96e418b9a2316d6cb8c5fe4124c06d86ac21c6949681c35776c41d4629f4dcd"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_h1180_st37_dtdl_18_36.csv",
+          "f28766bd3ac4189af8f5a9e2cc469ca35cba708924cfb7c27a1db156940da88d"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_k009_pw_dtdl_18_36.csv",
+          "1a987d3bc2f2f1ab91843f3ea8df4de5296091c7ceb86b1a6f0a36bffdc9a85c"
+        ]
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Nákupný zoznam sa nedá zostaviť (pozri Ruby konzolu).",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Rozpočet uložený: 1268,00 € → «DIR»/Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx · POZOR: 2 riadkov rozpočtu nemá cenu — suma je podhodnotená (položky v dokumente sú, v cene nie) — export si potvrdil",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.hardware_expansion",
+        "PC.sheets_map",
+        "PC.hardware_expansion",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "PC.export_confirmations",
+        "ES.last_dir",
+        "UI.savepanel",
+        "XlsxWriter.write_book",
+        "XlsxWriter.write",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 2,
+      "files": [
+        [
+          "Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx",
+          "4f6aaf28fa2222046db5364b5c6d71164f2137f2a389d2ff18a5ac9f07ad3dc6"
+        ]
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Cenová ponuka uložená: 1268,00 € · 7 riadkov · špecifikácia 4 položiek → «DIR»/Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx · POZOR: 2 riadkov rozpočtu nemá cenu — suma je podhodnotená (položky v dokumente sú, v cene nie) — export si potvrdil",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.hardware_expansion",
+        "PC.hardware_expansion",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "CpExport.specification",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "PC.export_confirmations",
+        "ES.last_dir",
+        "UI.savepanel",
+        "CpExport.firewall_hits",
+        "XlsxWriter.write_book",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 2,
+      "files": [
+        [
+          "Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx",
+          "4fe5bc4999862c3cd3ecee8e6662ccbb84a6e82c68cdbc3ca3743215e2e0f7ee"
+        ]
+      ]
+    }
+  },
+  "expanzia_prazdna": {
+    "vepo": {
+      "export": "do_export",
+      "status": "VEPO export hotový: 3 súborov, 8 riadkov (12 ks) → «DIR»/kuchyna_novak · KONTROLA: 0× RED, 5× ORANGE (v LOGu)",
+      "error": false,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "select_directory",
+          "start": "«DIR»",
+          "name": null
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: true)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:kit)",
+        "ES.last_dir",
+        "UI.select_directory",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.budget_payload",
+        "PC.control_payload",
+        "VepoExport.build",
+        "VepoExport.write",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 3,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1,
+        "vepo_edge_decors": 1,
+        "vepo_edge_thicknesses": 1,
+        "vepo_materials": 1,
+        "vepo_sheet_decors": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "kuchyna_novak/kuchyna_novak_biela_hdf_3.csv",
+          "27381cae15d1b76d7f9df2d6f19db73b60d89a2a92c6f4662cbdb1161b85046b"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_export.log",
+          "c96e418b9a2316d6cb8c5fe4124c06d86ac21c6949681c35776c41d4629f4dcd"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_h1180_st37_dtdl_18_36.csv",
+          "f28766bd3ac4189af8f5a9e2cc469ca35cba708924cfb7c27a1db156940da88d"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_k009_pw_dtdl_18_36.csv",
+          "1a987d3bc2f2f1ab91843f3ea8df4de5296091c7ceb86b1a6f0a36bffdc9a85c"
+        ]
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Model nemá žiadne kovanie — niet čo exportovať.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Rozpočet uložený: 1268,00 € → «DIR»/Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx · POZOR: 2 riadkov rozpočtu nemá cenu — suma je podhodnotená (položky v dokumente sú, v cene nie) — export si potvrdil",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.hardware_expansion",
+        "PC.sheets_map",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "PC.export_confirmations",
+        "ES.last_dir",
+        "UI.savepanel",
+        "XlsxWriter.write_book",
+        "XlsxWriter.write",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx",
+          "4f6aaf28fa2222046db5364b5c6d71164f2137f2a389d2ff18a5ac9f07ad3dc6"
+        ]
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Cenová ponuka uložená: 1268,00 € · 7 riadkov · špecifikácia 4 položiek → «DIR»/Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx · POZOR: 2 riadkov rozpočtu nemá cenu — suma je podhodnotená (položky v dokumente sú, v cene nie) — export si potvrdil",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.hardware_expansion",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "CpExport.specification",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "PC.export_confirmations",
+        "ES.last_dir",
+        "UI.savepanel",
+        "CpExport.firewall_hits",
+        "XlsxWriter.write_book",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx",
+          "4fe5bc4999862c3cd3ecee8e6662ccbb84a6e82c68cdbc3ca3743215e2e0f7ee"
+        ]
+      ]
+    }
+  },
+  "expanzia_nil_nil": {
+    "vepo": {
+      "export": "do_export",
+      "status": "VEPO export hotový: 3 súborov, 8 riadkov (12 ks) → «DIR»/kuchyna_novak · KONTROLA: 0× RED, 5× ORANGE (v LOGu)",
+      "error": false,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "select_directory",
+          "start": "«DIR»",
+          "name": null
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: true)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:kit)",
+        "ES.last_dir",
+        "UI.select_directory",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.hardware_expansion",
+        "PC.budget_payload",
+        "PC.control_payload",
+        "VepoExport.build",
+        "VepoExport.write",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 3,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1,
+        "vepo_edge_decors": 1,
+        "vepo_edge_thicknesses": 1,
+        "vepo_materials": 1,
+        "vepo_sheet_decors": 1
+      },
+      "expansions": 2,
+      "files": [
+        [
+          "kuchyna_novak/kuchyna_novak_biela_hdf_3.csv",
+          "27381cae15d1b76d7f9df2d6f19db73b60d89a2a92c6f4662cbdb1161b85046b"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_export.log",
+          "c96e418b9a2316d6cb8c5fe4124c06d86ac21c6949681c35776c41d4629f4dcd"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_h1180_st37_dtdl_18_36.csv",
+          "f28766bd3ac4189af8f5a9e2cc469ca35cba708924cfb7c27a1db156940da88d"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_k009_pw_dtdl_18_36.csv",
+          "1a987d3bc2f2f1ab91843f3ea8df4de5296091c7ceb86b1a6f0a36bffdc9a85c"
+        ]
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Nákupný zoznam sa nedá zostaviť (pozri Ruby konzolu).",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Rozpočet uložený: 1268,00 € → «DIR»/Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx · POZOR: 2 riadkov rozpočtu nemá cenu — suma je podhodnotená (položky v dokumente sú, v cene nie) — export si potvrdil",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.hardware_expansion",
+        "PC.sheets_map",
+        "PC.hardware_expansion",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "PC.export_confirmations",
+        "ES.last_dir",
+        "UI.savepanel",
+        "XlsxWriter.write_book",
+        "XlsxWriter.write",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 2,
+      "files": [
+        [
+          "Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx",
+          "4f6aaf28fa2222046db5364b5c6d71164f2137f2a389d2ff18a5ac9f07ad3dc6"
+        ]
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Cenová ponuka uložená: 1268,00 € · 7 riadkov · špecifikácia 4 položiek → «DIR»/Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx · POZOR: 2 riadkov rozpočtu nemá cenu — suma je podhodnotená (položky v dokumente sú, v cene nie) — export si potvrdil",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.hardware_expansion",
+        "PC.hardware_expansion",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "CpExport.specification",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "PC.export_confirmations",
+        "ES.last_dir",
+        "UI.savepanel",
+        "CpExport.firewall_hits",
+        "XlsxWriter.write_book",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 2,
+      "files": [
+        [
+          "Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx",
+          "4fe5bc4999862c3cd3ecee8e6662ccbb84a6e82c68cdbc3ca3743215e2e0f7ee"
+        ]
+      ]
+    }
+  },
+  "expanzia_nil_platna": {
+    "vepo": {
+      "export": "do_export",
+      "status": "VEPO export hotový: 3 súborov, 8 riadkov (12 ks) → «DIR»/kuchyna_novak · KONTROLA: 0× RED, 6× ORANGE (v LOGu)",
+      "error": false,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "select_directory",
+          "start": "«DIR»",
+          "name": null
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: true)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:kit)",
+        "ES.last_dir",
+        "UI.select_directory",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.hardware_expansion",
+        "PC.budget_payload",
+        "PC.control_payload",
+        "VepoExport.build",
+        "VepoExport.write",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 3,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1,
+        "vepo_edge_decors": 1,
+        "vepo_edge_thicknesses": 1,
+        "vepo_materials": 1,
+        "vepo_sheet_decors": 1
+      },
+      "expansions": 2,
+      "files": [
+        [
+          "kuchyna_novak/kuchyna_novak_biela_hdf_3.csv",
+          "27381cae15d1b76d7f9df2d6f19db73b60d89a2a92c6f4662cbdb1161b85046b"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_export.log",
+          "c85742e80ca44df5b9283787b184b321b7cd39eaa24a03f8ad7c09fe03332450"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_h1180_st37_dtdl_18_36.csv",
+          "f28766bd3ac4189af8f5a9e2cc469ca35cba708924cfb7c27a1db156940da88d"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_k009_pw_dtdl_18_36.csv",
+          "1a987d3bc2f2f1ab91843f3ea8df4de5296091c7ceb86b1a6f0a36bffdc9a85c"
+        ]
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Nákupný zoznam sa nedá zostaviť (pozri Ruby konzolu).",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Rozpočet uložený: 1282,00 € → «DIR»/Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx · POZOR: 3 riadkov rozpočtu nemá cenu — suma je podhodnotená (položky v dokumente sú, v cene nie) — export si potvrdil",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.hardware_expansion",
+        "PC.sheets_map",
+        "PC.hardware_expansion",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "PC.export_confirmations",
+        "ES.last_dir",
+        "UI.savepanel",
+        "XlsxWriter.write_book",
+        "XlsxWriter.write",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 2,
+      "files": [
+        [
+          "Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx",
+          "24414c4587b305b7588506880df706dfe8aed9b97c04c7372b95d68012a0961c"
+        ]
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Cenová ponuka uložená: 1282,00 € · 7 riadkov · špecifikácia 4 položiek → «DIR»/Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx · POZOR: 3 riadkov rozpočtu nemá cenu — suma je podhodnotená (položky v dokumente sú, v cene nie) — export si potvrdil",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.hardware_expansion",
+        "PC.hardware_expansion",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "CpExport.specification",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "PC.export_confirmations",
+        "ES.last_dir",
+        "UI.savepanel",
+        "CpExport.firewall_hits",
+        "XlsxWriter.write_book",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 2,
+      "files": [
+        [
+          "Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx",
+          "728a0f6115e26d5ee0212d7fcb1400978b41d39585cac7ecf8a0f51d5b91f4ee"
+        ]
+      ]
+    }
+  },
+  "kit_chyba": {
+    "vepo": {
+      "export": "do_export",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: nákup nenašiel kit výsuvu k postaveným dielcom (CAB-001) — oprav to v sekcii Kontrola.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: true)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:kit)",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: nákup nenašiel kit výsuvu k postaveným dielcom (CAB-001) — oprav to v sekcii Kontrola.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:all)",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: nákup nenašiel kit výsuvu k postaveným dielcom (CAB-001) — oprav to v sekcii Kontrola.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.hardware_expansion",
+        "PC.sheets_map",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "PC.drawer_stop(:all)",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: nákup nenašiel kit výsuvu k postaveným dielcom (CAB-001) — oprav to v sekcii Kontrola.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.hardware_expansion",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "CpExport.specification",
+        "PC.drawer_stop(:all)",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    }
+  },
+  "konflikt_stavby": {
+    "vepo": {
+      "export": "do_export",
+      "status": "VEPO export hotový: 3 súborov, 8 riadkov (12 ks) → «DIR»/kuchyna_novak · KONTROLA: 1× RED, 7× ORANGE (v LOGu)",
+      "error": false,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "select_directory",
+          "start": "«DIR»",
+          "name": null
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: true)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:kit)",
+        "ES.last_dir",
+        "UI.select_directory",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.budget_payload",
+        "PC.control_payload",
+        "VepoExport.build",
+        "VepoExport.write",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 3,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1,
+        "vepo_edge_decors": 1,
+        "vepo_edge_thicknesses": 1,
+        "vepo_materials": 1,
+        "vepo_sheet_decors": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "kuchyna_novak/kuchyna_novak_biela_hdf_3.csv",
+          "27381cae15d1b76d7f9df2d6f19db73b60d89a2a92c6f4662cbdb1161b85046b"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_export.log",
+          "f218b8d2a562a26857c38c906ab569da17a054a39727f7e3e3465a81d863d726"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_h1180_st37_dtdl_18_36.csv",
+          "f28766bd3ac4189af8f5a9e2cc469ca35cba708924cfb7c27a1db156940da88d"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_k009_pw_dtdl_18_36.csv",
+          "1a987d3bc2f2f1ab91843f3ea8df4de5296091c7ceb86b1a6f0a36bffdc9a85c"
+        ]
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: zásuvka nie je klasifikovaná (CAB-001) — oprav to v sekcii Kontrola.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:all)",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: zásuvka nie je klasifikovaná (CAB-001) — oprav to v sekcii Kontrola.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.hardware_expansion",
+        "PC.sheets_map",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "PC.drawer_stop(:all)",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: zásuvka nie je klasifikovaná (CAB-001) — oprav to v sekcii Kontrola.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.hardware_expansion",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "CpExport.specification",
+        "PC.drawer_stop(:all)",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    }
+  },
+  "vyklop_neuplny": {
+    "vepo": {
+      "export": "do_export",
+      "status": "VEPO export hotový: 3 súborov, 8 riadkov (12 ks) → «DIR»/kuchyna_novak · KONTROLA: 1× RED, 7× ORANGE (v LOGu)",
+      "error": false,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "select_directory",
+          "start": "«DIR»",
+          "name": null
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: true)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:kit)",
+        "ES.last_dir",
+        "UI.select_directory",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.budget_payload",
+        "PC.control_payload",
+        "VepoExport.build",
+        "VepoExport.write",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 3,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1,
+        "vepo_edge_decors": 1,
+        "vepo_edge_thicknesses": 1,
+        "vepo_materials": 1,
+        "vepo_sheet_decors": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "kuchyna_novak/kuchyna_novak_biela_hdf_3.csv",
+          "27381cae15d1b76d7f9df2d6f19db73b60d89a2a92c6f4662cbdb1161b85046b"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_export.log",
+          "ef4c1dc02987a2c8ce2b758de41b0a731f18fcd4936636bade9ccfe12eb51824"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_h1180_st37_dtdl_18_36.csv",
+          "f28766bd3ac4189af8f5a9e2cc469ca35cba708924cfb7c27a1db156940da88d"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_k009_pw_dtdl_18_36.csv",
+          "1a987d3bc2f2f1ab91843f3ea8df4de5296091c7ceb86b1a6f0a36bffdc9a85c"
+        ]
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: výklop nemá celú zostavu kovania (CAB-001) — oprav to v sekcii Kontrola.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:all)",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: výklop nemá celú zostavu kovania (CAB-001) — oprav to v sekcii Kontrola.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.hardware_expansion",
+        "PC.sheets_map",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "PC.drawer_stop(:all)",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: výklop nemá celú zostavu kovania (CAB-001) — oprav to v sekcii Kontrola.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.hardware_expansion",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "CpExport.specification",
+        "PC.drawer_stop(:all)",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    }
+  },
+  "zaves_nesedi": {
+    "vepo": {
+      "export": "do_export",
+      "status": "VEPO export hotový: 3 súborov, 8 riadkov (12 ks) → «DIR»/kuchyna_novak · KONTROLA: 1× RED, 7× ORANGE (v LOGu)",
+      "error": false,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "select_directory",
+          "start": "«DIR»",
+          "name": null
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: true)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:kit)",
+        "ES.last_dir",
+        "UI.select_directory",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.budget_payload",
+        "PC.control_payload",
+        "VepoExport.build",
+        "VepoExport.write",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 3,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1,
+        "vepo_edge_decors": 1,
+        "vepo_edge_thicknesses": 1,
+        "vepo_materials": 1,
+        "vepo_sheet_decors": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "kuchyna_novak/kuchyna_novak_biela_hdf_3.csv",
+          "27381cae15d1b76d7f9df2d6f19db73b60d89a2a92c6f4662cbdb1161b85046b"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_export.log",
+          "1fd51e323546205bc037d4ee41f7a16a229cdd732b684c43322c23168d2d663c"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_h1180_st37_dtdl_18_36.csv",
+          "f28766bd3ac4189af8f5a9e2cc469ca35cba708924cfb7c27a1db156940da88d"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_k009_pw_dtdl_18_36.csv",
+          "1a987d3bc2f2f1ab91843f3ea8df4de5296091c7ceb86b1a6f0a36bffdc9a85c"
+        ]
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: vybraný set závesov nesedí so spôsobom otvárania (CAB-001) — oprav to v sekcii Kontrola.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:all)",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: vybraný set závesov nesedí so spôsobom otvárania (CAB-001) — oprav to v sekcii Kontrola.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.hardware_expansion",
+        "PC.sheets_map",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "PC.drawer_stop(:all)",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: vybraný set závesov nesedí so spôsobom otvárania (CAB-001) — oprav to v sekcii Kontrola.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.hardware_expansion",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "CpExport.specification",
+        "PC.drawer_stop(:all)",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    }
+  },
+  "duplicita_blokujuca": {
+    "vepo": {
+      "export": "do_export",
+      "status": "VEPO export hotový: 3 súborov, 8 riadkov (12 ks) → «DIR»/kuchyna_novak · KONTROLA: 0× RED, 8× ORANGE (v LOGu)",
+      "error": false,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "select_directory",
+          "start": "«DIR»",
+          "name": null
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: true)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:kit)",
+        "ES.last_dir",
+        "UI.select_directory",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.budget_payload",
+        "PC.control_payload",
+        "VepoExport.build",
+        "VepoExport.write",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 3,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1,
+        "vepo_edge_decors": 1,
+        "vepo_edge_thicknesses": 1,
+        "vepo_materials": 1,
+        "vepo_sheet_decors": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "kuchyna_novak/kuchyna_novak_biela_hdf_3.csv",
+          "27381cae15d1b76d7f9df2d6f19db73b60d89a2a92c6f4662cbdb1161b85046b"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_export.log",
+          "49b50bed59a84de4bb069f8014dfb7cf24773ad9734a75d4053474894039c1df"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_h1180_st37_dtdl_18_36.csv",
+          "f28766bd3ac4189af8f5a9e2cc469ca35cba708924cfb7c27a1db156940da88d"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_k009_pw_dtdl_18_36.csv",
+          "1a987d3bc2f2f1ab91843f3ea8df4de5296091c7ceb86b1a6f0a36bffdc9a85c"
+        ]
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: v modeli sú skrinky so spoločným ID (CAB-001) — kovanie by sa objednalo zle (napr. TipOn účtovaný na vlastníka len raz alebo set podľa druhej skrinky); oprav ich v sekcii Kontrola.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: v modeli sú skrinky so spoločným ID (CAB-001) — kovanie by sa objednalo zle (napr. TipOn účtovaný na vlastníka len raz alebo set podľa druhej skrinky); oprav ich v sekcii Kontrola.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.hardware_expansion",
+        "PC.sheets_map",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: v modeli sú skrinky so spoločným ID (CAB-001) — kovanie by sa objednalo zle (napr. TipOn účtovaný na vlastníka len raz alebo set podľa druhej skrinky); oprav ich v sekcii Kontrola.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.hardware_expansion",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "CpExport.specification",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    }
+  },
+  "duplicita_neskodna": {
+    "vepo": {
+      "export": "do_export",
+      "status": "VEPO export hotový: 3 súborov, 8 riadkov (12 ks) → «DIR»/kuchyna_novak · KONTROLA: 0× RED, 8× ORANGE (v LOGu)",
+      "error": false,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "select_directory",
+          "start": "«DIR»",
+          "name": null
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: true)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:kit)",
+        "ES.last_dir",
+        "UI.select_directory",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.budget_payload",
+        "PC.control_payload",
+        "VepoExport.build",
+        "VepoExport.write",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 3,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1,
+        "vepo_edge_decors": 1,
+        "vepo_edge_thicknesses": 1,
+        "vepo_materials": 1,
+        "vepo_sheet_decors": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "kuchyna_novak/kuchyna_novak_biela_hdf_3.csv",
+          "27381cae15d1b76d7f9df2d6f19db73b60d89a2a92c6f4662cbdb1161b85046b"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_export.log",
+          "3461ea93a30f980f4ad32ef98208381f4a4180b67022523c2a6c58c0bd6ec1e9"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_h1180_st37_dtdl_18_36.csv",
+          "f28766bd3ac4189af8f5a9e2cc469ca35cba708924cfb7c27a1db156940da88d"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_k009_pw_dtdl_18_36.csv",
+          "1a987d3bc2f2f1ab91843f3ea8df4de5296091c7ceb86b1a6f0a36bffdc9a85c"
+        ]
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Nákupný zoznam: 2 položiek + 1 nemapovaných (v CSV aj KONTROLE) → «DIR»/kovanie_kuchyna_novak.csv · POZOR: v modeli sú kusy so spoločným ID (CAB-002) — kusovník ich zlieva do jedného vlastníka; pozri Kontrolu.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "kovanie_kuchyna_novak.csv"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "ES.last_dir",
+        "UI.savepanel",
+        "HardwareSets.purchase_csv",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "kovanie_kuchyna_novak.csv",
+          "709660ade49924bcd0d1bd1cb6295b3c0740a1489404867f29881f407a864b03"
+        ]
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Rozpočet uložený: 1282,00 € → «DIR»/Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx · POZOR: 3 riadkov rozpočtu nemá cenu — suma je podhodnotená (položky v dokumente sú, v cene nie) — export si potvrdil · POZOR: v modeli sú kusy so spoločným ID (CAB-002) — kusovník ich zlieva do jedného vlastníka; pozri Kontrolu.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.hardware_expansion",
+        "PC.sheets_map",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "PC.export_confirmations",
+        "ES.last_dir",
+        "UI.savepanel",
+        "XlsxWriter.write_book",
+        "XlsxWriter.write",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx",
+          "24414c4587b305b7588506880df706dfe8aed9b97c04c7372b95d68012a0961c"
+        ]
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Cenová ponuka uložená: 1282,00 € · 7 riadkov · špecifikácia 6 položiek → «DIR»/Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx · POZOR: 3 riadkov rozpočtu nemá cenu — suma je podhodnotená (položky v dokumente sú, v cene nie) — export si potvrdil · v modeli sú kusy so spoločným ID (CAB-002) — kusovník ich zlieva do jedného vlastníka; pozri Kontrolu",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.hardware_expansion",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "CpExport.specification",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "PC.export_confirmations",
+        "ES.last_dir",
+        "UI.savepanel",
+        "CpExport.firewall_hits",
+        "XlsxWriter.write_book",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx",
+          "75dbb53b54ee6424dd6a18bc08f6079e9a5b3602282c399f1ea38e939e7c0d0b"
+        ]
+      ]
+    }
+  },
+  "duplicita_dosky": {
+    "vepo": {
+      "export": "do_export",
+      "status": "VEPO export hotový: 3 súborov, 8 riadkov (12 ks) → «DIR»/kuchyna_novak · KONTROLA: 0× RED, 8× ORANGE (v LOGu)",
+      "error": false,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "select_directory",
+          "start": "«DIR»",
+          "name": null
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: true)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:kit)",
+        "ES.last_dir",
+        "UI.select_directory",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.budget_payload",
+        "PC.control_payload",
+        "VepoExport.build",
+        "VepoExport.write",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 3,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1,
+        "vepo_edge_decors": 1,
+        "vepo_edge_thicknesses": 1,
+        "vepo_materials": 1,
+        "vepo_sheet_decors": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "kuchyna_novak/kuchyna_novak_biela_hdf_3.csv",
+          "27381cae15d1b76d7f9df2d6f19db73b60d89a2a92c6f4662cbdb1161b85046b"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_export.log",
+          "6b62e4968f1acf38ec5841198b42880a9bdf8cf5e30ec479d32c0dcf25b63bd5"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_h1180_st37_dtdl_18_36.csv",
+          "f28766bd3ac4189af8f5a9e2cc469ca35cba708924cfb7c27a1db156940da88d"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_k009_pw_dtdl_18_36.csv",
+          "1a987d3bc2f2f1ab91843f3ea8df4de5296091c7ceb86b1a6f0a36bffdc9a85c"
+        ]
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Nákupný zoznam: 2 položiek + 1 nemapovaných (v CSV aj KONTROLE) → «DIR»/kovanie_kuchyna_novak.csv · POZOR: v modeli sú kusy so spoločným ID (BRD-001) — kusovník ich zlieva do jedného vlastníka; pozri Kontrolu.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "kovanie_kuchyna_novak.csv"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "ES.last_dir",
+        "UI.savepanel",
+        "HardwareSets.purchase_csv",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "kovanie_kuchyna_novak.csv",
+          "709660ade49924bcd0d1bd1cb6295b3c0740a1489404867f29881f407a864b03"
+        ]
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Rozpočet uložený: 1282,00 € → «DIR»/Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx · POZOR: 3 riadkov rozpočtu nemá cenu — suma je podhodnotená (položky v dokumente sú, v cene nie) — export si potvrdil · POZOR: v modeli sú kusy so spoločným ID (BRD-001) — kusovník ich zlieva do jedného vlastníka; pozri Kontrolu.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.hardware_expansion",
+        "PC.sheets_map",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "PC.export_confirmations",
+        "ES.last_dir",
+        "UI.savepanel",
+        "XlsxWriter.write_book",
+        "XlsxWriter.write",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx",
+          "24414c4587b305b7588506880df706dfe8aed9b97c04c7372b95d68012a0961c"
+        ]
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Cenová ponuka uložená: 1282,00 € · 7 riadkov · špecifikácia 6 položiek → «DIR»/Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx · POZOR: 3 riadkov rozpočtu nemá cenu — suma je podhodnotená (položky v dokumente sú, v cene nie) — export si potvrdil · v modeli sú kusy so spoločným ID (BRD-001) — kusovník ich zlieva do jedného vlastníka; pozri Kontrolu",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.hardware_expansion",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "CpExport.specification",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "PC.export_confirmations",
+        "ES.last_dir",
+        "UI.savepanel",
+        "CpExport.firewall_hits",
+        "XlsxWriter.write_book",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx",
+          "75dbb53b54ee6424dd6a18bc08f6079e9a5b3602282c399f1ea38e939e7c0d0b"
+        ]
+      ]
+    }
+  },
+  "rozpocet_nil": {
+    "vepo": {
+      "export": "do_export",
+      "status": "VEPO export hotový: 3 súborov, 8 riadkov (12 ks) → «DIR»/kuchyna_novak · KONTROLA: 0× RED, 3× ORANGE (v LOGu)",
+      "error": false,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "select_directory",
+          "start": "«DIR»",
+          "name": null
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: true)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:kit)",
+        "ES.last_dir",
+        "UI.select_directory",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.budget_payload",
+        "PC.control_payload",
+        "VepoExport.build",
+        "VepoExport.write",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 3,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1,
+        "vepo_edge_decors": 1,
+        "vepo_edge_thicknesses": 1,
+        "vepo_materials": 1,
+        "vepo_sheet_decors": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "kuchyna_novak/kuchyna_novak_biela_hdf_3.csv",
+          "27381cae15d1b76d7f9df2d6f19db73b60d89a2a92c6f4662cbdb1161b85046b"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_export.log",
+          "46160c2113e4b2ebdcea3ab82834edb66951a98072d47e094f8d10b5962fbdb3"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_h1180_st37_dtdl_18_36.csv",
+          "f28766bd3ac4189af8f5a9e2cc469ca35cba708924cfb7c27a1db156940da88d"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_k009_pw_dtdl_18_36.csv",
+          "1a987d3bc2f2f1ab91843f3ea8df4de5296091c7ceb86b1a6f0a36bffdc9a85c"
+        ]
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Nákupný zoznam: 2 položiek + 1 nemapovaných (v CSV aj KONTROLE) → «DIR»/kovanie_kuchyna_novak.csv",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "kovanie_kuchyna_novak.csv"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "ES.last_dir",
+        "UI.savepanel",
+        "HardwareSets.purchase_csv",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "kovanie_kuchyna_novak.csv",
+          "709660ade49924bcd0d1bd1cb6295b3c0740a1489404867f29881f407a864b03"
+        ]
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Rozpočet sa nepodarilo zostaviť (pozri Ruby konzolu).",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.hardware_expansion",
+        "PC.sheets_map",
+        "PC.budget_payload",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Rozpočet sa nepodarilo zostaviť (pozri Ruby konzolu).",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.hardware_expansion",
+        "PC.budget_payload",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    }
+  },
+  "budget_std": {
+    "vepo": {
+      "export": "do_export",
+      "status": "VEPO export hotový: 3 súborov, 8 riadkov (12 ks) → «DIR»/kuchyna_novak · KONTROLA: 0× RED, 7× ORANGE (v LOGu)",
+      "error": false,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "select_directory",
+          "start": "«DIR»",
+          "name": null
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: true)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:kit)",
+        "ES.last_dir",
+        "UI.select_directory",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.budget_payload",
+        "PC.control_payload",
+        "VepoExport.build",
+        "VepoExport.write",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 3,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1,
+        "vepo_edge_decors": 1,
+        "vepo_edge_thicknesses": 1,
+        "vepo_materials": 1,
+        "vepo_sheet_decors": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "kuchyna_novak/kuchyna_novak_biela_hdf_3.csv",
+          "27381cae15d1b76d7f9df2d6f19db73b60d89a2a92c6f4662cbdb1161b85046b"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_export.log",
+          "c41b548c46afd42be2e732463ec1c25e84efc156b9e5db3205e105130248b45d"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_h1180_st37_dtdl_18_36.csv",
+          "f28766bd3ac4189af8f5a9e2cc469ca35cba708924cfb7c27a1db156940da88d"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_k009_pw_dtdl_18_36.csv",
+          "1a987d3bc2f2f1ab91843f3ea8df4de5296091c7ceb86b1a6f0a36bffdc9a85c"
+        ]
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Nákupný zoznam: 2 položiek + 1 nemapovaných (v CSV aj KONTROLE) → «DIR»/kovanie_kuchyna_novak.csv",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "kovanie_kuchyna_novak.csv"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "ES.last_dir",
+        "UI.savepanel",
+        "HardwareSets.purchase_csv",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "kovanie_kuchyna_novak.csv",
+          "709660ade49924bcd0d1bd1cb6295b3c0740a1489404867f29881f407a864b03"
+        ]
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Rozpočet zákazky je z novšej verzie Noxun — úprava by dáta orezala; aktualizuj plugin.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.hardware_expansion",
+        "PC.sheets_map",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Rozpočet zákazky je z novšej verzie Noxun — úprava by dáta orezala; aktualizuj plugin.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.hardware_expansion",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    }
+  },
+  "zostava_zaporna": {
+    "vepo": {
+      "export": "do_export",
+      "status": "VEPO export hotový: 3 súborov, 8 riadkov (12 ks) → «DIR»/kuchyna_novak · KONTROLA: 0× RED, 7× ORANGE (v LOGu)",
+      "error": false,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "select_directory",
+          "start": "«DIR»",
+          "name": null
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: true)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:kit)",
+        "ES.last_dir",
+        "UI.select_directory",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.budget_payload",
+        "PC.control_payload",
+        "VepoExport.build",
+        "VepoExport.write",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 3,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1,
+        "vepo_edge_decors": 1,
+        "vepo_edge_thicknesses": 1,
+        "vepo_materials": 1,
+        "vepo_sheet_decors": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "kuchyna_novak/kuchyna_novak_biela_hdf_3.csv",
+          "27381cae15d1b76d7f9df2d6f19db73b60d89a2a92c6f4662cbdb1161b85046b"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_export.log",
+          "c41b548c46afd42be2e732463ec1c25e84efc156b9e5db3205e105130248b45d"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_h1180_st37_dtdl_18_36.csv",
+          "f28766bd3ac4189af8f5a9e2cc469ca35cba708924cfb7c27a1db156940da88d"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_k009_pw_dtdl_18_36.csv",
+          "1a987d3bc2f2f1ab91843f3ea8df4de5296091c7ceb86b1a6f0a36bffdc9a85c"
+        ]
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Nákupný zoznam: 2 položiek + 1 nemapovaných (v CSV aj KONTROLE) → «DIR»/kovanie_kuchyna_novak.csv",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "kovanie_kuchyna_novak.csv"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "ES.last_dir",
+        "UI.savepanel",
+        "HardwareSets.purchase_csv",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "kovanie_kuchyna_novak.csv",
+          "709660ade49924bcd0d1bd1cb6295b3c0740a1489404867f29881f407a864b03"
+        ]
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Rozpočet uložený: 1282,00 € → «DIR»/Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx · POZOR: 3 riadkov rozpočtu nemá cenu — suma je podhodnotená (položky v dokumente sú, v cene nie) — export si potvrdil",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.hardware_expansion",
+        "PC.sheets_map",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "PC.export_confirmations",
+        "ES.last_dir",
+        "UI.savepanel",
+        "XlsxWriter.write_book",
+        "XlsxWriter.write",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx",
+          "24414c4587b305b7588506880df706dfe8aed9b97c04c7372b95d68012a0961c"
+        ]
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: „Nábytková zostava“ vyšla záporná (-12,50 €) — samostatné riadky prevyšujú rozpočet; uprav zaradenie riadkov v sekcii Cenová ponuka.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.hardware_expansion",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "CpExport.specification",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    }
+  },
+  "ponuka_nesedi": {
+    "vepo": {
+      "export": "do_export",
+      "status": "VEPO export hotový: 3 súborov, 8 riadkov (12 ks) → «DIR»/kuchyna_novak · KONTROLA: 0× RED, 7× ORANGE (v LOGu)",
+      "error": false,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "select_directory",
+          "start": "«DIR»",
+          "name": null
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: true)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:kit)",
+        "ES.last_dir",
+        "UI.select_directory",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.budget_payload",
+        "PC.control_payload",
+        "VepoExport.build",
+        "VepoExport.write",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 3,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1,
+        "vepo_edge_decors": 1,
+        "vepo_edge_thicknesses": 1,
+        "vepo_materials": 1,
+        "vepo_sheet_decors": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "kuchyna_novak/kuchyna_novak_biela_hdf_3.csv",
+          "27381cae15d1b76d7f9df2d6f19db73b60d89a2a92c6f4662cbdb1161b85046b"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_export.log",
+          "c41b548c46afd42be2e732463ec1c25e84efc156b9e5db3205e105130248b45d"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_h1180_st37_dtdl_18_36.csv",
+          "f28766bd3ac4189af8f5a9e2cc469ca35cba708924cfb7c27a1db156940da88d"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_k009_pw_dtdl_18_36.csv",
+          "1a987d3bc2f2f1ab91843f3ea8df4de5296091c7ceb86b1a6f0a36bffdc9a85c"
+        ]
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Nákupný zoznam: 2 položiek + 1 nemapovaných (v CSV aj KONTROLE) → «DIR»/kovanie_kuchyna_novak.csv",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "kovanie_kuchyna_novak.csv"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "ES.last_dir",
+        "UI.savepanel",
+        "HardwareSets.purchase_csv",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "kovanie_kuchyna_novak.csv",
+          "709660ade49924bcd0d1bd1cb6295b3c0740a1489404867f29881f407a864b03"
+        ]
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Rozpočet uložený: 1282,00 € → «DIR»/Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx · POZOR: 3 riadkov rozpočtu nemá cenu — suma je podhodnotená (položky v dokumente sú, v cene nie) — export si potvrdil",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.hardware_expansion",
+        "PC.sheets_map",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "PC.export_confirmations",
+        "ES.last_dir",
+        "UI.savepanel",
+        "XlsxWriter.write_book",
+        "XlsxWriter.write",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx",
+          "24414c4587b305b7588506880df706dfe8aed9b97c04c7372b95d68012a0961c"
+        ]
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: cenová ponuka nesedí s rozpočtom o 3,40 € — skontroluj prepísané sumy a násobky v sekcii Rozpočet.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.hardware_expansion",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "CpExport.specification",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    }
+  },
+  "bez_ceny_bez_potvrdenia": {
+    "vepo": {
+      "export": "do_export",
+      "status": "VEPO export hotový: 3 súborov, 8 riadkov (12 ks) → «DIR»/kuchyna_novak · KONTROLA: 0× RED, 7× ORANGE (v LOGu)",
+      "error": false,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "select_directory",
+          "start": "«DIR»",
+          "name": null
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: true)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:kit)",
+        "ES.last_dir",
+        "UI.select_directory",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.budget_payload",
+        "PC.control_payload",
+        "VepoExport.build",
+        "VepoExport.write",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 3,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1,
+        "vepo_edge_decors": 1,
+        "vepo_edge_thicknesses": 1,
+        "vepo_materials": 1,
+        "vepo_sheet_decors": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "kuchyna_novak/kuchyna_novak_biela_hdf_3.csv",
+          "27381cae15d1b76d7f9df2d6f19db73b60d89a2a92c6f4662cbdb1161b85046b"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_export.log",
+          "c41b548c46afd42be2e732463ec1c25e84efc156b9e5db3205e105130248b45d"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_h1180_st37_dtdl_18_36.csv",
+          "f28766bd3ac4189af8f5a9e2cc469ca35cba708924cfb7c27a1db156940da88d"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_k009_pw_dtdl_18_36.csv",
+          "1a987d3bc2f2f1ab91843f3ea8df4de5296091c7ceb86b1a6f0a36bffdc9a85c"
+        ]
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Nákupný zoznam: 2 položiek + 1 nemapovaných (v CSV aj KONTROLE) → «DIR»/kovanie_kuchyna_novak.csv",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "kovanie_kuchyna_novak.csv"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "ES.last_dir",
+        "UI.savepanel",
+        "HardwareSets.purchase_csv",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "kovanie_kuchyna_novak.csv",
+          "709660ade49924bcd0d1bd1cb6295b3c0740a1489404867f29881f407a864b03"
+        ]
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Export sa zastavil — súbor sa zatiaľ nevytvoril. 3 riadkov rozpočtu nemá cenu — suma je podhodnotená (položky v dokumente sú, v cene nie). Doplň ceny v sekcii Rozpočet — alebo klikni na export ešte raz a potvrď, že chceš exportovať aj tak.",
+      "error": true,
+      "statuses": 1,
+      "repush": 1,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.hardware_expansion",
+        "PC.sheets_map",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "PC.export_confirmations",
+        "repush",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Export sa zastavil — súbor sa zatiaľ nevytvoril. 3 riadkov rozpočtu nemá cenu — suma je podhodnotená (položky v dokumente sú, v cene nie). Doplň ceny v sekcii Rozpočet — alebo klikni na export ešte raz a potvrď, že chceš exportovať aj tak.",
+      "error": true,
+      "statuses": 1,
+      "repush": 1,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.hardware_expansion",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "CpExport.specification",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "PC.export_confirmations",
+        "repush",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    }
+  },
+  "bez_ceny_zly_pocet": {
+    "vepo": {
+      "export": "do_export",
+      "status": "VEPO export hotový: 3 súborov, 8 riadkov (12 ks) → «DIR»/kuchyna_novak · KONTROLA: 0× RED, 7× ORANGE (v LOGu)",
+      "error": false,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "select_directory",
+          "start": "«DIR»",
+          "name": null
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: true)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:kit)",
+        "ES.last_dir",
+        "UI.select_directory",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.budget_payload",
+        "PC.control_payload",
+        "VepoExport.build",
+        "VepoExport.write",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 3,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1,
+        "vepo_edge_decors": 1,
+        "vepo_edge_thicknesses": 1,
+        "vepo_materials": 1,
+        "vepo_sheet_decors": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "kuchyna_novak/kuchyna_novak_biela_hdf_3.csv",
+          "27381cae15d1b76d7f9df2d6f19db73b60d89a2a92c6f4662cbdb1161b85046b"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_export.log",
+          "c41b548c46afd42be2e732463ec1c25e84efc156b9e5db3205e105130248b45d"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_h1180_st37_dtdl_18_36.csv",
+          "f28766bd3ac4189af8f5a9e2cc469ca35cba708924cfb7c27a1db156940da88d"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_k009_pw_dtdl_18_36.csv",
+          "1a987d3bc2f2f1ab91843f3ea8df4de5296091c7ceb86b1a6f0a36bffdc9a85c"
+        ]
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Nákupný zoznam: 2 položiek + 1 nemapovaných (v CSV aj KONTROLE) → «DIR»/kovanie_kuchyna_novak.csv",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "kovanie_kuchyna_novak.csv"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "ES.last_dir",
+        "UI.savepanel",
+        "HardwareSets.purchase_csv",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "kovanie_kuchyna_novak.csv",
+          "709660ade49924bcd0d1bd1cb6295b3c0740a1489404867f29881f407a864b03"
+        ]
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Export sa zastavil — súbor sa zatiaľ nevytvoril. 3 riadkov rozpočtu nemá cenu — suma je podhodnotená (položky v dokumente sú, v cene nie). Doplň ceny v sekcii Rozpočet — alebo klikni na export ešte raz a potvrď, že chceš exportovať aj tak.",
+      "error": true,
+      "statuses": 1,
+      "repush": 1,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.hardware_expansion",
+        "PC.sheets_map",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "PC.export_confirmations",
+        "repush",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Export sa zastavil — súbor sa zatiaľ nevytvoril. 3 riadkov rozpočtu nemá cenu — suma je podhodnotená (položky v dokumente sú, v cene nie). Doplň ceny v sekcii Rozpočet — alebo klikni na export ešte raz a potvrď, že chceš exportovať aj tak.",
+      "error": true,
+      "statuses": 1,
+      "repush": 1,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.hardware_expansion",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "CpExport.specification",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "PC.export_confirmations",
+        "repush",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    }
+  },
+  "bez_ceny_spravny_pocet": {
+    "vepo": {
+      "export": "do_export",
+      "status": "VEPO export hotový: 3 súborov, 8 riadkov (12 ks) → «DIR»/kuchyna_novak · KONTROLA: 0× RED, 7× ORANGE (v LOGu)",
+      "error": false,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "select_directory",
+          "start": "«DIR»",
+          "name": null
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: true)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:kit)",
+        "ES.last_dir",
+        "UI.select_directory",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.budget_payload",
+        "PC.control_payload",
+        "VepoExport.build",
+        "VepoExport.write",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 3,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1,
+        "vepo_edge_decors": 1,
+        "vepo_edge_thicknesses": 1,
+        "vepo_materials": 1,
+        "vepo_sheet_decors": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "kuchyna_novak/kuchyna_novak_biela_hdf_3.csv",
+          "27381cae15d1b76d7f9df2d6f19db73b60d89a2a92c6f4662cbdb1161b85046b"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_export.log",
+          "c41b548c46afd42be2e732463ec1c25e84efc156b9e5db3205e105130248b45d"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_h1180_st37_dtdl_18_36.csv",
+          "f28766bd3ac4189af8f5a9e2cc469ca35cba708924cfb7c27a1db156940da88d"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_k009_pw_dtdl_18_36.csv",
+          "1a987d3bc2f2f1ab91843f3ea8df4de5296091c7ceb86b1a6f0a36bffdc9a85c"
+        ]
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Nákupný zoznam: 2 položiek + 1 nemapovaných (v CSV aj KONTROLE) → «DIR»/kovanie_kuchyna_novak.csv",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "kovanie_kuchyna_novak.csv"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "ES.last_dir",
+        "UI.savepanel",
+        "HardwareSets.purchase_csv",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "kovanie_kuchyna_novak.csv",
+          "709660ade49924bcd0d1bd1cb6295b3c0740a1489404867f29881f407a864b03"
+        ]
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Rozpočet uložený: 1282,00 € → «DIR»/Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx · POZOR: 3 riadkov rozpočtu nemá cenu — suma je podhodnotená (položky v dokumente sú, v cene nie) — export si potvrdil",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.hardware_expansion",
+        "PC.sheets_map",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "PC.export_confirmations",
+        "ES.last_dir",
+        "UI.savepanel",
+        "XlsxWriter.write_book",
+        "XlsxWriter.write",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx",
+          "24414c4587b305b7588506880df706dfe8aed9b97c04c7372b95d68012a0961c"
+        ]
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Cenová ponuka uložená: 1282,00 € · 7 riadkov · špecifikácia 6 položiek → «DIR»/Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx · POZOR: 3 riadkov rozpočtu nemá cenu — suma je podhodnotená (položky v dokumente sú, v cene nie) — export si potvrdil",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.hardware_expansion",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "CpExport.specification",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "PC.export_confirmations",
+        "ES.last_dir",
+        "UI.savepanel",
+        "CpExport.firewall_hits",
+        "XlsxWriter.write_book",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx",
+          "75dbb53b54ee6424dd6a18bc08f6079e9a5b3602282c399f1ea38e939e7c0d0b"
+        ]
+      ]
+    }
+  },
+  "picker_nil": {
+    "vepo": {
+      "export": "do_export",
+      "status": "Export zrušený.",
+      "error": false,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "select_directory",
+          "start": "«DIR»",
+          "name": null
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: true)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:kit)",
+        "ES.last_dir",
+        "UI.select_directory",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Export zrušený.",
+      "error": false,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "kovanie_kuchyna_novak.csv"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "ES.last_dir",
+        "UI.savepanel",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Export zrušený.",
+      "error": false,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.hardware_expansion",
+        "PC.sheets_map",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "PC.export_confirmations",
+        "ES.last_dir",
+        "UI.savepanel",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Export zrušený.",
+      "error": false,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.hardware_expansion",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "CpExport.specification",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "PC.export_confirmations",
+        "ES.last_dir",
+        "UI.savepanel",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    }
+  },
+  "picker_prazdny": {
+    "vepo": {
+      "export": "do_export",
+      "status": "Export zrušený.",
+      "error": false,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "select_directory",
+          "start": "«DIR»",
+          "name": null
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: true)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:kit)",
+        "ES.last_dir",
+        "UI.select_directory",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Export zrušený.",
+      "error": false,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "kovanie_kuchyna_novak.csv"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "ES.last_dir",
+        "UI.savepanel",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Export zrušený.",
+      "error": false,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.hardware_expansion",
+        "PC.sheets_map",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "PC.export_confirmations",
+        "ES.last_dir",
+        "UI.savepanel",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Export zrušený.",
+      "error": false,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.hardware_expansion",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "CpExport.specification",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "PC.export_confirmations",
+        "ES.last_dir",
+        "UI.savepanel",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    }
+  },
+  "vepo_bez_dielcov": {
+    "vepo": {
+      "export": "do_export",
+      "status": "Niet čo exportovať — model nemá výrobné dielce.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "select_directory",
+          "start": "«DIR»",
+          "name": null
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: true)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:kit)",
+        "ES.last_dir",
+        "UI.select_directory",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.budget_payload",
+        "PC.control_payload",
+        "VepoExport.build",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 3,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1,
+        "vepo_edge_decors": 1,
+        "vepo_edge_thicknesses": 1,
+        "vepo_materials": 1,
+        "vepo_sheet_decors": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Nákupný zoznam: 2 položiek + 1 nemapovaných (v CSV aj KONTROLE) → «DIR»/kovanie_kuchyna_novak.csv",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "kovanie_kuchyna_novak.csv"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "ES.last_dir",
+        "UI.savepanel",
+        "HardwareSets.purchase_csv",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "kovanie_kuchyna_novak.csv",
+          "709660ade49924bcd0d1bd1cb6295b3c0740a1489404867f29881f407a864b03"
+        ]
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Rozpočet uložený: 674,00 € → «DIR»/Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx · POZOR: 2 riadkov rozpočtu nemá cenu — suma je podhodnotená (položky v dokumente sú, v cene nie) — export si potvrdil",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.hardware_expansion",
+        "PC.sheets_map",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "PC.export_confirmations",
+        "ES.last_dir",
+        "UI.savepanel",
+        "XlsxWriter.write_book",
+        "XlsxWriter.write",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx",
+          "ed3c8b4524e152f3004f14661b8e5e203366987f6de74368100a0e84e6518190"
+        ]
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Cenová ponuka uložená: 674,00 € · 5 riadkov · špecifikácia 2 položiek → «DIR»/Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx · POZOR: 2 riadkov rozpočtu nemá cenu — suma je podhodnotená (položky v dokumente sú, v cene nie) — export si potvrdil",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.hardware_expansion",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "CpExport.specification",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "PC.export_confirmations",
+        "ES.last_dir",
+        "UI.savepanel",
+        "CpExport.firewall_hits",
+        "XlsxWriter.write_book",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx",
+          "54d553361315218ea11f42ae225b3a0c7b1e0bcbb30b4982d7ece0bb5a398e75"
+        ]
+      ]
+    }
+  },
+  "vynimka_bom": {
+    "vepo": {
+      "export": "do_export",
+      "status": "Chyba exportu: H17 porucha kusovnika",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "select_directory",
+          "start": "«DIR»",
+          "name": null
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: true)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:kit)",
+        "ES.last_dir",
+        "UI.select_directory",
+        "Bom.compute!",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Nákupný zoznam: 2 položiek + 1 nemapovaných (v CSV aj KONTROLE) → «DIR»/kovanie_kuchyna_novak.csv",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "kovanie_kuchyna_novak.csv"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "ES.last_dir",
+        "UI.savepanel",
+        "HardwareSets.purchase_csv",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "kovanie_kuchyna_novak.csv",
+          "709660ade49924bcd0d1bd1cb6295b3c0740a1489404867f29881f407a864b03"
+        ]
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Export rozpočtu zlyhal: H17 porucha kusovnika",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute!",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Export cenovej ponuky zlyhal: H17 porucha kusovnika",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute!",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    }
+  },
+  "vynimka_kontrola": {
+    "vepo": {
+      "export": "do_export",
+      "status": "Chyba exportu: H17 porucha kontroly",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "select_directory",
+          "start": "«DIR»",
+          "name": null
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: true)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:kit)",
+        "ES.last_dir",
+        "UI.select_directory",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.budget_payload",
+        "PC.control_payload!",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Nákupný zoznam: 2 položiek + 1 nemapovaných (v CSV aj KONTROLE) → «DIR»/kovanie_kuchyna_novak.csv",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "kovanie_kuchyna_novak.csv"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "ES.last_dir",
+        "UI.savepanel",
+        "HardwareSets.purchase_csv",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "kovanie_kuchyna_novak.csv",
+          "709660ade49924bcd0d1bd1cb6295b3c0740a1489404867f29881f407a864b03"
+        ]
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Rozpočet uložený: 1282,00 € → «DIR»/Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx · POZOR: 3 riadkov rozpočtu nemá cenu — suma je podhodnotená (položky v dokumente sú, v cene nie) — export si potvrdil",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.hardware_expansion",
+        "PC.sheets_map",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "PC.export_confirmations",
+        "ES.last_dir",
+        "UI.savepanel",
+        "XlsxWriter.write_book",
+        "XlsxWriter.write",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx",
+          "24414c4587b305b7588506880df706dfe8aed9b97c04c7372b95d68012a0961c"
+        ]
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Cenová ponuka uložená: 1282,00 € · 7 riadkov · špecifikácia 6 položiek → «DIR»/Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx · POZOR: 3 riadkov rozpočtu nemá cenu — suma je podhodnotená (položky v dokumente sú, v cene nie) — export si potvrdil",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.hardware_expansion",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "CpExport.specification",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "PC.export_confirmations",
+        "ES.last_dir",
+        "UI.savepanel",
+        "CpExport.firewall_hits",
+        "XlsxWriter.write_book",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx",
+          "75dbb53b54ee6424dd6a18bc08f6079e9a5b3602282c399f1ea38e939e7c0d0b"
+        ]
+      ]
+    }
+  },
+  "vynimka_odhad": {
+    "vepo": {
+      "export": "do_export",
+      "status": "VEPO export hotový: 3 súborov, 8 riadkov (12 ks) → «DIR»/kuchyna_novak · KONTROLA: 0× RED, 3× ORANGE (v LOGu)",
+      "error": false,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "select_directory",
+          "start": "«DIR»",
+          "name": null
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: true)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:kit)",
+        "ES.last_dir",
+        "UI.select_directory",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.budget_payload",
+        "PC.control_payload",
+        "VepoExport.build",
+        "VepoExport.write",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 1,
+        "fresh_collect": 1,
+        "sheets_map": 1,
+        "vepo_edge_decors": 1,
+        "vepo_edge_thicknesses": 1,
+        "vepo_materials": 1,
+        "vepo_sheet_decors": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "kuchyna_novak/kuchyna_novak_biela_hdf_3.csv",
+          "27381cae15d1b76d7f9df2d6f19db73b60d89a2a92c6f4662cbdb1161b85046b"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_export.log",
+          "46160c2113e4b2ebdcea3ab82834edb66951a98072d47e094f8d10b5962fbdb3"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_h1180_st37_dtdl_18_36.csv",
+          "f28766bd3ac4189af8f5a9e2cc469ca35cba708924cfb7c27a1db156940da88d"
+        ],
+        [
+          "kuchyna_novak/kuchyna_novak_k009_pw_dtdl_18_36.csv",
+          "1a987d3bc2f2f1ab91843f3ea8df4de5296091c7ceb86b1a6f0a36bffdc9a85c"
+        ]
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Nákupný zoznam: 2 položiek + 1 nemapovaných (v CSV aj KONTROLE) → «DIR»/kovanie_kuchyna_novak.csv",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "kovanie_kuchyna_novak.csv"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "ES.last_dir",
+        "UI.savepanel",
+        "HardwareSets.purchase_csv",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "kovanie_kuchyna_novak.csv",
+          "709660ade49924bcd0d1bd1cb6295b3c0740a1489404867f29881f407a864b03"
+        ]
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Rozpočet sa nepodarilo zostaviť (pozri Ruby konzolu).",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.hardware_expansion",
+        "PC.sheets_map",
+        "PC.budget_payload",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Rozpočet sa nepodarilo zostaviť (pozri Ruby konzolu).",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.hardware_expansion",
+        "PC.budget_payload",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+
+      ]
+    }
+  },
+  "cudzi_subor_vepo": {
+    "vepo": {
+      "export": "do_export",
+      "status": "Chyba exportu: Priečinok «DIR»/kuchyna_novak obsahuje cudzie súbory (dodavatel.txt) — vyber iný cieľ.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "select_directory",
+          "start": "«DIR»",
+          "name": null
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: true)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:kit)",
+        "ES.last_dir",
+        "UI.select_directory",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.budget_payload",
+        "PC.control_payload",
+        "VepoExport.build",
+        "VepoExport.write!",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 3,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1,
+        "vepo_edge_decors": 1,
+        "vepo_edge_thicknesses": 1,
+        "vepo_materials": 1,
+        "vepo_sheet_decors": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "kuchyna_novak/dodavatel.txt",
+          "8edcdee25990c1d35fd147a17bbe84bf818c5132241e75d11fe1f2eee42e2df7"
+        ]
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Nákupný zoznam: 2 položiek + 1 nemapovaných (v CSV aj KONTROLE) → «DIR»/kovanie_kuchyna_novak.csv",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "kovanie_kuchyna_novak.csv"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "PC.hardware_expansion",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "ES.last_dir",
+        "UI.savepanel",
+        "HardwareSets.purchase_csv",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "kovanie_kuchyna_novak.csv",
+          "709660ade49924bcd0d1bd1cb6295b3c0740a1489404867f29881f407a864b03"
+        ],
+        [
+          "kuchyna_novak/dodavatel.txt",
+          "8edcdee25990c1d35fd147a17bbe84bf818c5132241e75d11fe1f2eee42e2df7"
+        ]
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Rozpočet uložený: 1282,00 € → «DIR»/Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx · POZOR: 3 riadkov rozpočtu nemá cenu — suma je podhodnotená (položky v dokumente sú, v cene nie) — export si potvrdil",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.hardware_expansion",
+        "PC.sheets_map",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "PC.export_confirmations",
+        "ES.last_dir",
+        "UI.savepanel",
+        "XlsxWriter.write_book",
+        "XlsxWriter.write",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx",
+          "24414c4587b305b7588506880df706dfe8aed9b97c04c7372b95d68012a0961c"
+        ],
+        [
+          "kuchyna_novak/dodavatel.txt",
+          "8edcdee25990c1d35fd147a17bbe84bf818c5132241e75d11fe1f2eee42e2df7"
+        ]
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Cenová ponuka uložená: 1282,00 € · 7 riadkov · špecifikácia 6 položiek → «DIR»/Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx · POZOR: 3 riadkov rozpočtu nemá cenu — suma je podhodnotená (položky v dokumente sú, v cene nie) — export si potvrdil",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "«DIR»",
+          "name": "Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx"
+        }
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "Bom.compute",
+        "PC.sheets_map",
+        "PC.hardware_expansion",
+        "PC.budget_payload",
+        "PC.budget_std_block",
+        "CpExport.specification",
+        "PC.drawer_stop(:all)",
+        "PC.dup_partition",
+        "PC.export_confirmations",
+        "ES.last_dir",
+        "UI.savepanel",
+        "CpExport.firewall_hits",
+        "XlsxWriter.write_book",
+        "ES.save_last_dir",
+        "PC.pending_name_note",
+        "PC.default_name_note",
+        "status"
+      ],
+      "counts": {
+        "edges_map": 2,
+        "fresh_collect": 1,
+        "hardware_catalog_items": 1,
+        "sheets_map": 1
+      },
+      "expansions": 1,
+      "files": [
+        [
+          "Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx",
+          "75dbb53b54ee6424dd6a18bc08f6079e9a5b3602282c399f1ea38e939e7c0d0b"
+        ],
+        [
+          "kuchyna_novak/dodavatel.txt",
+          "8edcdee25990c1d35fd147a17bbe84bf818c5132241e75d11fe1f2eee42e2df7"
+        ]
+      ]
+    }
+  },
+  "chrbat_cut_size_invalid": {
+    "vepo": {
+      "export": "do_export",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: poškodený rozmer do nárezu (CAB-002) — prestav skrinku.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: true)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: poškodený rozmer do nárezu (CAB-002) — prestav skrinku.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: poškodený rozmer do nárezu (CAB-002) — prestav skrinku.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: poškodený rozmer do nárezu (CAB-002) — prestav skrinku.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    }
+  },
+  "chrbat_back_groove_edged": {
+    "vepo": {
+      "export": "do_export",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: chrbát v drážke s olepením (CAB-002) — zruš olepenie alebo zmeň typ chrbta.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: true)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: chrbát v drážke s olepením (CAB-002) — zruš olepenie alebo zmeň typ chrbta.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: chrbát v drážke s olepením (CAB-002) — zruš olepenie alebo zmeň typ chrbta.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: chrbát v drážke s olepením (CAB-002) — zruš olepenie alebo zmeň typ chrbta.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    }
+  },
+  "chrbat_back_groove_incomplete": {
+    "vepo": {
+      "export": "do_export",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: chrbát v drážke bez rozmeru do nárezu (CAB-002) — prestav skrinku.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: true)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: chrbát v drážke bez rozmeru do nárezu (CAB-002) — prestav skrinku.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: chrbát v drážke bez rozmeru do nárezu (CAB-002) — prestav skrinku.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: chrbát v drážke bez rozmeru do nárezu (CAB-002) — prestav skrinku.",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    }
+  },
+  "chrbat_back_groove_stale": {
+    "vepo": {
+      "export": "do_export",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: chrbát v drážke zo staršej verzie (do nárezu by išiel v rozmere modelu) (CAB-002) — prestav skrinky (Kontrola → Prestaviť zastarané skrinky).",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: true)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: chrbát v drážke zo staršej verzie (do nárezu by išiel v rozmere modelu) (CAB-002) — prestav skrinky (Kontrola → Prestaviť zastarané skrinky).",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: chrbát v drážke zo staršej verzie (do nárezu by išiel v rozmere modelu) (CAB-002) — prestav skrinky (Kontrola → Prestaviť zastarané skrinky).",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: chrbát v drážke zo staršej verzie (do nárezu by išiel v rozmere modelu) (CAB-002) — prestav skrinky (Kontrola → Prestaviť zastarané skrinky).",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    }
+  },
+  "chrbat_back_rail_stale": {
+    "vepo": {
+      "export": "do_export",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: chrbát pri výstuhách na výšku zo staršej verzie (môže prechádzať zadnou výstuhou) (CAB-002) — prestav skrinky (Kontrola → Prestaviť zastarané skrinky).",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: true)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "hw_csv": {
+      "export": "do_hw_csv",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: chrbát pri výstuhách na výšku zo staršej verzie (môže prechádzať zadnou výstuhou) (CAB-002) — prestav skrinky (Kontrola → Prestaviť zastarané skrinky).",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "budget": {
+      "export": "do_budget_xlsx",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: chrbát pri výstuhách na výšku zo staršej verzie (môže prechádzať zadnou výstuhou) (CAB-002) — prestav skrinky (Kontrola → Prestaviť zastarané skrinky).",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    },
+    "offer": {
+      "export": "do_cp_xlsx",
+      "status": "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: chrbát pri výstuhách na výšku zo staršej verzie (môže prechádzať zadnou výstuhou) (CAB-002) — prestav skrinky (Kontrola → Prestaviť zastarané skrinky).",
+      "error": true,
+      "statuses": 1,
+      "repush": 0,
+      "pickers": [
+
+      ],
+      "last_dir_before": "«DIR»",
+      "last_dir": "«DIR»",
+      "order": [
+        "ES.refresh",
+        "PC.export_expect_check(merge: false)",
+        "PC.fresh_collect",
+        "PC.newer_config_stop",
+        "PC.cut_stop",
+        "status"
+      ],
+      "counts": {
+        "fresh_collect": 1
+      },
+      "expansions": 0,
+      "files": [
+
+      ]
+    }
+  }
+}
