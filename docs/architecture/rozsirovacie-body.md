@@ -2,8 +2,8 @@
 
 > **Časť mapy modulov Noxun Engine.** Rozcestník a kľúčové invarianty sú
 > v [../ARCHITEKTURA.md](../ARCHITEKTURA.md).
-> **Čo to je:** kontrolný zoznam miest pre sedem najčastejších rozšírení — nový typ skrinky, nová rola dielca, nový stĺpec Kusovníka,
-> nová sekcia Štúdia, nové pravidlo kovania viazané na typ, nový set alebo systém kovania a nové úložisko na počítači. Detail každého miesta je v odseku jeho modulu (Grep `^### <súbor>`).
+> **Čo to je:** kontrolný zoznam miest pre osem najčastejších rozšírení — nový typ skrinky, nová rola dielca, nový stĺpec Kusovníka,
+> nová sekcia Štúdia, nové pravidlo kovania viazané na typ, nový set alebo systém kovania, nové úložisko na počítači a nový výstup (export). Detail každého miesta je v odseku jeho modulu (Grep `^### <súbor>`).
 > **Ako sa číta:** tabuľky menujú **súbor a mená** (konštanta, modul, funkcia) — nikdy čísla riadkov. Riadok tabuľky, ktorý začína
 > cestou v spätných apostrofoch, stráži `tests/pure/test_h13_rozsirovacie_body.rb`: súbor musí existovať a každé meno z druhého
 > stĺpca v ňom musí byť. Meno `Modul::ČLEN` alebo `Modul.metóda` sa hľadá **v rozsahu toho modulu** (súbor, ktorý modul nedeklaruje,
@@ -192,7 +192,28 @@ modul a formát súboru = dávka **audit-povinná**. Súpis: [kniznice.md](knizn
 | `tests/h16_first_use.rb` | `UsageStats.record` | krok prvého behu, ak súbor vzniká bez okna |
 | `docs/architecture/kniznice.md` | `LibraryRegistry` · `WRITE_SITES` | riadok súpisu (časť 2 alebo 3) |
 
+## 8 · Nový výstup (export)
+
+Nový súbor zo zákazky (výkresy, etikety, CNC…). Úvod exportu — generácia okna, červené polia, čerstvé nastavenia, brána `expect`, čerstvý zber,
+novšia schéma a chrbát — sa **neopisuje**: robí ho `ExportPrep.start` a dáta (overený názov, kusovník, kovanie, rozpočet, kontrola) dáva lenivý
+`ExportPrep::Context`. Vlastné brány druhu výstupu (napr. kit, duplicity, potvrdenie cien) má export sám, v poradí pred výberom súboru. Výstup,
+ktorý mení výrobné alebo cenové čísla či súbory, je dávka **výrobná/cenová**; nový modul = **audit-povinná**.
+
+| Súbor | Mená | Čo tam urobiť |
+|---|---|---|
+| `noxun_engine/ui/export_prep.rb` | `ExportPrep::KINDS` · `ExportPrep.start` · `ExportPrep::Context` | riadok `kľúč: 'do_<výstup>'` v inventári; čítačka kontextu, ak výstup potrebuje nové dáta zákazky |
+| `noxun_engine/ui/production_core.rb` | `ProductionCore.do_export` · `ProductionCore.export_file_names` · `ProductionCore.pending_name_note` · `ProductionCore.default_name_note` | `do_<výstup>`: `ctx = ExportPrep.start(…)` · `return unless ctx` → vlastné brány → picker → zápis → `save_last_dir` → vety názvu (`ctx.name_note`); vlastný `rescue`; meno súboru aj do `export_file_names` (tooltip) |
+| `noxun_engine/ui/studio_dialog.rb` | `StudioDialog.handle_export` · `StudioDialog.push_vepo_bar` | obal a callback okna; po návrate `push_vepo_bar` (echo hlavičky) |
+| `noxun_engine/ui/js/studio.js` | `nxVepoExpect` | volanie z okna nesie `expect` (názov a 18 + 36, ktoré okno ukazuje) |
+| `tests/pure/h17_harness.rb` | `NxH17.g1_cases` · `NxH17.g2_triggers` | prípad šťastnej cesty v golden H17 (matica odmietnutí G2 beží nad `KINDS` sama) |
+| `docs/architecture/outputs.md` | `export_prep.rb` | odsek výstupu a riadok v tabuľke exportov |
+
+**Čo ťa zastaví:** `tests/pure/test_h17_export_prep.rb` R4 b — funkcia so `UI.savepanel` / `UI.select_directory`, ktorá nie je v `KINDS` alebo nezačína
+`ExportPrep.start`, zhodí test („nový výstup: pridaj riadok do ExportPrep::KINDS a začni ExportPrep.start — žiadna kópia úvodu"); matica G2 overí, že nový
+export odmietnutie úvodu **rešpektuje** (picker ani zápis pri spúšťačoch úvodu). Pred mergom výstupnej dávky orchestrátor porovná ručné exporty testovacej
+zákazky z mainu a z vetvy (P == K).
+
 ## História
 
 Kapitola vznikla dávkou H13 bloku 9 · HARDENING (krížový audit V1, B-06/CN-02, CN-03) ako náhrada súpisu, ktorý žil len v archíve
-rohovej skrinky (`SYSTEM/archiv/bloky/ROHOVA/FAKTY_Z_KODU_2026-09-27.md` §1.2 a §2.6, s číslami riadkov k v0.14.0) a v package H12 §0. Scenár 6: H15b. Scenár 7: H16.
+rohovej skrinky (`SYSTEM/archiv/bloky/ROHOVA/FAKTY_Z_KODU_2026-09-27.md` §1.2 a §2.6, s číslami riadkov k v0.14.0) a v package H12 §0. Scenár 6: H15b. Scenár 7: H16. Scenár 8: H17a.

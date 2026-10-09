@@ -312,7 +312,8 @@ module Noxun
       # Je to nastavenie POCITACA, presne ako `last_dir`/`merge_18_36`: ziadny
       # zapis do modelu, ziadny krok Spat. VSETKY styri exporty (VEPO, CSV
       # kovania, XLSX rozpoctu, XLSX cenovej ponuky) citaju `project_name(model)`
-      # — z klienta uz nazov neprichadza.
+      # cez branu `expect` v spolocnej priprave `ExportPrep.start` (H17) — z klienta
+      # uz nazov neprichadza.
       #
       # KLUC JE CESTA SUBORU, NIE `model.guid` (review PR #193 P1). SketchUp
       # dokumentuje, ze guid sa MENI po kazdom ulozeni modelu — na guid kluci by
