@@ -487,15 +487,25 @@ if NxTest.headless?
 end
 
 NxTest.test('D-143: brana je vo VSETKYCH STYROCH exportoch hned po zbere a PRED pickerom') do
+  # H17a (R5): poradie zber -> novsia schema -> chrbat zije v `ExportPrep.start`
+  # (jedno miesto); telo KAZDEHO exportu ho vola PRED expanziou aj pickerom.
+  # Spravanie (picker 0, expanzia 0 pri kazdom kode `CUT_BLOCKERS`) dokazuje
+  # matica G2 `test_h17_golden.rb` (chrbat_*), poradie krokov G4.
   s = NxKon0.src('noxun_engine', 'ui', 'production_core.rb')
-  %w[do_export do_hw_csv do_budget_xlsx do_cp_xlsx].each do |m|
+  start = NxKon0.src('noxun_engine', 'ui', 'export_prep.rb')[/def start\(.*?\n      end\n/m].to_s
+  i_col = start.index('ctx = Context.new(model, kind, gate)')
+  i_new = start.index('ProductionCore.newer_config_stop(ctx.collected)')
+  i_cut = start.index('ProductionCore.cut_stop(ctx.collected)')
+  NxTest.assert(i_col && i_new && i_cut && i_col < i_new && i_new < i_cut,
+                'spolocna priprava: zber -> novsia schema -> brana D-143')
+  NxTest.assert(start.index("\n        ctx\n") > i_cut, 'kontext sa vrati az po brane chrbta')
+  Noxun::Engine::ExportPrep::KINDS.each do |kind, m|
     body = s[/def #{m}\b.*?\n      rescue StandardError/m].to_s
     NxTest.refute(body.empty?, m)
-    i_col = body.index('fresh_collect(model)')
-    i_cut = body.index('cut_stop(collected)')
+    i_start = body.index("ExportPrep.start(model, data, #{kind.inspect},")
     picker = body.index('UI.select_directory') || body.index('UI.savepanel')
-    NxTest.assert(i_cut && i_col < i_cut && i_cut < picker, "#{m}: poradie zber -> brana D-143 -> picker")
-    NxTest.assert(i_cut < (body.index('hardware_expansion(') || picker), "#{m}: brana pred expanziou")
+    NxTest.assert(i_start && i_start < picker, "#{m}: poradie priprava (zber -> brana D-143) -> picker")
+    NxTest.assert(i_start < (body.index('ctx.hw_exp') || picker), "#{m}: brana pred expanziou")
   end
 end
 

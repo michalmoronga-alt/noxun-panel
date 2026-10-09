@@ -576,9 +576,17 @@ NxTest.test('KOV-H1/GHOST-D1 (B3): `newer_configs` zastavi VSETKY STYRI exporty 
 
   # GHOST-D1: branu vola PRAVE STYRI exporty (VEPO uz vynimku nema) a PRAVE
   # cez jedno miesto (`newer_config_stop`), aby sa nedala v jednom zabudnut.
+  # H17a (R5): to jedno miesto je `ExportPrep.start`; KAZDY export z `KINDS`
+  # (VEPO, nakupny CSV, rozpocet XLSX, ponuka XLSX) ho vola so svojim klucom.
   src = NxKovh1.src('ui/production_core.rb')
-  NxTest.assert_equal(4, src.scan('newer_stop = newer_config_stop(collected)').length,
-                      'styri exporty: VEPO, nakupny CSV, rozpocet XLSX, ponuka XLSX')
+  prep = NxKovh1.src('ui/export_prep.rb')
+  NxTest.assert_equal(1, prep.scan('ProductionCore.newer_config_stop(').length, 'brana v spolocnej priprave prave raz')
+  Noxun::Engine::ExportPrep::KINDS.each do |kind, meth|
+    body = src[/def #{meth}\(model, data, generation:, status:, repush:\).*?\n      rescue StandardError/m].to_s
+    NxTest.assert(body.include?("ExportPrep.start(model, data, #{kind.inspect},"),
+                  "#{meth}: zacina spolocnou pripravou (brana novsej schemy)")
+  end
+  NxTest.assert_equal(0, src.scan('newer_stop = newer_config_stop(').length, 'ziadna kopia brany v tele exportu')
   NxTest.assert_equal(1, src.scan('newer: newer_configs(collected)').length,
                       'jedine miesto, kde sa `newer:` sklada — `newer_config_stop`')
 end

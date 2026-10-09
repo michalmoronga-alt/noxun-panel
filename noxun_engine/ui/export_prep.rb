@@ -117,12 +117,16 @@ module Noxun
       # Spolocny uvod exportu `kind` (kluc `KINDS`). -> `Context`, alebo `nil`,
       # ked sa export zastavil (veta uz odisla cez `status`). Poradie je ZAVAZNE:
       #
-      #  1. generacia okna — klik z okna, ktoreho payload uz neplati (medzitym
-      #     prepnuty dokument alebo push z ineho miesta) -> okno sa obnovi
-      #     (`repush`) a povie to. VEDOMA ZMENA (audit #15): CSV kovania tento
-      #     guard predtym NEMAL — zosuladenie, nie nova ochrana. CO NECHYTA:
-      #     prestavbu skrinky z Inspectora (generaciu nezdviha); na tu je
-      #     poistkou CERSTVY zber nizsie, nie DOM.
+      #  1. generacia okna. VEDOMA ZMENA (audit #15): CSV kovania tento guard
+      #     predtym NEMAL — ako jediny zo styroch exportov. Zosuladenie, nie nova
+      #     ochrana: CO GUARD NAOZAJ CHYTA je klik z okna, ktoreho payload uz
+      #     neplati — medzitym PREPNUTY DOKUMENT (`on_model_changed` zdvihne
+      #     generaciu) alebo push, ktory si okno medzitym vyziadalo odinakial
+      #     (refresh, zmena katalogu, zapis z ineho okna). CO NECHYTA: prestavbu
+      #     skrinky z Inspectora — tá generaciu NEZDVIHA. Na tú je poistkou to,
+      #     ze data sa aj tak pocitaju z CERSTVEHO zberu (`fresh_collect`
+      #     v `Context#collected`) az v exporte, nie z toho, co drzi DOM.
+      #     Odmietnutie nie je tiche — okno sa obnovi (`repush`) a povie to.
       #  2. cervene polia panela (`flush_blocked`).
       #  3. `ExportSettings.refresh` (1b-6c): nazov aj 18 + 36 z CERSTVEHO suboru.
       #  4. brana `expect` (H7b §16 B2, §17 C1): okno musi vidiet to, co plati —

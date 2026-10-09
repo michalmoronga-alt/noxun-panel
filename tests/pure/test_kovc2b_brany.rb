@@ -174,7 +174,8 @@ NxTest.test('KOV-C2b (R4): brana bezi PRED vyberom priecinka vo VSETKYCH styroch
     NxTest.assert(picker.nil? || body.index('drawer_stop') < picker,
                   "#{m}: brana musi padnut PRED vyberom suboru/priecinka")
   end
-  NxTest.assert(s.include?('drawer_stop(collected, hw_exp, scope: :kit)'),
+  # H17a: zber a expanzia idu z kontextu exportu (`ExportPrep::Context`).
+  NxTest.assert(s.include?('drawer_stop(ctx.collected, ctx.hw_exp, scope: :kit)'),
                 'VEPO ma branu LEN na chybajuci kit')
 end
 
