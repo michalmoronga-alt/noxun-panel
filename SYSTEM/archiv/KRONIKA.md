@@ -17,6 +17,13 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **Oprava faktu o effort subagenta (10.10.2026, PR #?, docs).** WORKFLOW § 2 „Matica výberu" tvrdil (PR #465), že effort sa pri volaní
+  Agent tool nedá nastaviť. Neplatí od Claude Code v2.1.292: Agent tool má parameter `effort` (nie pre fork), ktorý prepíše `effort:`
+  definície; `CLAUDE_CODE_EFFORT_LEVEL` má prednosť pred oboma (code.claude.com/docs/en/sub-agents, overené 10.10.2026; zistené pri
+  benchmarku OCR+Grok, PR #468). Veta opravená: parameter sa použije len na výslovnú žiadosť Michala, CLAUDE.md alebo skillu, inak platí
+  effort z definície typu — profily (model + effort) ostávajú. Grep `.claude/`, `SYSTEM/`, `docs/`: iný výskyt nie je (záznam PR #465 nižšie
+  ostáva ako história). VERSION ani STAV bez zmeny.
+
 - **H17a · spoločná príprava exportov `ExportPrep` (9.10.2026, PR #467, v0.17.29, blok 9 HARDENING, C-06, prvý rez R-15).** Michal 9.10.: H17-0 (nástroj porovnania
   exportov) **zrušené**, robí sa len refaktor ([package](../zdroje/bloky/HARDENING/PACKAGE_H17.md) §00 má prednosť; audit návrhu §15 platí). Nový modul `ui/export_prep.rb`:
   `ExportPrep.start` = generácia → flush → `ExportSettings.refresh` → brána `expect` **práve raz** (`merge: kind == :vepo`) → čerstvý zber → novšia schéma → chrbát
