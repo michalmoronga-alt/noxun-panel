@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **Docs · benchmark review Open Code Review + Grok vs. GitHub Codex (10.10.2026, PR #?).** Na pokyn Michala (šetrenie Codex kvóty):
+- **Docs · benchmark review Open Code Review + Grok vs. GitHub Codex (10.10.2026, PR #468).** Na pokyn Michala (šetrenie Codex kvóty):
   10 zmergovaných PR (#466, #457, #456, #455, #454, #438, #434, #465 + čisté #453, #437; 18 nálezov Codexu, 1× P1) na verzii, ktorú videl
   Codex, v izolovaných plytkých kópiách; OCR v1.12.13 v režime delegovania, review Grok Build `grok-4.7` cez oficiálny plugin (len čítanie),
   vyhodnotenie novým subagentom. Kolo 1 (systémové pravidlá OCR): záchyt 5/18 (28 %), 0 planých, 3 pravdivé navyše. Kolo 2 (projektové
