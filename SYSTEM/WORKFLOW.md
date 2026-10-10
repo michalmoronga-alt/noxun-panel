@@ -81,9 +81,11 @@ na rad, až keď primárny agent roly nemôže a čakanie nepripadá do úvahy (
 ### Matica výberu (schválil Michal 7.10.2026)
 
 Zámer: prispôsobiť agenta náročnosti dávky, rozložiť usage medzi poskytovateľov, znížiť spotrebu a zvýšiť efektivitu bez straty kvality.
-**Effort sa pri volaní Agent tool nedá nastaviť** — len `effort:` v definícii typu (`low`/`medium`/`high`/`xhigh`/`max`); parameter `model:`
-pri volaní prepíše model, effort nie (zdroj: code.claude.com/docs/en/sub-agents, overené 7.10.2026). Preto typy agentov sú **profily**
-(pevná dvojica model + effort) a výber profilu = výber typu.
+**Effort subagenta určuje `effort:` v definícii typu** (`low`/`medium`/`high`/`xhigh`/`max`). Agent tool má od Claude Code v2.1.292 aj
+parameter `effort` pri volaní (nie pre fork) — prepíše `effort:` definície a platí aj po pokračovaní subagenta; premenná
+`CLAUDE_CODE_EFFORT_LEVEL` má prednosť pred oboma. Orchestrátor ho **použije len vtedy, keď to výslovne žiada Michal, CLAUDE.md alebo
+skill**; inak platí effort z definície typu. Parameter `model:` pri volaní prepíše model (zdroj: code.claude.com/docs/en/sub-agents,
+overené 7.10. a 10.10.2026). Preto typy agentov ostávajú **profily** (pevná dvojica model + effort) a výber profilu = výber typu.
 
 **Triedy dávok** (záväzné definície tried a prednosť Ť > S > Ľ sú v CLAUDE.md, sekcia „Roly a modely“; tu je ich mapovanie na profily; triedu určuje orchestrátor pri zadaní dávky):
 

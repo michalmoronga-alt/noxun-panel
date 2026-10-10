@@ -17,6 +17,13 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **Oprava faktu o effort subagenta (10.10.2026, PR #469, docs).** WORKFLOW § 2 „Matica výberu" tvrdil (PR #465), že effort sa pri volaní
+  Agent tool nedá nastaviť. Neplatí od Claude Code v2.1.292: Agent tool má parameter `effort` (nie pre fork), ktorý prepíše `effort:`
+  definície; `CLAUDE_CODE_EFFORT_LEVEL` má prednosť pred oboma (code.claude.com/docs/en/sub-agents, overené 10.10.2026; zistené pri
+  benchmarku OCR+Grok, PR #468). Veta opravená: parameter sa použije len na výslovnú žiadosť Michala, CLAUDE.md alebo skillu, inak platí
+  effort z definície typu — profily (model + effort) ostávajú. Grep `.claude/`, `SYSTEM/`, `docs/`: iný výskyt nie je (záznam PR #465 nižšie
+  ostáva ako história). VERSION ani STAV bez zmeny.
+
 - **Docs · benchmark review Open Code Review + Grok vs. GitHub Codex (10.10.2026, PR #468).** Na pokyn Michala (šetrenie Codex kvóty):
   10 zmergovaných PR (#466, #457, #456, #455, #454, #438, #434, #465 + čisté #453, #437; 18 nálezov Codexu, 1× P1) na verzii, ktorú videl
   Codex, v izolovaných plytkých kópiách; OCR v1.12.13 v režime delegovania, review Grok Build `grok-4.7` cez oficiálny plugin (len čítanie),
