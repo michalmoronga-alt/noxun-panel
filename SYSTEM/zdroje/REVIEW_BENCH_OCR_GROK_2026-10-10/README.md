@@ -36,7 +36,8 @@ hlavne pri dokumentačných a workflow PR. Kapacita Groka nie je neobmedzená: 2
 - **Kolo 2:** projektové pravidlá [ocr_rule_noxun.json](ocr_rule_noxun.json) (26 pravidiel podľa typu súboru, `.md` zapnuté, `tests/fixtures` vynechané)
   + `--effort high`. Pravidlá napísal subagent **len z dokumentácie** (bez KRONIKY, DOGFOODINGU a histórie PR). Verzia v repe je **po review #468
   spresnená** v 4 pravidlách (chýbajúci kľúč, čerstvá inštalácia zo seedov, `PR #?` pri otvorení PR, prázdny `model_guid` v zdokumentovaných
-  cestách) — kolo 2 bežalo s pôvodnou; pôvodné pravidlo o `PR #?` vyrobilo oba plané nálezy.
+  cestách); aby sa zmestili do limitu ~2500 znakov, z troch pravidiel (výrobné výstupy, jadro, perzistencia) vypadlo aj zopár
+  vedľajších kontrolných bodov — pôvodné znenie je v commite 3c3cbb2f. Kolo 2 bežalo s pôvodnou verziou; pôvodné pravidlo o `PR #?` vyrobilo oba plané nálezy.
 
 ## Výsledky
 
