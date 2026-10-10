@@ -21,7 +21,7 @@
   10 zmergovaných PR (#466, #457, #456, #455, #454, #438, #434, #465 + čisté #453, #437; 18 nálezov Codexu, 1× P1) na verzii, ktorú videl
   Codex, v izolovaných plytkých kópiách; OCR v1.12.13 v režime delegovania, review Grok Build `grok-4.7` cez oficiálny plugin (len čítanie),
   vyhodnotenie novým subagentom. Kolo 1 (systémové pravidlá OCR): záchyt 5/18 (28 %), 0 planých, 3 pravdivé navyše. Kolo 2 (projektové
-  pravidlá + effort high): 5 + 1 čiastočne (28/33 %), 2 plané, presnosť 63–69 %; P1 minul v oboch. 20 behov = 52 % týždenného limitu Groka.
+  pravidlá + effort high): 5 + 1 čiastočne (28/33 %), 2 plané (chybné pravidlo o `PR #?`, opravené po review), presnosť 69–88 %; P1 minul v oboch. 20 behov = 52 % týždenného limitu Groka.
   Záver: náhrada GH Codex review **nie**, doplnkový kontrolór docs PR áno (návrh, nerozhodnuté). Podklad:
   [REVIEW_BENCH_OCR_GROK_2026-10-10](../zdroje/REVIEW_BENCH_OCR_GROK_2026-10-10/README.md). Pravidlá, VERSION ani STAV sa nemenia.
 

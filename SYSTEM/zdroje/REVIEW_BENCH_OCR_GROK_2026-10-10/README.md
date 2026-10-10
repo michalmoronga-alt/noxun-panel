@@ -34,7 +34,9 @@ hlavne pri dokumentačných a workflow PR. Kapacita Groka nie je neobmedzená: 2
   (PRAVDIVÝ / SPORNÝ / PLANÝ).
 - **Kolo 1:** systémové pravidlá OCR (Ruby nemá vlastné — len všeobecný zoznam; `.md` OCR štandardne vynecháva), effort predvolený.
 - **Kolo 2:** projektové pravidlá [ocr_rule_noxun.json](ocr_rule_noxun.json) (26 pravidiel podľa typu súboru, `.md` zapnuté, `tests/fixtures` vynechané)
-  + `--effort high`. Pravidlá napísal subagent **len z dokumentácie** (bez KRONIKY, DOGFOODINGU a histórie PR).
+  + `--effort high`. Pravidlá napísal subagent **len z dokumentácie** (bez KRONIKY, DOGFOODINGU a histórie PR). Verzia v repe je **po review #468
+  spresnená** v 4 pravidlách (chýbajúci kľúč, čerstvá inštalácia zo seedov, `PR #?` pri otvorení PR, prázdny `model_guid` v zdokumentovaných
+  cestách) — kolo 2 bežalo s pôvodnou; pôvodné pravidlo o `PR #?` vyrobilo oba plané nálezy.
 
 ## Výsledky
 
@@ -43,8 +45,8 @@ hlavne pri dokumentačných a workflow PR. Kapacita Groka nie je neobmedzená: 2
 | nálezov Groka | 8 | 16 |
 | zhody s Codexom (z 18) | 5 (28 %) | 5 + 1 čiastočne (28 / 33 %) |
 | pravdivé nálezy navyše | 3 | 5 (+ 3 sporné) |
-| plané poplachy | 0 | 2 |
-| presnosť (pravdivé / všetky) | 100 % | 63–69 % |
+| plané poplachy | 0 | 2 (oba z chybného pravidla o `PR #?`) |
+| presnosť (potvrdené / všetky) | 100 % | 69 % (88 %, ak sa potvrdia 3 sporné) |
 | P1 v #465 | minul | minul |
 | čas na PR | 2–30 min | 9–21 min |
 
