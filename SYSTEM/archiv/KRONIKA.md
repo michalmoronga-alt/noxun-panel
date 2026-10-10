@@ -17,6 +17,14 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **Docs · benchmark review Open Code Review + Grok vs. GitHub Codex (10.10.2026, PR #?).** Na pokyn Michala (šetrenie Codex kvóty):
+  10 zmergovaných PR (#466, #457, #456, #455, #454, #438, #434, #465 + čisté #453, #437; 18 nálezov Codexu, 1× P1) na verzii, ktorú videl
+  Codex, v izolovaných plytkých kópiách; OCR v1.12.13 v režime delegovania, review Grok Build `grok-4.7` cez oficiálny plugin (len čítanie),
+  vyhodnotenie novým subagentom. Kolo 1 (systémové pravidlá OCR): záchyt 5/18 (28 %), 0 planých, 3 pravdivé navyše. Kolo 2 (projektové
+  pravidlá + effort high): 5 + 1 čiastočne (28/33 %), 2 plané, presnosť 63–69 %; P1 minul v oboch. 20 behov = 52 % týždenného limitu Groka.
+  Záver: náhrada GH Codex review **nie**, doplnkový kontrolór docs PR áno (návrh, nerozhodnuté). Podklad:
+  [REVIEW_BENCH_OCR_GROK_2026-10-10](../zdroje/REVIEW_BENCH_OCR_GROK_2026-10-10/README.md). Pravidlá, VERSION ani STAV sa nemenia.
+
 - **H17a · spoločná príprava exportov `ExportPrep` (9.10.2026, PR #467, v0.17.29, blok 9 HARDENING, C-06, prvý rez R-15).** Michal 9.10.: H17-0 (nástroj porovnania
   exportov) **zrušené**, robí sa len refaktor ([package](../zdroje/bloky/HARDENING/PACKAGE_H17.md) §00 má prednosť; audit návrhu §15 platí). Nový modul `ui/export_prep.rb`:
   `ExportPrep.start` = generácia → flush → `ExportSettings.refresh` → brána `expect` **práve raz** (`merge: kind == :vepo`) → čerstvý zber → novšia schéma → chrbát
