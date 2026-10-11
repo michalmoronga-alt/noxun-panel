@@ -213,13 +213,22 @@ NxTest.test('export_compare: XLSX — povolene LEN vygenerovane datum v titulku 
     p_date = w.call('p1.xlsx', zipf.call(sheet.call('Rozpočet X - AKT. 10.10. 2026', 10)))
     p_both = w.call('p2.xlsx', zipf.call(sheet.call('Rozpočet X - AKT. 10.10. 2026', 11)))
     p_name = w.call('p3.xlsx', zipf.call(sheet.call('Rozpočet Y - AKT. 9.10. 2026', 10)))
+    # rovnaky text BEZ „- AKT.“, lisi sa LEN datum => vseobecna maska by dala :ok, vzor titulku nie
+    k_free = w.call('k_free.xlsx', zipf.call(sheet.call('Rozpočet X, vystavene 9.10. 2026', 10)))
     p_free = w.call('p4.xlsx', zipf.call(sheet.call('Rozpočet X, vystavene 10.10. 2026', 10)))
+    # titulok cenovej ponuky: „CENOVÁ PONUKA <meno> - AKT. d.m.rrrr“ (bez medzery, cp_export.rb)
+    k_cp = w.call('k_cp.xlsx', zipf.call(sheet.call('CENOVÁ PONUKA X - AKT. 9.10.2026', 10)))
+    p_cp = w.call('p_cp.xlsx', zipf.call(sheet.call('CENOVÁ PONUKA X - AKT. 10.10.2026', 10)))
+    p_cp_val = w.call('p_cp2.xlsx', zipf.call(sheet.call('CENOVÁ PONUKA X - AKT. 10.10.2026', 11)))
     v, note, = ec.cmp_xlsx(k, p_date)
     NxTest.assert_equal(:ok, v, note)
     NxTest.assert(note.include?('xl/worksheets/sheet1.xml'), note)
+    v, note, = ec.cmp_xlsx(k_cp, p_cp)
+    NxTest.assert_equal(:ok, v, "ponuka bez medzery: #{note}")
+    NxTest.assert_equal(:diff, ec.cmp_xlsx(k_cp, p_cp_val).first, 'ponuka: datum + hodnota = rozdiel')
     NxTest.assert_equal(:diff, ec.cmp_xlsx(k, p_both).first, 'datum + hodnota v tom istom XML = rozdiel')
     NxTest.assert_equal(:diff, ec.cmp_xlsx(k, p_name).first, 'ine meno v titulku = rozdiel')
-    NxTest.assert_equal(:diff, ec.cmp_xlsx(k, p_free).first, 'datum mimo vzoru titulku (vseobecna maska) = rozdiel')
+    NxTest.assert_equal(:diff, ec.cmp_xlsx(k_free, p_free).first, 'datum mimo vzoru titulku (vseobecna maska) = rozdiel')
   end
 end
 
@@ -348,6 +357,9 @@ NX_EXPPROBE_HARNESS = <<~'RUBY'
               if name == 'do_hw_csv' && MODE == 'terminal' # rescue exportu PO zapise suboru
                 msg = 'Export zlyhal: boom'
                 red = true
+              elsif name == 'do_export' && MODE == 'nocsv' # VEPO: ziadny CSV (LOG sa zapisal)
+                msg = "Export nevytvoril žiadny CSV — 3 chybných riadkov. Dôvody v LOGu: #{dir}"
+                red = true
               elsif name == 'do_hw_csv' && MODE == 'warn' # uspech s cervenym varovanim
                 msg = "Nákupný zoznam: 18 položiek + 3 nemapovaných (v CSV aj KONTROLE) → #{dir}"
                 red = true
@@ -419,6 +431,10 @@ NxTest.test('export sonda: koncova chybova veta exportu (aj po zapise suboru) = 
   fails = r['log'].lines.grep(/^FAIL:/)
   NxTest.assert_equal(1, fails.length, fails.inspect)
   NxTest.assert(fails.first.include?('do_hw_csv') && fails.first.include?('koncova chyba exportu'), fails.first)
+  r = nx_expprobe_run('nocsv')
+  fails = r['log'].lines.grep(/^FAIL:/)
+  NxTest.assert_equal(1, fails.length, fails.inspect)
+  NxTest.assert(fails.first.include?('do_export') && fails.first.include?('koncova chyba exportu'), fails.first)
   r = nx_expprobe_run('warn')
   NxTest.assert(r['log'].include?('"err":true'), 'varovanie je cervena udalost')
   NxTest.refute(r['log'].include?('FAIL:'), 'cervene varovanie pri uspechu nie je FAIL')
@@ -428,6 +444,8 @@ NxTest.test('export sonda: koncova chybova veta exportu (aj po zapise suboru) = 
    '"Export cenovej ponuky zlyhal: #{e.message}"'].each do |s|
     NxTest.assert(pc.include?("status.call(#{s}, true)"), "production_core.rb: #{s}")
   end
+  NxTest.assert(pc.include?('status.call("Export nevytvoril žiadny CSV — #{result[\'errors\'].length} chybných riadkov. "'),
+                'production_core.rb: veta VEPO „Export nevytvoril žiadny CSV“')
   probe = NxExpCmp.read('tests', 'sketchup', 'su_export_probe.rb')
   NxTest.assert(probe.include?('TERMINAL_ERROR'), 'sonda: TERMINAL_ERROR')
 end

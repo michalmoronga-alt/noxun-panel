@@ -26,9 +26,9 @@ module NoxunExportProbe
   METHODS = %w[do_export do_hw_csv do_budget_xlsx do_cp_xlsx].freeze
   # Koncove chybove vety `rescue` exportov v production_core.rb (do_export: „Chyba exportu: …“,
   # do_hw_csv: „Export zlyhal: …“, rozpocet: „Export rozpočtu zlyhal: …“, ponuka: „Export cenovej
-  # ponuky zlyhal: …“) a zlyhanie zostavenia rozpoctu. Cervena veta uspechu (napr. „+ 3 nemapovanych“)
+  # ponuky zlyhal: …“), zlyhanie zostavenia rozpoctu a VEPO „Export nevytvoril žiadny CSV — N chybných riadkov“. Cervena veta uspechu (napr. „+ 3 nemapovanych“)
   # sem nepatri.
-  TERMINAL_ERROR = /\A(Chyba exportu: |Export zlyhal: |Export rozpočtu zlyhal: |Export cenovej ponuky zlyhal: |Rozpočet sa nepodarilo zostaviť)/.freeze
+  TERMINAL_ERROR = /\A(Chyba exportu: |Export zlyhal: |Export rozpočtu zlyhal: |Export cenovej ponuky zlyhal: |Rozpočet sa nepodarilo zostaviť|Export nevytvoril žiadny CSV)/.freeze
   READY_TIMEOUT_S = 120
   POLL_S = 2.0
   GRACE_S = 4.0

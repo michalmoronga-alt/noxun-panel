@@ -25,7 +25,7 @@ module ExportCompare
   STAMP = /\d{4}-\d{2}-\d{2} \d{2}:\d{2}/n
   DATE_DOT = /(?<!\d)\d{1,2}\.\s?\d{1,2}\.\s?\d{4}(?!\d)/
   SHEET_TITLE_DATE = /(- AKT\. )\d{1,2}\.\d{1,2}\.\s?\d{4}/n
-  DATE_UND =/(?<!\d)\d{1,2}_\d{1,2}_\d{4}(?!\d)/
+  DATE_UND = /(?<!\d)\d{1,2}_\d{1,2}_\d{4}(?!\d)/
   METHODS = %w[do_export do_hw_csv do_budget_xlsx do_cp_xlsx].freeze
   MAX_DIFFS = 8
 
