@@ -9,8 +9,8 @@
 
 ## HARDENING PO V1
 
-- **D-151 · Výklop bez systému prijme neúčinný výber setu** — zápis na skrinke aj čele hlási úspech, ale `resolve_set_id` zastaví nákup na `lift_system_missing`; raw resolver hodnotu číta. Zásobník, mimo H18b-1.
-- **D-152 · Výber dielca po zmene čela zostáva a po návrate ožije** — legacy `typ@dielec` nečistí `prune_missing_owners`; zahŕňa `hinge@krídlo`. Zásobník, mimo H18b-1; oprava by menila config pri prestavbe.
+*(Skupina je prázdna a **blok 9 je uzavretý vo v0.18.0 (11.10.2026)** — [výsledok a smoke checklist](archiv/HARDENING_ZAVER_2026-10-11.md). Nevyriešené D-151 a D-152 sú v zásobníku nižšie
+(raz, nie v oboch skupinách). Smoke bloku čaká na Michala; dočasná skupina „smoke po uzávere HARDENING" vznikne, až keď príde prvý nález.)*
 
 ## KONTROLA + VÝROBA
 
@@ -35,7 +35,7 @@ Smoke bloku 2 **PASS 29.9.2026** (bez chýb); nové postrehy k týmto funkciám 
 
 - **D-154 · Tlačidlo „Exportovať všetko"** (Michal 11.10.2026, pri dávke H19) — jeden klik v Štúdiu, raz vybraný priečinok; do podpriečinka zákazky (napr. „KLINIKA 11.10.2026")
   padnú naraz VEPO, CSV kovania, XLSX rozpočtu aj ponuky (dnes sú to štyri samostatné exporty so štyrmi výbermi priečinka). Nová funkcia exportov → mockup na schválenie
-  a plná výrobná brána (export test `scripts\export_test.ps1`). *Stav: zásobník — po uzávere bloku 9.*
+  a plná výrobná brána (export test `scripts\export_test.ps1`). *Stav: zásobník — blok 9 je uzavretý (v0.18.0); ďalší postup určí Michal.*
 - **D-151 · Výber setu pri klasifikovanom výklope bez systému sa nikdy nepoužije** (sonda H18b, 3.10.2026) — zápis na skrinke
   aj pri čele hlási úspech, resolver ho zastaví ako `lift_system_missing` ešte pred mapovaním; export už dnes stojí na RED.
   Návrh: zápis odmietnuť vetou „čelo nemá systém výklopu (HK top / HL top)". *Zásobník; mimo H18/H18b-1.*

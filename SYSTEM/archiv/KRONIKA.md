@@ -17,6 +17,18 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **UZÁVER BLOKU 9 · HARDENING PO V1 (11.10.2026, v0.18.0, PR #?, trieda Ľ — dokumentácia a verzia).** Posledná dávka bloku podľa postupu uzáveru (variant B, vzor PR #429): minor bump
+  0.17.31 → **0.18.0** (`noxun_engine.rb`, `main.rb`, všetky `?v=` v `ui/*.html`; kód pluginu sa inak nemení), blok 9 plným textom do `archiv/ROADMAP_hotove_etapy.md` (v PLAN ostáva zmienka
+  v zozname uzavretých blokov a zásobník), **celý priečinok bloku `SYSTEM/zdroje/bloky/HARDENING/` → `SYSTEM/archiv/bloky/HARDENING/`** (`git mv`; odkazy opravené v SYSTEM, docs a komentároch
+  testov, tri odkazy z presunutých dokumentov na `zdroje/` prepísané na nové úrovne), záverečný dokument [HARDENING_ZAVER_2026-10-11.md](HARDENING_ZAVER_2026-10-11.md) (výsledok pre stolára,
+  dávky H1–H19 s PR, overenie, aktualizácia oboch PC, priznané limity, otvorené body, **jeden zlúčený smoke checklist 94 bodov v 5 skupinách** + tabuľka zdroj → body). **H11c uzavreté
+  overením bez kódu:** SketchUp 2026.2 (26.2.243), plugin 0.17.29 (main `580c3e57`), quit test 5× (3× `Sketchup.quit`, 2× Súbor > Koniec) — vždy exit 0, `on_quit` 1×, poradie B,
+  žiadny pád (#1117 sa neprejavil); plná in-SU sada 3421 PASS / 0 FAIL; Michal 11.10. „ideme podľa návrhu": **Z1 sa nerobí**; zápis v [PACKAGE_H11.md](bloky/HARDENING/PACKAGE_H11.md) §18,
+  `AUDIT_REGISTER.md` R-42 (uzavreté overením), docs (`SKETCHUP_PRAVIDLA.md`, `ARCHITEKTURA.md`, `ui-lifecycle.md` odsek `app_lifecycle.rb`). Otvorené: smoke Michala (E7, Koniec na 2026.2)
+  a Luciin PC (nevieme, či má 2026.2). `DOGFOODING.md`: skupina „HARDENING PO V1" zrušená, D-151/D-152 ostávajú len v zásobníku (predtým 2×). Aktualizované: `V1_VIZIA.md`, `README.md`.
+  Testy: 5426 headless · 163 JS sád zelené, encoding guard čistý, in-SU netreba (kód sa mení len číslom verzie a `?v=`). Nahradený text STAV: „v0.17.31 · H17b…"
+  a súpis smoke po dávkach (H3…H18 podľa packages) — nahradený odkazom na záverečný dokument; sekcia „Robí sa" („Blok 9 …, H11c čaká na 2026.2") → „Nič — ďalší blok určí Michal".
+
 - **H19 · nástroj export testu (11.10.2026, PR #472, trieda S — plugin bez zmeny, bez bumpu verzie).** Rozhodnutie Michala 11.10.: „Nástroj export testu" ako samostatná dávka
   bloku 9 pred uzáverom ([brief](bloky/HARDENING/briefy/BRIEF_H19.md)); tlačidlo „Exportovať všetko" zapísané ako **D-154** (zásobník). Dôvod: brána R9 „P == K"
   z H17a/H17b znamenala ručné exporty Michala (~3×) a porovnanie orchestrátorom; teraz ju robí `scripts/export_test.ps1`: pod zámkom `deploy.lock` + `last_run.txt` ako

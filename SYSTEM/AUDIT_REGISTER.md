@@ -7,7 +7,7 @@
 > ([zdroje/SWEEP_2026-08_kandidati.md](zdroje/SWEEP_2026-08_kandidati.md), značky A/B/C) a 4 protinázory Codex review #250
 > (dispozície v threadoch PR #250). Podklad a pravidlá auditu: [zdroje/AUDIT_2026-08_podklad.md](zdroje/AUDIT_2026-08_podklad.md).
 >
-> **Údržba:** položky sa vybavujú dávkami blokov v [PLAN.md](PLAN.md) (pôvodne blok 1d; od 1.10.2026 blok 9 · HARDENING, inak zásobník Po V1) — vyriešená položka dostane riadok „✅ dávka/PR"
+> **Údržba:** položky sa vybavujú dávkami blokov v [PLAN.md](PLAN.md) (pôvodne blok 1d; od 1.10.2026 blok 9 · HARDENING, uzavretý 11.10.2026 vo v0.18.0; inak zásobník Po V1) — vyriešená položka dostane riadok „✅ dávka/PR"
 > a pri uzávere bloku sa presunie plným textom do sekcie „Vyriešené" nižšie (blok 1d: 1.10.2026); v osiach ostávajú len otvorené a čiastočne otvorené položky. Pravidlo 1d: rieši sa LEN výrobné riziko alebo
 > ponechaný V1 rozsah; dávka bez menovanej funkcie/dlhu sa nerobí. Čísla riadkov = stav k `dc2d53f`
 > (kód sa odvtedy hýbe — pri práci sa orientuj podľa MIEN metód; nové položky citujú mená, nie čísla).
@@ -43,7 +43,10 @@ V1 rozsahu. Hlásená strata neuložených hodnôt, hygiena, texty, refaktor a v
 
 ### R-42 · P2 · ui/core · `ui/panel.rb` + `ui/studio_dialog.rb` (`set_on_closed`) + `core/ghost_tool.rb` (`cancel_session` → `pop_tool`) — F-01 bloku 9 · HARDENING
 
-**UZAVRETÉ OVERENÍM (H11c, 11.10.2026, bez zmeny kódu).** Na SketchUp 2026.2 (26.2.243, plugin 0.17.29) quit test 5× (3× `Sketchup.quit`, 2× Súbor > Koniec): vždy exit 0, `on_quit` presne 1×, poradie B, žiadny pád (#1117 sa u nás neprejavil); plná in-SU sada 3421 PASS / 0 FAIL. Michal (11.10.): Z1 sa nerobí. Zostáva smoke bod A9/6 (Michal) a otvorený bod Luciin PC (nevieme, či má 2026.2). Pôvodný záznam: pád SketchUpu 2026.2 pri ukončení s otvoreným Inspectorom (api-issue-tracker #1117: `pop_tool` z `set_on_closed`). **Quit test H11a na 26.0.429:** `Sketchup.quit` aj Súbor > Koniec (`send_action` 57665): stopa `hook:studio` · `hook:inspector` (pri `Sketchup.quit` niekedy aj `pop:executed` z timera) · **až potom** `on_quit`, exit kód **0** —
+**UZAVRETÉ OVERENÍM (H11c, 11.10.2026, bez zmeny kódu).** Na SketchUp 2026.2 (26.2.243, plugin 0.17.29) quit test 5× (3× `Sketchup.quit`, 2× Súbor > Koniec): vždy exit 0, `on_quit` presne 1×, poradie B, žiadny pád (#1117 sa u nás neprejavil); plná in-SU sada 3421 PASS / 0 FAIL. Michal (11.10.): Z1 sa nerobí.
+Zostáva smoke bod A9/6 (Michal) a otvorený bod Luciin PC (nevieme, či má 2026.2).
+Pôvodný záznam: pád SketchUpu 2026.2 pri ukončení s otvoreným Inspectorom (api-issue-tracker #1117: `pop_tool` z `set_on_closed`).
+**Quit test H11a na 26.0.429:** `Sketchup.quit` aj Súbor > Koniec (`send_action` 57665): stopa `hook:studio` · `hook:inspector` (pri `Sketchup.quit` niekedy aj `pop:executed` z timera) · **až potom** `on_quit`, exit kód **0** —
 hooky okien prídu **pred** `onQuit` (poradie B), takže ochrana príznakom z `onQuit` nezaberie. *(Záložný návrh Z1 — hook nástroj nepopne, ghost sa ukončí sám pri ďalšom vstupe — sa nerobí, pozri vyššie.)* Dávka H11a dodala len načítanie súborov s jednou hláškou
 a nástroj quit testu (`run_su_tests.ps1 -QuitProbe [-QuitMenu]`). Package: `SYSTEM/archiv/bloky/HARDENING/PACKAGE_H11.md` §17 a §18.
 
@@ -575,7 +578,7 @@ kryje in-SketchUp sekcia `run_kovb3`.
 
 ## Odporúčané poradie pre 1d (zhoda [E] aj [F/S]) — história, blok 1d uzavretý 1.10.2026
 
-*(Platné poradie otvorených položiek: tabuľka „Stav po previerke 29.9.2026" vyššie a [PLAN.md](PLAN.md) blok 9. Položky R-39 a R-40 pod týmto
+*(Platné poradie otvorených položiek: tabuľka „Stav po previerke 29.9.2026" vyššie a zásobník Po V1 v [PLAN.md](PLAN.md). Položky R-39 a R-40 pod týmto
 odsekom sú otvorené — pribudli po audite 1c a ostávajú na svojom mieste kvôli odkazom.)*
 
 1. **P0 hotfix** (✅ #252) → 2. **pred GHOST:** ~~R-01+R-04~~ (✅ #261) → ~~R-02~~ (✅ #264) → ~~R-03~~ (✅ #265 — **tvrdý blocker GHOST padol**) *(GHOST package upresňuje: tvrdý
