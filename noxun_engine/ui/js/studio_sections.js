@@ -100,9 +100,9 @@
         refresh: 'Načítavam pravidlá z aktuálneho modelu…',
         module: 'rules.js', data: 'rules', tools: 'rulesRenderTools', body: 'rulesRenderBody', stale: true,
         missing: 'Pravidlá sa nenačítali (js/rules.js).' },
-      // Bez vlastnej hlášky „Obnoviť" (predvolená) — vedomý stav, PACKAGE_H14 Q1.
       { id: 'tpl', grp: 'catalogs', ic: 'star', t: 'Šablóny',
         head: 'knižnica je spoločná pre všetky zákazky · novú uložíš v Inspectore z označenej skrinky',
+        refresh: 'Načítavam knižnicu šablón…',
         module: 'templates.js', data: 'tpl', tools: 'tplRenderTools', body: 'tplRenderBody', stale: true,
         missing: 'Šablóny sa nenačítali (js/templates.js).' },
       { id: 'sup', grp: 'settings', ic: 'truck', t: 'Dodávateľ / Demos',

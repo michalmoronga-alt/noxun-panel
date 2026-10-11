@@ -1450,7 +1450,7 @@ Ruby test so `SECTIONS` — žiadny regex nad zdrojom druhej strany.
 
 **Riadok:** `id` · `grp` (`job` ZÁKAZKA, `catalogs` KATALÓGY, `settings` NASTAVENIA) · `ic` (ikona spritu, každá iná) · `t` (názov v navigácii = nadpis) ·
 `hint` (len doplnok tooltipu navigácie, dnes `cut`) · `badge` (`ctrl` = semafor zákazky `ST.counts`, `appl` = `ST.appl.job.counts`) · `head` (nápoveda
-hlavičky) · `refresh` (hláška počas „Obnoviť"; bez nej `REFRESH_DEFAULT` „Prepočítavam kusovník…" — Šablóny vedome, Q1 H14) · `module` (súbor, ktorý sekciu
+hlavičky) · `refresh` (hláška počas „Obnoviť"; bez nej `REFRESH_DEFAULT` „Prepočítavam kusovník…"; Šablóny majú vlastnú „Načítavam knižnicu šablón…" od H14 Q1) · `module` (súbor, ktorý sekciu
 kreslí) · `data` (kľúč payloadu `NX.setStudio`; guard overí, že ho `push_state` skladá — skladanie payloadu ostáva v Ruby explicitné).
 **Háčiky (mená funkcií):** `tools` / `body` (lišta a telo; `stale: true` = lišta dostane príznak neaktuálnosti ako argument — `cut`, `mat`, `hw`, `rules`,
 `tpl`) · `missing` (núdzový text tela, keď sekčný modul chýba; lišta je vtedy prázdna) · `leave` (`mat`, `hw`, `appl` — modály mimo tela, beh na serveri) ·

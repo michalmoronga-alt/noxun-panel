@@ -17,6 +17,11 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **H14 Q1 · hláška „Obnoviť" v Šablónach (11.10.2026, v0.17.30, PR #470, trieda Ľ).** Michal rozhodol opraviť Q1 z PACKAGE_H14 §13: sekcia `tpl` v registri
+  `studio_sections.js` má vlastnú hlášku „Načítavam knižnicu šablón…" (predtým predvolená „Prepočítavam kusovník…"); `REFRESH_DEFAULT` ostáva pre kusovník.
+  Fixtúra `h14_studio_sections.json` a golden `g5_refresh.json` upravené len pre kľúč `tpl`. Čísla ani exporty sa nemenia. Testy: 5402 Ruby/0/0, 163 JS PASS.
+  Nahradený text STAV: „H14 Q1 Obnoviť čaká na Michala"; hlavička v0.17.29 H17a sa zhrnula do jednej vety.
+
 - **Oprava faktu o effort subagenta (10.10.2026, PR #469, docs).** WORKFLOW § 2 „Matica výberu" tvrdil (PR #465), že effort sa pri volaní
   Agent tool nedá nastaviť. Neplatí od Claude Code v2.1.292: Agent tool má parameter `effort` (nie pre fork), ktorý prepíše `effort:`
   definície; `CLAUDE_CODE_EFFORT_LEVEL` má prednosť pred oboma (code.claude.com/docs/en/sub-agents, overené 10.10.2026; zistené pri

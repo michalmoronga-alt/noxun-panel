@@ -182,6 +182,7 @@
       "ic": "star",
       "t": "Šablóny",
       "head": "knižnica je spoločná pre všetky zákazky · novú uložíš v Inspectore z označenej skrinky",
+      "refresh": "Načítavam knižnicu šablón…",
       "module": "templates.js",
       "data": "tpl",
       "tools": "tplRenderTools",

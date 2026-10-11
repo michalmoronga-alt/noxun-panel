@@ -356,6 +356,7 @@ s časťami (✅ + PR) → package + surový audit do `SYSTEM/zdroje/bloky/HARDE
 - **Q1 · Hláška pri „Obnoviť" v Šablónach.** Keď v Štúdiu → Šablóny klikneš „Obnoviť", okno počas načítania napíše „Prepočítavam kusovník…", hoci sa načítava knižnica šablón
   (ostatné sekcie píšu, čo naozaj robia). **Návrh:** H14 ostane prísne „bez viditeľnej zmeny" a hlášku nechá; opraví sa samostatnou drobnosťou (jeden riadok registra:
   „Načítavam knižnicu šablón…"). Ak chceš, H14b ju môže opraviť rovno ako jedinú vedomú zmenu.
+  **Rozhodnutie Michala 11.10.2026: opraviť** — PR #470.
 
 ## 14 · Nálezy mimo scope a odovzdanie H13
 
