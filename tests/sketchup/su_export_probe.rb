@@ -24,6 +24,11 @@ module NoxunExportProbe
   WORK = ENV['NOXUN_EXPORT_WORK'].to_s
   MARKER = '=== KONIEC SUBORU ==='
   METHODS = %w[do_export do_hw_csv do_budget_xlsx do_cp_xlsx].freeze
+  # Koncove chybove vety `rescue` exportov v production_core.rb (do_export: „Chyba exportu: …“,
+  # do_hw_csv: „Export zlyhal: …“, rozpocet: „Export rozpočtu zlyhal: …“, ponuka: „Export cenovej
+  # ponuky zlyhal: …“) a zlyhanie zostavenia rozpoctu. Cervena veta uspechu (napr. „+ 3 nemapovanych“)
+  # sem nepatri.
+  TERMINAL_ERROR = /\A(Chyba exportu: |Export zlyhal: |Export rozpočtu zlyhal: |Export cenovej ponuky zlyhal: |Rozpočet sa nepodarilo zostaviť)/.freeze
   READY_TIMEOUT_S = 120
   POLL_S = 2.0
   GRACE_S = 4.0
@@ -130,8 +135,12 @@ module NoxunExportProbe
       data['confirm_unpriced'] = unpriced if unpriced > 0 && %w[do_budget_xlsx do_cp_xlsx].include?(name)
       # Cervena veta NIE JE chyba sondy (napr. „+ 3 nemapovane" pri uspesnom exporte) —
       # zapisuje sa a porovnava s druhou stranou ako kazda veta statusu.
+      # `do_*` chytaju vynimku SAME (`rescue` -> koncova chybova veta s `err`) — bez tejto
+      # kontroly by K aj P zlyhali rovnako (aj po zapise suboru) a nastroj by hlasil P == K.
+      # Varovanie pri uspechu je tiez cervene, preto sa rozlisuje podla tvaru vety.
       st = lambda do |msg, err = false|
         event('STATUS', m: name, err: err ? true : false, msg: msg.to_s)
+        fail!("#{name}: koncova chyba exportu: #{msg}") if err && TERMINAL_ERROR.match?(msg.to_s)
       end
       rp = -> { event('REPUSH', m: name) }
       pc.send(name, model, data, generation: 1, status: st, repush: rp)

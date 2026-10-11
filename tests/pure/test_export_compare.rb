@@ -198,6 +198,31 @@ NxTest.test('export_compare: ZIP citacka — STORE aj DEFLATE, cas v hlavickach 
   end
 end
 
+NxTest.test('export_compare: XLSX — povolene LEN vygenerovane datum v titulku harka; iny rozdiel v tom istom XML = rozdiel') do
+  ec = NxExpCmp::EC
+  sheet = lambda do |title, val|
+    NxExpCmp::SHEET.sub('<sheetData>', "<sheetData><row r=\"0\"><c><is><t>#{title}</t></is></c></row>").sub('<v>10</v>', "<v>#{val}</v>")
+  end
+  zipf = ->(s) { NxExpCmp.zip(NxExpCmp::PARTS.merge('xl/worksheets/sheet1.xml' => s)) }
+  Dir.mktmpdir('expcmp-') do |dir|
+    w = lambda do |name, bytes|
+      File.binwrite(File.join(dir, name), bytes)
+      File.join(dir, name)
+    end
+    k = w.call('k.xlsx', zipf.call(sheet.call('Rozpočet X - AKT. 9.10. 2026', 10)))
+    p_date = w.call('p1.xlsx', zipf.call(sheet.call('Rozpočet X - AKT. 10.10. 2026', 10)))
+    p_both = w.call('p2.xlsx', zipf.call(sheet.call('Rozpočet X - AKT. 10.10. 2026', 11)))
+    p_name = w.call('p3.xlsx', zipf.call(sheet.call('Rozpočet Y - AKT. 9.10. 2026', 10)))
+    p_free = w.call('p4.xlsx', zipf.call(sheet.call('Rozpočet X, vystavene 10.10. 2026', 10)))
+    v, note, = ec.cmp_xlsx(k, p_date)
+    NxTest.assert_equal(:ok, v, note)
+    NxTest.assert(note.include?('xl/worksheets/sheet1.xml'), note)
+    NxTest.assert_equal(:diff, ec.cmp_xlsx(k, p_both).first, 'datum + hodnota v tom istom XML = rozdiel')
+    NxTest.assert_equal(:diff, ec.cmp_xlsx(k, p_name).first, 'ine meno v titulku = rozdiel')
+    NxTest.assert_equal(:diff, ec.cmp_xlsx(k, p_free).first, 'datum mimo vzoru titulku (vseobecna maska) = rozdiel')
+  end
+end
+
 NxTest.test('export_compare: vety statusu — cesty a datum sa normalizuju, iná veta / chýbajúci export = rozdiel') do
   ec = NxExpCmp::EC
   log = lambda do |out, sentence|
@@ -318,7 +343,16 @@ NX_EXPPROBE_HARNESS = <<~'RUBY'
               dir = UI.select_directory(title: 't', directory: 'C:/start')
               file = UI.savepanel('t', 'C:/start', "#{name}.out")
               FileUtils.touch(file) unless MODE == 'fail' && name == 'do_budget_xlsx'
-              status.call("hotovo #{name} #{dir}", MODE == 'fail' && name == 'do_cp_xlsx')
+              msg = "hotovo #{name} #{dir}"
+              red = MODE == 'fail' && name == 'do_cp_xlsx'
+              if name == 'do_hw_csv' && MODE == 'terminal' # rescue exportu PO zapise suboru
+                msg = 'Export zlyhal: boom'
+                red = true
+              elsif name == 'do_hw_csv' && MODE == 'warn' # uspech s cervenym varovanim
+                msg = "Nákupný zoznam: 18 položiek + 3 nemapovaných (v CSV aj KONTROLE) → #{dir}"
+                red = true
+              end
+              status.call(msg, red)
               repush.call if name == 'do_export'
             end
           end
@@ -378,6 +412,24 @@ NxTest.test('export sonda: vynimka exportu a export bez suboru = FAIL (cervena v
   NxTest.assert_equal(4, r['calls'].length, 'vsetky 4 exporty zavolane aj po chybe')
   NxTest.assert_equal(1, r['log'].scan('=== KONIEC SUBORU ===').length)
   NxTest.assert_equal(1, r['quits'])
+end
+
+NxTest.test('export sonda: koncova chybova veta exportu (aj po zapise suboru) = FAIL; cervene varovanie pri uspechu nie') do
+  r = nx_expprobe_run('terminal')
+  fails = r['log'].lines.grep(/^FAIL:/)
+  NxTest.assert_equal(1, fails.length, fails.inspect)
+  NxTest.assert(fails.first.include?('do_hw_csv') && fails.first.include?('koncova chyba exportu'), fails.first)
+  r = nx_expprobe_run('warn')
+  NxTest.assert(r['log'].include?('"err":true'), 'varovanie je cervena udalost')
+  NxTest.refute(r['log'].include?('FAIL:'), 'cervene varovanie pri uspechu nie je FAIL')
+  # tvary viet musia zodpovedat rescue vetam v production_core.rb (zmena vety => zmen sondu)
+  pc = NxExpCmp.read('noxun_engine', 'ui', 'production_core.rb')
+  ['"Chyba exportu: #{e.message}"', '"Export zlyhal: #{e.message}"', '"Export rozpočtu zlyhal: #{e.message}"',
+   '"Export cenovej ponuky zlyhal: #{e.message}"'].each do |s|
+    NxTest.assert(pc.include?("status.call(#{s}, true)"), "production_core.rb: #{s}")
+  end
+  probe = NxExpCmp.read('tests', 'sketchup', 'su_export_probe.rb')
+  NxTest.assert(probe.include?('TERMINAL_ERROR'), 'sonda: TERMINAL_ERROR')
 end
 
 NxTest.test('export sonda: model mimo pracovneho priecinka behu = FAIL, nic sa neexportuje (poistka pred zakazkou)') do

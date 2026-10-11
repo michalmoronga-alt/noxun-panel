@@ -8,7 +8,8 @@
 #     a cas zapisu (`RRRR-MM-DD HH:MM`, pripadne datum `9.10.2026`) v 1. riadku CSV kovania;
 #   * povoleny rozdiel v NAZVE: datum (`9.10.2026`, `9_10_2026`);
 #   * XLSX = rozbalene casti ZIPu (`xl/**`, `[Content_Types].xml`, `_rels`...) porovnane
-#     bajtovo; ZIP hlavicky (cas zapisu) sa neporovnavaju;
+#     bajtovo; ZIP hlavicky (cas zapisu) sa neporovnavaju; vynimka: vygenerovane datum
+#     v titulku harka (`- AKT. 9.10. 2026`), ine rozdiely v tom istom XML ostavaju rozdielom;
 #   * vsetko ostatne (kazdy dielec VEPO, kazdy bajt XML harka, meno VEPO skupiny,
 #     chybajuci/nadbytocny subor) = rozdiel;
 #   * vstupny model v priecinku vystupu sa vyluci MENOVITE (`--exclude-input meno`).
@@ -23,7 +24,8 @@ module ExportCompare
   ALLOWED_MARK = "«ALLOWED»".b.freeze
   STAMP = /\d{4}-\d{2}-\d{2} \d{2}:\d{2}/n
   DATE_DOT = /(?<!\d)\d{1,2}\.\s?\d{1,2}\.\s?\d{4}(?!\d)/
-  DATE_UND = /(?<!\d)\d{1,2}_\d{1,2}_\d{4}(?!\d)/
+  SHEET_TITLE_DATE = /(- AKT\. )\d{1,2}\.\d{1,2}\.\s?\d{4}/n
+  DATE_UND =/(?<!\d)\d{1,2}_\d{1,2}_\d{4}(?!\d)/
   METHODS = %w[do_export do_hw_csv do_budget_xlsx do_cp_xlsx].freeze
   MAX_DIFFS = 8
 
@@ -148,15 +150,28 @@ module ExportCompare
     diffs = []
     (za.keys - zb.keys).each { |n| diffs << "cast #{n} chyba v P" }
     (zb.keys - za.keys).each { |n| diffs << "cast #{n} chyba v K" }
+    allowed = []
     (za.keys & zb.keys).each do |n|
       x = za[n]
       y = zb[n]
       next if x == y
 
+      if n.start_with?('xl/worksheets/')
+        # Povolene LEN vygenerovane datum v titulku harka (`BudgetXlsx.title` / `CpXlsx.title`:
+        # "... - AKT. d.m. rrrr" / "... - AKT. d.m.rrrr" z Time.now) — beh cez polnoc.
+        x = x.gsub(SHEET_TITLE_DATE, '\1<DATUM>'.b)
+        y = y.gsub(SHEET_TITLE_DATE, '\1<DATUM>'.b)
+        if x == y
+          allowed << n
+          next
+        end
+      end
       i = (0...[x.length, y.length].min).find { |k| x.getbyte(k) != y.getbyte(k) } || [x.length, y.length].min
       diffs << "#{n}: bajt #{i} K [#{show(x[[i - 30, 0].max, 70])}] != P [#{show(y[[i - 30, 0].max, 70])}]"
     end
     return [:diff, 'obsah XLSX sa lisi', diffs.first(MAX_DIFFS)] unless diffs.empty?
+
+    return [:ok, "casti XLSX zhodne; povolene: datum v titulku harka (#{allowed.join(', ')})", []] unless allowed.empty?
 
     [:ok, 'casti XLSX zhodne (ZIP hlavicky = cas zapisu)', []]
   rescue StandardError => e
