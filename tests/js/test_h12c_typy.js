@@ -1,5 +1,5 @@
 // H12c — JS Inspectora a Studia cita TYPY SKRINKY zo servera (package
-// `SYSTEM/zdroje/bloky/HARDENING/PACKAGE_H12.md`, cast H12c, §15 A1).
+// `SYSTEM/archiv/bloky/HARDENING/PACKAGE_H12.md`, cast H12c, §15 A1).
 //   node tests/js/test_h12c_typy.js
 //
 // Co sa tu strazi (spravanie pred/po strazi golden `test_h12_golden.js`):

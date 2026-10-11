@@ -1,5 +1,5 @@
 // H14a · T1 — register sekcii Studia `ui/js/studio_sections.js` (package
-// `SYSTEM/zdroje/bloky/HARDENING/PACKAGE_H14.md`, R1, R4.1).
+// `SYSTEM/archiv/bloky/HARDENING/PACKAGE_H14.md`, R1, R4.1).
 //   node tests/js/test_h14a_register.js
 //
 // Co sa tu dokazuje:

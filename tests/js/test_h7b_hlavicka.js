@@ -1,5 +1,5 @@
 // H7b — NÁZOV ZÁKAZKY V HLAVIČKE ŠTÚDIA + `expect` štyroch exportov
-// (package `SYSTEM/zdroje/bloky/HARDENING/PACKAGE_H7.md` §6 R-B4–R-B8, R-B5b,
+// (package `SYSTEM/archiv/bloky/HARDENING/PACKAGE_H7.md` §6 R-B4–R-B8, R-B5b,
 // §15–§17; mockup H7 PLATÍ 2.10.2026).
 //   node tests/js/test_h7b_hlavicka.js
 //

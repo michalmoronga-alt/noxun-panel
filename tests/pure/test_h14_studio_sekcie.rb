@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 # H14 · T0b (R0.3) — CHARAKTERIZACIA serverovej strany sekcii Studia pred
-# registrom `NXStudioSections` (package `SYSTEM/zdroje/bloky/HARDENING/PACKAGE_H14.md`).
+# registrom `NXStudioSections` (package `SYSTEM/archiv/bloky/HARDENING/PACKAGE_H14.md`).
 #
 # H14 meni LEN klienta (zoznamy sekcii v JS); Ruby sa nemeni — a tento test to
 # dokazuje odtlackom zachytenym na NEZMENENOM kode (1. commit H14a):

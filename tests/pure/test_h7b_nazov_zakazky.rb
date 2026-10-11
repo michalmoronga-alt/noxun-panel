@@ -2,7 +2,7 @@
 # H7b — NAZOV ZAKAZKY V HLAVICKE STUDIA (server): payload `vepo`, mena
 # exportov pre tooltip, veta po exporte s predvolenym nazvom, echo hlavicky po
 # exporte a POVINNA kontrola `expect` v styroch exportoch (package
-# `SYSTEM/zdroje/bloky/HARDENING/PACKAGE_H7.md` §6 R-B1–R-B3, R-B5b, R-B9 +
+# `SYSTEM/archiv/bloky/HARDENING/PACKAGE_H7.md` §6 R-B1–R-B3, R-B5b, R-B9 +
 # §16 B2 a §17 C1/C2 — §17 MA PREDNOST).
 #
 #   T-B7  payload aj echo: 3 povodne kluce v poradi + source/file/export_names

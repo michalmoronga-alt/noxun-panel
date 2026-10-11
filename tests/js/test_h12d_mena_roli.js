@@ -1,5 +1,5 @@
 // H12d (C-05) — MENA ROLI V KARTE DIELCA zo servera (package
-// `SYSTEM/zdroje/bloky/HARDENING/PACKAGE_H12.md`, R0.6, R4.3, R4.4, M16).
+// `SYSTEM/archiv/bloky/HARDENING/PACKAGE_H12.md`, R0.6, R4.3, R4.4, M16).
 //   node tests/js/test_h12d_mena_roli.js
 //
 // Do H12d mala karta dielca vlastnu JS mapu `roleLabel` (part_card.js), ktora

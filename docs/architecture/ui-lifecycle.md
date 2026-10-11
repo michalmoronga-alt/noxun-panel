@@ -1417,7 +1417,7 @@ v komentároch; správanie `tests/js/test_h4b_texty_vzhlad.js`. **Hľadanie** (K
 **Rohové nastavenie tlačidiel** (zóna `.cornerzone` zdieľaná s railom Inspectora a lištou Kontroly, obsah okna vlastný): zatvára klik mimo a Escape — **v jednom
 listeneri** s `ecMenu`/`vepoMenu` a až za modalovou brankou `nxModalOpen`.
 
-**Hlavička — názov zákazky (H7b, mockup `SYSTEM/zdroje/bloky/HARDENING/MOCKUP_H7_NAZOV_ZAKAZKY.html`, O1–O9):** pravá časť hlavičky KAŽDEJ sekcie je
+**Hlavička — názov zákazky (H7b, mockup `SYSTEM/archiv/bloky/HARDENING/MOCKUP_H7_NAZOV_ZAKAZKY.html`, O1–O9):** pravá časť hlavičky KAŽDEJ sekcie je
 `jobHeadHtml(vepo, verzia, zobrazený)` (`studio.js`, čistá funkcia) — „Zákazka" · `<button id="jobName" class="jobname src-<zdroj>">` s ceruzkou · dovetok · „· v<verzia>"
 (zanikol `#stModel` „zákazka: <súbor>"). Zdroj skladá **server** (`vepo.source`): `set` zadaný (tučne) · `file` podľa súboru (sivé „podľa súboru") · `default` predvolený
 „projekt" (jantárová `.jdot`, kurzíva, „zadaj názov"); **čakajúci názov** (`vepo.pending`, poškodený súbor nastavení pri prvom uložení — Q2 predvolené áno, čaká na
@@ -2250,7 +2250,7 @@ Plné znenie: archív, „updater.rb — …" a „UI vrstva — sekcia „O plu
 ### app_lifecycle.rb
 
 **Životný cyklus pluginu v procese SketchUpu (F-01) — čistý Ruby, prvý načítaný súbor pluginu. Dnes len načítanie súborov s jednou hláškou**; ukončovanie
-SketchUpu (pád #1117 na 2026.2) tu zatiaľ nie je — rieši ho dávka H11c (záložný návrh Z1 s vlastným auditom, nižšie).
+SketchUpu tu nie je: pád #1117 sa na 2026.2 nepotvrdil a záložný návrh Z1 sa nerobí (H11c, nižšie).
 - **Načítanie:** `main.rb` najprv **bootstrapom** načíta tento súbor (Ruby `require` s absolútnou cestou, vlastná chybová vetva `rescue StandardError, ScriptError`
   + **sentinel** `AppLifecycle::LOADED` na poslednom riadku súboru = vykonal sa celý). Chyba bootstrapu = jedna hláška o základnom súbore (`Engine::BOOTSTRAP_MESSAGE`)
   a zvyšok `main.rb` sa nevykoná. Potom **95 súborov `main.rb` a 14 častí `ui/panel.rb`** ide cez **`AppLifecycle.require_part 'noxun_engine/…'`** = Ruby `require`
@@ -2265,18 +2265,19 @@ SketchUpu (pád #1117 na 2026.2) tu zatiaľ nie je — rieši ho dávka H11c (z�
   by nechal `panel.rb` v require cache bez jeho častí). Nový súbor pluginu = riadok v `main.rb` **aj** v zmrazenom zozname `tests/pure/test_h11a_nacitanie.rb` (T6).
   `reset_for_tests!` volajú len testy (guard).
 
-#### Zatvorenie okna vs. ukončenie SketchUpu (zmerané, rieši H11c)
+#### Zatvorenie okna vs. ukončenie SketchUpu (zmerané na 26.0 aj 2026.2, H11c)
 
 Hooky `set_on_closed` Inspectora (`panel.rb`) a Štúdia (`studio_dialog.rb`) sa pri ukončení SketchUpu **volajú** a na 26.0.429 prídu **PRED**
 `AppObserver#onQuit` (poradie B) — quit test H11a cez `Sketchup.quit` aj Súbor > Koniec: stopa `hook:studio` · `hook:inspector` (pri `Sketchup.quit` niekedy aj
-`pop:executed` z timera) · až potom `on_quit`, exit kód 0. Príznak z `onQuit` by preto hooky pri ukončení nezachytil; v 2026.2 `pop_tool` z hooku padá (#1117).
-Riešenie je **záložný návrh Z1** v dávke **H11c** (hook nástroj nepopne, ghost sa ukončí sám pri ďalšom vstupe) s vlastným auditom, keď bude SketchUp 2026.2.
+`pop:executed` z timera) · až potom `on_quit`, exit kód 0. Príznak z `onQuit` by preto hooky pri ukončení nezachytil. Api-issue-tracker #1117 hlási pád `pop_tool` z hooku v 2026.2, **no H11c (11.10.2026, SketchUp 26.2.243):
+quit test 5× (3× `Sketchup.quit`, 2× Súbor > Koniec) vždy exit 0, `on_quit` 1×, poradie B, žiadny pád; plná in-SU sada 3421 PASS** → záložný návrh Z1 (hook nástroj nepopne) sa **nerobí**, kód ostáva.
+Otvorené: smoke Michala (A9 krok 6 na 2026.2) a Luciin PC (či má 2026.2).
 
 **Quit test** (`scripts\run_su_tests.ps1 -QuitProbe`, s `-QuitMenu` cesta Súbor > Koniec cez `send_action` 57665 → `tests/sketchup/su_quit_probe.rb`):
 kópia ENGINEtests.skp, Inspector + Štúdio + ghost, **inštrumentácia žije len v sonde** (vlastný `AppObserver#onQuit`, obaly `Panel.detach_observer`,
 `StudioDialog.detach_stale_observer`, `GhostTool.pop_tool`), stopa cez vopred otvorený handle do `quit_trace.txt`, uloženie run-kópie, ukončenie; verdikt **až po
 zániku procesu** = **záznam, nie brána**: skript vypíše `QUIT-TEST: ZAZNAM` so stopou, exit kódom a poradím (`A` = `on_quit` pred hookmi okien, `B` =
-hooky pred `on_quit`); exit 0 len pri ukončení s kódom 0 a presne 1× `on_quit`, inak 1 (0xC0000374 = 1). Kritériá PASS/FAIL pre záložný návrh Z1 **prepíše H11c**.
+hooky pred `on_quit`); exit 0 len pri ukončení s kódom 0 a presne 1× `on_quit`, inak 1 (0xC0000374 = 1). Na 2026.2 dopadol 5× exit 0 (H11c), nástroj ostáva pre budúce ročníky.
 In-SU: `run_h11a` (P1 brána načítania, Q7) a `run_h11a_async` (Q1 ručné zatvorenie) v `su_runner.rb`.
 
 ### Satelitné okná

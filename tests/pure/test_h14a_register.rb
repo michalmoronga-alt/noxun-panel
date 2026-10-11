@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 # H14a — register sekcii Studia `ui/js/studio_sections.js` (package
-# `SYSTEM/zdroje/bloky/HARDENING/PACKAGE_H14.md`, R4 parita a R5 guardy a–c, e).
+# `SYSTEM/archiv/bloky/HARDENING/PACKAGE_H14.md`, R4 parita a R5 guardy a–c, e).
 #
 # Sekcia Studia sa prihlasuje NA JEDNOM MIESTE: riadkom JS registra
 # `NXStudioSections`. Ruby `StudioDialog::SECTIONS` ostava serverovym

@@ -32,7 +32,7 @@ Destilát z „Výskumná správa pre kódera SketchUp pluginov" (deep research,
 ## HtmlDialog
 
 - **`set_on_closed` beží aj pri UKONČENÍ aplikácie** a na 26.0.429 príde **pred** `AppObserver#onQuit` (quit test H11a); v 2026.2 `pop_tool` z hooku
-  padá (api-issue-tracker #1117). Riešenie (záložný návrh Z1) je dávka H11c — do hooku zatiaľ nepridávať nové volania SketchUp API.
+  padá podľa api-issue-tracker #1117, ale **u nás sa to na 2026.2 (26.2.243) nepotvrdilo** (H11c: quit test 5× exit 0, bez pádu; Z1 sa nerobí). Do hooku aj tak nepridávať nové volania SketchUp API.
 - **Referenciu na dialóg držať** v modulovej/inštančnej premennej — inak ho GC zavrie „záhadne".
 - Unikátny `preferences_key`; **callbacky (`add_action_callback`) registrovať pred `show`**.
 - **Ruby → JS výhradne cez `to_json`** (`dialog.execute_script("app.update(#{data.to_json})")`), nikdy interpoláciou stringu.

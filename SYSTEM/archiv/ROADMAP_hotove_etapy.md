@@ -648,7 +648,7 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
 
 #### Po V1 — zásobník (nezaradené, nestratiť)
 
-- **Z krížového auditu V1 (1.10.2026) — 29 položiek Po V1** (plný zoznam a zdroje: [zdroje/bloky/HARDENING/ROZHODNUTIA_MICHALA_2026-10-01.md](../zdroje/bloky/HARDENING/ROZHODNUTIA_MICHALA_2026-10-01.md);
+- **Z krížového auditu V1 (1.10.2026) — 29 položiek Po V1** (plný zoznam a zdroje: [archiv/bloky/HARDENING/ROZHODNUTIA_MICHALA_2026-10-01.md](bloky/HARDENING/ROZHODNUTIA_MICHALA_2026-10-01.md);
   R-13 → R-37 → R-35 sú od 1.10. v bloku 9 ako H8–H10): najsilnejší **E-01 snímka odovzdanej zákazky + „čo sa zmenilo od objednávky"** (4 audítori nezávisle; súvisí
   **G-02** karta zákazky, **G-05** export všetkého do datovaného priečinka) · kód a API: C-08 zásuvky podľa tvaru receptu (s prvým novým systémom; **G-01** vzorky
   z konfigurátora Blum — Michal má prístup), F-03 spoločný základ prekrytí, F-04 natívne fotenie náhľadu šablóny (jednoduchšia cesta pre **D-107**), F-05 skrytie
@@ -706,6 +706,57 @@ Tri úrovne — odpoveď na otázku „kedy nový typ korpusu":
 2. **ŠABLÓNA (template, čisté dáta)** = pomenovaná sada nastavení TYPU — žiadny nový kód. → **drezová** (= dolná + výstuhy na výšku), **varná** (= dolná + výstuhy −20 mm), klasik, zásuvková… Používateľ si tvorí vlastné (Blum „My Library" princíp).
 3. **PARAMETER** = individuálna hodnota konkrétnej skrinky.
 Pravidlo: kým sa dá vec vyjadriť hodnotou/variantom existujúceho dielca → parameter/šablóna. Nový typ až keď sa mení topológia.
+
+## BLOK 9 · HARDENING PO V1 — UZAVRETÝ (11.10.2026, v0.18.0; štart PR #432, dávky H1–H19 + uzáver PR #473)
+
+**Hardening po V1** — po dokončení všetkých siedmich bodov V1 (30.9.2026) sa pred novými funkciami spevnili zavádzajúce údaje v oknách, ochrana dát a rozširovacie
+body. Podklad: krížový audit V1 siedmimi audítormi → Michalovo triedenie **35 Teraz · 29 Po V1 · 11 vyradených**; 19 dávok **H1–H19** (+ ŠÍRKA 50, H18b-1, H14 Q1)
+sekvenčne bez zmeny výrobných a cenových čísel (okrem vedome pomenovaných: ŠÍRKA 50 = skrinka od 50 mm s 2 nohami, H18/H18b-1 = skutočne použitý set závesov).
+Výsledok, dávky s PR, overenie, priznané limity, otvorené body a **zlúčený smoke checklist bloku**: [HARDENING_ZAVER_2026-10-11.md](HARDENING_ZAVER_2026-10-11.md).
+Priečinok bloku (rozhodnutia Michala, krížový audit, packages, surové audity, briefy, mockupy H6 a H7) je od uzáveru v [bloky/HARDENING/](bloky/HARDENING/).
+H11c (pád #1117 na 2026.2) sa uzavrelo **overením bez kódu** (quit test 5× exit 0, in-SU 3421 PASS; Z1 sa nerobí). **Smoke čaká na Michala.**
+
+### Pôvodný plný text bloku pri uzávere (PLAN, blok 9)
+
+### 9 · HARDENING PO V1 (štart 1.10.2026 — krížový audit V1)
+
+**Cieľ:** pred funkciami po V1 opraviť zavádzajúce údaje v okne, spevniť ochranu dát a zlacniť ďalšie rozširovanie (nový typ skrinky, sekcia Štúdia,
+kovanie, zdieľané knižnice) — **bez zmeny výrobných a cenových čísel** (charakterizačné/golden testy pred zásahom; UI zmeny nič nepočítajú). Podklad:
+krížový audit 7 audítorov → Michalovo triedenie **35 Teraz · 29 Po V1 · 11 vyradených**; priečinok bloku [archiv/bloky/HARDENING/](bloky/HARDENING/)
+(rozhodnutia a výsledok triedenia, podklad, surové výstupy `CROSS_AUDIT_A*`, triediaca stránka). **Poradie = poradie tabuľky** (Michal 1.10.: bez viazania na
+noci — beh spracuje sekvenčne, koľko stihne). **Mockupy H6 a H7 schválil Michal 2.10.** (rozhodnutia v priečinku bloku). Trieda dávky (audit,
+predrecenzia, in-SU) sa určí pri package podľa CLAUDE.md; stĺpec je predpoklad. Uzáver bloku = minor verzia + smoke.
+
+| Dávka | Položky (ID z triedenia) | Predpokladaná trieda |
+|---|---|---|
+| ✅ H1 · pravidlá čítania pre agentov (kapitoly namiesto celých súborov, PLAN bez hotových blokov, STAV po docs PR, hranice triedy dávky) — **PR #433** | B-01 · B-04 · B-08 · B-09 | dokumentácia |
+| ✅ H2 · fotenie okien pre UI PR (prehrávač dát pluginu + fotky Inspectora a sekcií Štúdia) — **PR #434** | D-10 | nástroj, plugin sa nemení |
+| ✅ H3a · zavádzajúce údaje v okne (platne v Kusovníku → preklik do Nárezového plánu, tabuľka ponuky, semafor Kontroly, Nákup po slovensky, sadzby) — package [PACKAGE_H3.md](bloky/HARDENING/PACKAGE_H3.md) — **PR #435** | A-01 · A-02 · A-03 · A-04 · A-07 | kód · výrobná/cenová (zobrazenie) |
+| ✅ H3b · log po otvorení nového súboru (vypnutie prekrytia zatvoreného dokumentu bez falošnej chyby) — package [PACKAGE_H3.md](bloky/HARDENING/PACKAGE_H3.md) §6.6 — **PR #436** | A-06 | kód · in-SU (audit len pri zmene toku) |
+| ✅ H4a · čísla (jeden zápis čísel a jednotiek v Štúdiu — čiarka, celé kusy, € s dvomi desatinnými, jednotky malým, nič sa neskryje; ABS „dookola" v Kusovníku) — package [PACKAGE_H4.md](bloky/HARDENING/PACKAGE_H4.md) — **PR #437** | D-04 · D-11 | kód UI · výrobná/cenová (zobrazenie) · predrecenzia |
+| ✅ H4b · texty a vzhľad (Obnoviť vs. vrátenie katalógu, žargón a VEĽKÉ písmená, rozbaľovačky, hľadanie, stĺpce Kusovníka, ikony mazania, ikona Nastavení rozpočtu) — package [PACKAGE_H4.md](bloky/HARDENING/PACKAGE_H4.md) — **PR #438** (Q1/Q2 predvolená vratná voľba) | D-06 · D-07 · D-08 · D-09 | kód UI · nový ovládací prvok · predrecenzia |
+| ✅ H5 · dokumentácia okien a UI dizajnu (aktuálny stav oddelený od histórie, strážca rastu, zastarané vety) — **H5a PR #439** (mapa okien `ui-lifecycle.md` 551 → 253 kB, história do archívu, strop veľkosti mapy) · **H5b PR #440** (UI_DIZAJN = norma bez denníka, deväť zastaraných viet opravených, strážca veľkosti, značiek a inventára ikon) | B-02 · B-03 · B-05 | dokumentácia |
+| ✅ H6 · priestor v Inspectore — mockup schválený 2.10., package [PACKAGE_H6.md](bloky/HARDENING/PACKAGE_H6.md), rez: **✅ H6a · nápovedy do „?", spodok panela, stavová veta — PR #453** · **✅ H6b · lišty sektorov a súhrny — PR #454** · **✅ H6c · kóty náhľadu (11 px stále, bez „mm") — PR #455** | D-01 · D-02 · D-05 | kód UI · mockup |
+| H7 · názov zákazky na jednom mieste + nastavenia exportu v jadre — package [PACKAGE_H7.md](bloky/HARDENING/PACKAGE_H7.md), rez: **✅ H7a · nastavenia exportu v jadre + ochrana R-38 — PR #456** · **✅ H7b · názov zákazky v hlavičke Štúdia + povinný `expect` pri 4 exportoch — PR #457** | A-05 · C-07 · R-38 | kód · mockup · audit · výrobná (H7a) |
+| ✅ H8 · dielec z inej verzie štandardu (ORANGE `std_version` v Kontrole, čísla bez zmeny) — package [PACKAGE_H8.md](bloky/HARDENING/PACKAGE_H8.md) — **PR #441** | R-13 | kód · audit · in-SU |
+| ✅ H9 · ochrana nastavení dodávateľa, pravidiel ABS a kovania pred seedom (súbor zlého tvaru = poškodený; zdravý bez zmeny) — package [PACKAGE_H9.md](bloky/HARDENING/PACKAGE_H9.md) — **PR #442** | R-37 | kód · audit |
+| H10 · dve okná SketchUpu neprepíšu pravidlá kovania a rady — package [PACKAGE_H10.md](bloky/HARDENING/PACKAGE_H10.md), rez: **✅ H10a · pravidlá kovania (revízia obsahu, predkontrola, pin globálu; Q1 predvolená vratná voľba) — PR #443** · **✅ H10b · rozmerové rady (po kľúčoch s pôvodnou hodnotou kľúča; Q2 predvolená vratná voľba) — PR #444** | R-35 | kód · audit · in-SU (H10a) |
+| ✅ H11b · minimum SketchUp 2026 (starší SketchUp = jedna hláška a plugin sa nenačíta; mŕtve poistky prekrytí preč; inštalátor odmietne SketchUp < 2026) — package [PACKAGE_H11.md](bloky/HARDENING/PACKAGE_H11.md) časť I — **PR #445** (Q2 predvolená vratná voľba) | F-02 | kód |
+| ✅ H11a · načítanie súborov pluginu s jednou hláškou (chyba ktoréhokoľvek súboru = plugin v okne vypnutý, obnova reštartom; Q1) + nástroj quit testu — package [PACKAGE_H11.md](bloky/HARDENING/PACKAGE_H11.md) časť II a **§17** (ukončovanie vrátené: quit test 26.0 = poradie B) — **PR #458** | F-01 | kód · audit · in-SU · quit test |
+| ✅ H11c · ukončenie SketchUpu bez pádu (F-01, AUDIT_REGISTER R-42) — uzavreté **overením bez kódu**: **11.10.2026 na SketchUp 2026.2 (26.2.243, plugin 0.17.29): quit test 5× (3× `Sketchup.quit`, 2× Súbor > Koniec) vždy exit 0, `on_quit` 1×, poradie B, žiadny pád (#1117 sa neprejavil); plná in-SU sada 3421 PASS / 0 FAIL. Michal: Z1 sa nerobí, kód sa nemení** — [PACKAGE_H11.md](bloky/HARDENING/PACKAGE_H11.md) §18; smoke bod A9/6 (Michal) a Luciin PC (2026.2?) ostávajú otvorené. | F-01 | overenie · quit test na 2026.2 |
+| ✅ H12 · typy skriniek na jednom mieste + mená rolí — package [PACKAGE_H12.md](bloky/HARDENING/PACKAGE_H12.md), rez: **✅ H12a · register typov + jadro (čísla bez zmeny) — PR #446** · **✅ H12b · panel Ruby + payload (čísla bez zmeny) — PR #447** · **✅ H12c · JS zo servera (čísla bez zmeny) — PR #448** · **✅ H12d · mená rolí (Q1) — PR #452** | C-01 · C-05 | kód · audit · in-SU · výrobná |
+| ✅ H13 · mapa rozširovacích bodov (vrátane pravidiel viazaných na typ) + tabuľka verzií dát — [rozsirovacie-body.md](../../docs/architecture/rozsirovacie-body.md) a [STANDARD §13](../STANDARD.md) — **PR #449** | B-06 · B-07 | dokumentácia + guard testy (po H12) |
+| H14 · sekcie Štúdia na jednom mieste — package [PACKAGE_H14.md](bloky/HARDENING/PACKAGE_H14.md), rez: **✅ H14a · register sekcií + zoznamy z registra (bez viditeľnej zmeny) — PR #450** · **✅ H14b · jedna cesta prepnutia, kotvy a kreslenie sekcie z registra (bez viditeľnej zmeny) — PR #451** · **✅ H14 Q1 opravené — PR #470** | C-02 | kód · audit · predrecenzia |
+| ✅ H15 · dáta kovania oddelené od mechaniky setov — package [PACKAGE_H15.md](bloky/HARDENING/PACKAGE_H15.md), rez: **✅ H15a · seed dáta setov v `core/hardware_sets_seed.rb` + golden T0 troch modulov (výstupy bez zmeny) — PR #459** · **✅ H15b · katalóg a taxonómia v `*_seed.rb` + scenár 6 mapy — PR #460** | C-03 | kód · audit · výrobná · predrecenzia |
+| ✅ H16 · súpis knižníc (príprava D-48) — register `LibraryRegistry` + [kniznice.md](../../docs/architecture/kniznice.md), jediný koreň (bez viditeľnej zmeny) — package [PACKAGE_H16.md](bloky/HARDENING/PACKAGE_H16.md) — **PR #461** | C-04 | kód · audit |
+| H17 · spoločná príprava exportov (prvý rez R-15) — package [PACKAGE_H17.md](bloky/HARDENING/PACKAGE_H17.md), rez: ~~H17-0 · nástroj porovnania exportov~~ zrušené (Michal 9.10., package §00) · **✅ H17a · spoločná príprava `ExportPrep` (bez viditeľnej zmeny, golden H17) — PR #467** · **✅ H17b · koniec exportu — PR #471** | C-06 | kód · audit · výrobná |
+| ✅ H18 · Inspector ukáže skutočne použitý set závesov (D-149, rozhodnutie Michala 3A); nákup a ceny bez zmeny — [package](bloky/HARDENING/PACKAGE_H18.md), **PR #462** | — | kód · audit · výrobná/cenová (zobrazenie) · predrecenzia |
+
+| ✅ H18b-1 · voľba setu krídla platí (D-150 v archíve), v0.17.27 — [package](bloky/HARDENING/PACKAGE_H18b.md); predrecenzia 0 P1/P2/P3, in-SU 3400 PASS nad `337f9601` — **PR #463** | — | kód · výrobná/cenová · predrecenzia · in-SU |
+| ✅ ŠÍRKA 50 · skrinka od 50 mm + 2 nohy pod úzkou dolnou (pokyn Michala 7.–8.10.), v0.17.28 — [package](bloky/HARDENING/PACKAGE_SIRKA50.md); `CONFIG_SCHEMA` 23, seed pravidiel 8 — **PR #466** | — | kód · audit · výrobná/cenová · predrecenzia · in-SU |
+| ✅ H19 · nástroj export testu `scripts\export_test.ps1` (rozhodnutie Michala 11.10., pred uzáverom bloku) — sám urobí 4 exporty testovacej zákazky na maine (K) a na vetve (P) a vypíše `P == K` / `P != K`; nahrádza ručné R9; plugin bez zmeny, [brief](bloky/HARDENING/briefy/BRIEF_H19.md) — **PR #472** | — | nástroj · trieda S |
+
+**Otvorené po H18:** D-151 (výklop bez systému) a D-152 (oživenie mŕtveho výberu) → zásobník. D-150 opravené H18b-1, plný text a index v [archíve](DOGFOODING_vyriesene.md).
 
 ## CENY — overenie cien materiálov a ABS — UZAVRETÝ (30.9.2026, v0.17.0; štart PR #425, dávky PR #426–#428 + uzáver PR #429)
 
