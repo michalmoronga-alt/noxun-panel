@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **H19 · nástroj export testu (11.10.2026, PR #?, trieda S — plugin bez zmeny, bez bumpu verzie).** Rozhodnutie Michala 11.10.: „Nástroj export testu" ako samostatná dávka
+- **H19 · nástroj export testu (11.10.2026, PR #472, trieda S — plugin bez zmeny, bez bumpu verzie).** Rozhodnutie Michala 11.10.: „Nástroj export testu" ako samostatná dávka
   bloku 9 pred uzáverom ([brief](../zdroje/bloky/HARDENING/briefy/BRIEF_H19.md)); tlačidlo „Exportovať všetko" zapísané ako **D-154** (zásobník). Dôvod: brána R9 „P == K"
   z H17a/H17b znamenala ručné exporty Michala (~3×) a porovnanie orchestrátorom; teraz ju robí `scripts/export_test.ps1`: pod zámkom `deploy.lock` + `last_run.txt` ako
   runner skopíruje profil `%APPDATA%\NOXUN` raz, pre K (`-Base`, predvolene `origin/main`, dočasný `git worktree add --detach` v `%TEMP%\nxkp\<beh>\t`) aj P (aktuálny checkout)
