@@ -14,6 +14,9 @@
 #         `gate` nemenny, rozpocet bez `estimate`/`layout`, vynimka prejde von,
 #         cas harnessu (novy objekt, lokalny cas po rozpocte)
 #   T2    `start`: kazda vetva R1.2, `merge: true` len pri :vepo, neznamy druh
+#   R8    H17b koniec exportu: `start_dir` (N1), `remember_dir`, `name_suffix` —
+#         jedno miesto (Grep-strazca tiel a celeho pluginu) + spravanie kazdej
+#         (golden N1 je v `test_h17_golden.rb`)
 require_relative '../helper' unless defined?(NxTest)
 require_relative 'h17_harness'
 require 'rbconfig'
@@ -234,7 +237,9 @@ NxTest.test('H17 R4 e: telo exportu z KINDS necita kusovnik, expanziu, rozpocet,
       NxTest.refute(b.include?(needle), "#{meth}: #{needle.inspect} — data a nazov idu z `ctx`")
     end
     NxTest.assert(b.include?('ctx.project'), "#{meth}: nazov = ctx.project")
-    NxTest.assert(b.include?('ctx.name_note'), "#{meth}: veta automatickeho nazvu = ctx.name_note")
+    # H17b: veta automatickeho nazvu (`ctx.name_note`) ide do statusu cez
+    # `ExportPrep.name_suffix(ctx)` — strazca R8 nizsie.
+    NxTest.assert(b.include?('ExportPrep.name_suffix(ctx)'), "#{meth}: vety nazvu = ExportPrep.name_suffix(ctx)")
   end
 end
 
@@ -437,5 +442,116 @@ NxTest.test('H17 T2: neznamy druh = ArgumentError; v exporte konci vetou jeho re
   ensure
     ep.send(:remove_const, :KINDS)
     ep.const_set(:KINDS, orig)
+  end
+end
+
+# =============================================================================
+# H17b / R8 KONIEC EXPORTU — start_dir, remember_dir, name_suffix (jedno miesto)
+# =============================================================================
+
+module NxH17P
+  # Text konca exportu, ktory v tele exportu NESMIE byt (R8 — patri do ExportPrep).
+  END_IN_BODY = ['last_dir', 'File.directory?', 'pending_name_note', 'default_name_note', 'ctx.name_note'].freeze
+
+  module_function
+
+  # Riadky kodu (bez komentarov) suboru pluginu.
+  def code_lines(path)
+    File.read(path, encoding: 'UTF-8').lines.reject { |l| l.strip.start_with?('#') }
+  end
+
+  # Docasna nahrada singleton metody (vrati povodnu v ensure).
+  def with_singleton(mod, name, impl)
+    orig = mod.method(name)
+    mod.define_singleton_method(name, &impl)
+    yield
+  ensure
+    mod.define_singleton_method(name, orig)
+  end
+end
+
+NxTest.test('H17b R8: telo ziadneho exportu z KINDS nesklada koniec exportu samo (priecinok, zapamatanie, vety nazvu)') do
+  NxH17P::EP::KINDS.each do |kind, meth|
+    code = NxH17P.body(meth).lines.reject { |l| l.strip.start_with?('#') }.join
+    NxTest.refute(code.empty?, "#{meth}: telo sa naslo")
+    NxH17P::END_IN_BODY.each do |needle|
+      NxTest.refute(code.include?(needle), "#{meth} (#{kind}): #{needle.inspect} patri do ExportPrep (start_dir/remember_dir/name_suffix)")
+    end
+    picker = code.lines.find { |l| l.include?('UI.savepanel') || l.include?('UI.select_directory') }.to_s
+    NxTest.assert(picker.include?('ExportPrep.start_dir'), "#{meth}: vyber zacina v ExportPrep.start_dir (N1)")
+    NxTest.assert_equal(1, code.scan('ExportPrep.start_dir').length, "#{meth}: start_dir prave raz")
+    NxTest.assert_equal(1, code.scan('ExportPrep.remember_dir(').length, "#{meth}: remember_dir prave raz")
+    NxTest.assert_equal(1, code.scan('ExportPrep.name_suffix(ctx)').length, "#{meth}: name_suffix prave raz")
+    NxTest.assert(code.index(picker) < code.index('ExportPrep.remember_dir('),
+                  "#{meth}: priecinok sa zapamata az PO vybere (a zapise)")
+  end
+end
+
+NxTest.test('H17b R8: posledny priecinok a vety nazvu sklada v plugine LEN ExportPrep (ziadna piata kopia)') do
+  readers = []
+  writers = []
+  notes = []
+  Dir.glob(File.join(NxTest::ROOT, 'noxun_engine', '**', '*.rb')).sort.each do |path|
+    rel = path.sub("#{NxTest::ROOT}/", '')
+    NxH17P.code_lines(path).each do |l|
+      readers << rel if l.include?('ExportSettings.last_dir')
+      writers << rel if l.include?('ExportSettings.save_last_dir(')
+      notes << rel if l =~ /(?<!def )\b(?:pending_name_note|default_name_note)\(/
+    end
+  end
+  NxTest.assert_equal(['noxun_engine/ui/export_prep.rb'], readers.uniq, 'ExportSettings.last_dir cita len ExportPrep.start_dir')
+  NxTest.assert_equal(['noxun_engine/ui/export_prep.rb'], writers.uniq, 'ExportSettings.save_last_dir vola len ExportPrep.remember_dir')
+  NxTest.assert_equal(['noxun_engine/ui/export_prep.rb'], notes.uniq, 'vety nazvu sklada len ExportPrep.name_suffix')
+end
+
+NxTest.test('H17b R8.1: start_dir — existujuci priecinok (text) vrati; inak nil (neexistuje, prazdny, nil, cislo, objekt, pole)') do
+  NxTest.skip!('vyzaduje headless sandbox') unless NxTest.headless?
+  ep = NxH17P::EP
+  es = Noxun::Engine::ExportSettings
+  NxH17P::H.with_sandbox do |sandbox|
+    real = File.join(sandbox, 'export_ok')
+    Dir.mkdir(real)
+    [[real, real], [File.join(sandbox, 'premenovany'), nil], ['', nil], [nil, nil], [42, nil],
+     [{ 'cesta' => real }, nil], [[real], nil]].each do |stored, want|
+      es.save_last_dir(stored)
+      Noxun::Engine::JsonFileStore.invalidate
+      NxTest.assert_equal(stored, es.last_dir, "ulozene #{stored.inspect} (surova hodnota ostava v subore)")
+      NxTest.assert_equal(want, ep.start_dir, "start_dir pri #{stored.inspect}")
+    end
+  end
+end
+
+NxTest.test('H17b R8.2: remember_dir zapise priecinok cez save_last_dir prave raz a vysledok ignoruje (aj zlyhany)') do
+  NxTest.skip!('vyzaduje headless sandbox') unless NxTest.headless?
+  ep = NxH17P::EP
+  es = Noxun::Engine::ExportSettings
+  NxH17P::H.with_sandbox do |sandbox|
+    NxTest.assert(ep.remember_dir(sandbox).nil?, 'vysledok sa nevracia (H7 D5)')
+    Noxun::Engine::JsonFileStore.invalidate
+    NxTest.assert_equal(sandbox, es.last_dir, 'priecinok sa ulozil')
+    seen = []
+    NxH17P.with_singleton(es, :save_last_dir, ->(dir) { seen << dir; [:failed, 'zamok'] }) do
+      NxTest.assert(ep.remember_dir('D:/Zakazky').nil?, 'zlyhany zapis export nezastavi (nil, ziadna vynimka)')
+    end
+    NxTest.assert_equal(['D:/Zakazky'], seen, 'save_last_dir prave raz s tym istym priecinkom')
+  end
+end
+
+NxTest.test('H17b R8.3: name_suffix = cakajuci nazov + predvoleny „projekt" (overeny nazov) + ctx.name_note, v tomto poradi') do
+  pc = NxH17P::PC
+  args = []
+  ctx = NxH17P::EP::Context.new(:model_x, :hw_csv, NxH17P::GATE.merge(note: ' · C'))
+  NxH17P.with_singleton(pc, :pending_name_note, ->(m) { args << [:pending, m]; ' · A' }) do
+    NxH17P.with_singleton(pc, :default_name_note, ->(m, p) { args << [:default, m, p]; ' · B' }) do
+      NxTest.assert_equal(' · A · B · C', NxH17P::EP.name_suffix(ctx), 'poradie viet ako pred H17b (4 kopie)')
+    end
+  end
+  NxTest.assert_equal([[:pending, :model_x], [:default, :model_x, 'Kuchyňa Novák']], args,
+                      'model kontextu a OVERENY nazov (ctx.project), kazda veta raz')
+  NxH17P.with_singleton(pc, :pending_name_note, ->(_m) { '' }) do
+    NxH17P.with_singleton(pc, :default_name_note, ->(_m, _p) { '' }) do
+      empty = NxH17P::EP::Context.new(:m, :vepo, NxH17P::GATE.merge(note: ''))
+      NxTest.assert_equal('', NxH17P::EP.name_suffix(empty), 'bez viet = prazdny retazec (status bez zmeny)')
+    end
   end
 end

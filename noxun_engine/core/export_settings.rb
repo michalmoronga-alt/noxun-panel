@@ -283,14 +283,16 @@ module Noxun
         false
       end
 
-      # Posledny priecinok exportu — SUROVA hodnota (ako ju exporty citali
-      # doteraz; typ kontroluje VEPO cesta — zjednotenie je H17).
+      # Posledny priecinok exportu — SUROVA hodnota zo suboru. Exporty ju
+      # necitaju priamo: startovaci priecinok vyberu (text a existujuci
+      # priecinok, inak `nil`) sklada `ExportPrep.start_dir` (H17b, N1).
       def last_dir
         read['last_dir']
       end
 
       # Vysledok exporty zamerne IGNORUJU (zlyhany `last_dir` nema zastavit
-      # hotovy export; dovod je v logu `update`).
+      # hotovy export; dovod je v logu `update`) — volaju ho cez
+      # `ExportPrep.remember_dir` (H17b).
       def save_last_dir(dir)
         save('last_dir' => dir)
       end

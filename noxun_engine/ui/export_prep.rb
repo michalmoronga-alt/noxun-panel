@@ -14,6 +14,10 @@
 # `ctx = ExportPrep.start(...)` / `return unless ctx` — ziadna kopia uvodu
 # (strazca `test_h17_export_prep.rb` R4 b ho bez toho nepusti).
 #
+# KONIEC EXPORTU (H17b) je tiez jedno miesto: startovaci priecinok vyberu
+# (`start_dir`), zapamatanie priecinka po zapise (`remember_dir`) a vety
+# o nazve zakazky na konci statusu (`name_suffix`). Export ich len vola.
+#
 # PRECO `ui/`: uvod vola `ProductionCore` (okno, vety statusu, `repush`) a `core/`
 # nesmie volat `ui/`; pamat kontextu v `production_core.rb` by narazila na zakaz
 # instancnych premennych modulu. Modul je BEZSTAVOVY — `Context` zije len pocas
@@ -179,6 +183,36 @@ module Noxun
           return nil
         end
         ctx
+      end
+
+      # --- H17b: KONIEC EXPORTU (jedno miesto namiesto styroch kopii) ---------
+
+      # Startovaci priecinok vyberu suboru/priecinka — VSETKY STYRI pickery.
+      # Ulozena hodnota je SUROVA (`ExportSettings.last_dir`); plati, len ked
+      # je to text a priecinok existuje, inak `nil` = okno vyberu bez startu.
+      # VEDOMA ZMENA N1: CSV kovania a oba XLSX dostavali surovu hodnotu aj ked
+      # priecinok medzitym niekto premenoval/zmazal alebo subor nastaveni niesol
+      # nie-text (`savepanel` mohol zlyhat); VEPO ju overoval presne takto.
+      def start_dir
+        last = ExportSettings.last_dir
+        last.is_a?(String) && File.directory?(last) ? last : nil
+      end
+
+      # Zapamata priecinok PO HOTOVOM zapise. Vysledok sa zamerne ignoruje
+      # (H7 D5): zlyhany zapis nastaveni nema zhodit hotovy export — dovod je
+      # v logu `ExportSettings.update`.
+      def remember_dir(dir)
+        ExportSettings.save_last_dir(dir)
+        nil
+      end
+
+      # Vety o nazve zakazky na KONIEC zaverecneho statusu exportu, v tomto
+      # poradi: cakajuci nazov (H7a §15 A1) · predvoleny „projekt" (H7b R-B3)
+      # · automaticky -> automaticky nazov z brany `expect` (`ctx.name_note`).
+      # Farbu statusu nemenia. Nazov je OVERENY nazov kontextu (`ctx.project`).
+      def name_suffix(ctx)
+        "#{ProductionCore.pending_name_note(ctx.model)}" \
+          "#{ProductionCore.default_name_note(ctx.model, ctx.project)}#{ctx.name_note}"
       end
     end
   end

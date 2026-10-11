@@ -17,6 +17,17 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **H17b · koniec exportu (11.10.2026, v0.17.31, PR #471, trieda Ť — výrobná/cenová, predrecenzia povinná).** Druhý rez C-06 / R-15 ([PACKAGE_H17.md](../zdroje/bloky/HARDENING/PACKAGE_H17.md)
+  §6 R8, brief `briefy/BRIEF_H17b.md`): `ExportPrep.start_dir` (štartovací priečinok všetkých 4 pickerov — text a existujúci priečinok, inak `nil`; VEPO overovanie presunuté),
+  `ExportPrep.remember_dir` (zápis posledného priečinka, výsledok ignorovaný — H7 D5) a `ExportPrep.name_suffix` (pending + predvolený „projekt" + `ctx.name_note`) namiesto
+  4 kópií v `do_export`, `do_hw_csv`, `do_budget_xlsx`, `do_cp_xlsx` (rozpočet a ponuka nechávajú `plan_export_note` pred ňou). **Jediná vedomá zmena N1:** neplatný
+  uložený priečinok (premenovaný · číslo · objekt) → CSV kovania a oba XLSX otvoria výber bez štartu (predtým surová hodnota). Golden G1–G3 **bez regenerácie**;
+  nový golden N1 (samostatný commit) odvodený z G1 — na kóde pred H17b padal na CSV/XLSX, VEPO prešiel. Strážcovia R8 (telo exportu nič z konca neskladá; `last_dir`,
+  `save_last_dir`, vety názvu volá len `ExportPrep`) + správanie troch funkcií. **Mutácie (11, každá zhodená):** start_dir bez `File.directory?` · bez kontroly `String` ·
+  CSV / rozpočet / VEPO obíde start_dir · remember_dir prázdne · ponuka bez remember_dir · name_suffix v inom poradí · bez `ctx.name_note` · s neovereným názvom ·
+  rozpočet skladá vety sám. Plugin +51/−18 vrátane komentárov (export_prep, production_core, komentár export_settings; bez bumpu verzie a `?v=`). Testy: 5408 Ruby/0/0,
+  163 JS PASS; encoding PASS. In-SU runner a R9 P == K robí orchestrátor pred mergom. Nahradený text STAV: hlavička v0.17.30 H14 Q1 zhrnutá do vety; „H17b voliteľná" → ✅.
+
 - **H14 Q1 · hláška „Obnoviť" v Šablónach (11.10.2026, v0.17.30, PR #470, trieda Ľ).** Michal rozhodol opraviť Q1 z PACKAGE_H14 §13: sekcia `tpl` v registri
   `studio_sections.js` má vlastnú hlášku „Načítavam knižnicu šablón…" (predtým predvolená „Prepočítavam kusovník…"); `REFRESH_DEFAULT` ostáva pre kusovník.
   Fixtúra `h14_studio_sections.json` a golden `g5_refresh.json` upravené len pre kľúč `tpl`. Čísla ani exporty sa nemenia. Testy: 5402 Ruby/0/0, 163 JS PASS.

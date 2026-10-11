@@ -201,8 +201,8 @@ ktorý mení výrobné alebo cenové čísla či súbory, je dávka **výrobná/
 
 | Súbor | Mená | Čo tam urobiť |
 |---|---|---|
-| `noxun_engine/ui/export_prep.rb` | `ExportPrep::KINDS` · `ExportPrep.start` · `ExportPrep::Context` | riadok `kľúč: 'do_<výstup>'` v inventári; čítačka kontextu, ak výstup potrebuje nové dáta zákazky |
-| `noxun_engine/ui/production_core.rb` | `ProductionCore.do_export` · `ProductionCore.export_file_names` · `ProductionCore.pending_name_note` · `ProductionCore.default_name_note` | `do_<výstup>`: `ctx = ExportPrep.start(…)` · `return unless ctx` → vlastné brány → picker → zápis → `save_last_dir` → vety názvu (`ctx.name_note`); vlastný `rescue`; meno súboru aj do `export_file_names` (tooltip) |
+| `noxun_engine/ui/export_prep.rb` | `ExportPrep::KINDS` · `ExportPrep.start` · `ExportPrep::Context` · `ExportPrep.start_dir` · `ExportPrep.remember_dir` · `ExportPrep.name_suffix` | riadok `kľúč: 'do_<výstup>'` v inventári; čítačka kontextu, ak výstup potrebuje nové dáta zákazky |
+| `noxun_engine/ui/production_core.rb` | `ProductionCore.do_export` · `ProductionCore.export_file_names` | `do_<výstup>`: `ctx = ExportPrep.start(…)` · `return unless ctx` → vlastné brány → picker so štartom `ExportPrep.start_dir` → zápis → `ExportPrep.remember_dir(…)` → veta + `ExportPrep.name_suffix(ctx)`; vlastný `rescue`; meno súboru aj do `export_file_names` (tooltip) |
 | `noxun_engine/ui/studio_dialog.rb` | `StudioDialog.handle_export` · `StudioDialog.push_vepo_bar` | obal a callback okna; po návrate `push_vepo_bar` (echo hlavičky) |
 | `noxun_engine/ui/js/studio.js` | `nxVepoExpect` | volanie z okna nesie `expect` (názov a 18 + 36, ktoré okno ukazuje) |
 | `tests/pure/h17_harness.rb` | `NxH17.g1_cases` · `NxH17.g2_triggers` | prípad šťastnej cesty v golden H17 (matica odmietnutí G2 beží nad `KINDS` sama) |
