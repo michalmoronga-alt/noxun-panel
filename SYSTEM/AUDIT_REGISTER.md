@@ -135,7 +135,7 @@ aj renderer ponuky závisia od UI vrstvy. [E:R-08 + F-05]
 rozpočet), dialógy/fokus/statusy ostávajú v UI orchestrátore. **Podmienka poradia: až PO P0 bránach** (menia tie
 isté miesta). **Odhad: L.**
 **Prvý rez ✅ H17a (PR #467, v0.17.29):** spoločný úvod štyroch exportov `ExportPrep.start` + lenivý `ExportPrep::Context` (`ui/export_prep.rb`);
-brány druhu výstupu a dialógy ostali v exportoch. **Koniec exportu ✅ H17b (PR #?, v0.17.31):** štartovací priečinok (`ExportPrep.start_dir`, N1),
+brány druhu výstupu a dialógy ostali v exportoch. **Koniec exportu ✅ H17b (PR #471, v0.17.31):** štartovací priečinok (`ExportPrep.start_dir`, N1),
 zapamätanie priečinka (`remember_dir`) a vety názvu (`name_suffix`) na jednom mieste. Ďalej: `OutputPackage` v jadre vrátane `push_state` (Po V1).
 
 ### R-16 · P2 · core · `core/budget.rb:164-200` + `core/cp_export.rb:305-370`

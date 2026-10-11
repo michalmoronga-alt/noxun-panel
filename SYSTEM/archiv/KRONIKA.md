@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **H17b · koniec exportu (11.10.2026, v0.17.31, PR #?, trieda Ť — výrobná/cenová, predrecenzia povinná).** Druhý rez C-06 / R-15 ([PACKAGE_H17.md](../zdroje/bloky/HARDENING/PACKAGE_H17.md)
+- **H17b · koniec exportu (11.10.2026, v0.17.31, PR #471, trieda Ť — výrobná/cenová, predrecenzia povinná).** Druhý rez C-06 / R-15 ([PACKAGE_H17.md](../zdroje/bloky/HARDENING/PACKAGE_H17.md)
   §6 R8, brief `briefy/BRIEF_H17b.md`): `ExportPrep.start_dir` (štartovací priečinok všetkých 4 pickerov — text a existujúci priečinok, inak `nil`; VEPO overovanie presunuté),
   `ExportPrep.remember_dir` (zápis posledného priečinka, výsledok ignorovaný — H7 D5) a `ExportPrep.name_suffix` (pending + predvolený „projekt" + `ctx.name_note`) namiesto
   4 kópií v `do_export`, `do_hw_csv`, `do_budget_xlsx`, `do_cp_xlsx` (rozpočet a ponuka nechávajú `plan_export_note` pred ňou). **Jediná vedomá zmena N1:** neplatný
