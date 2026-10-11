@@ -1,5 +1,5 @@
 // H12 · T0 (R0.4) — CHARAKTERIZACNY ODTLACOK JS pred H12c (package
-// `SYSTEM/zdroje/bloky/HARDENING/PACKAGE_H12.md`, cast H12c).
+// `SYSTEM/archiv/bloky/HARDENING/PACKAGE_H12.md`, cast H12c).
 //   node tests/js/test_h12_golden.js
 //
 // H12c prepisuje JS Inspectora a Studia z vlastnych zoznamov a porovnani mena

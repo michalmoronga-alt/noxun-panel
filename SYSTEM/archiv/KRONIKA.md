@@ -18,7 +18,7 @@
 ## Záznamy dávok (najnovšie hore)
 
 - **H19 · nástroj export testu (11.10.2026, PR #472, trieda S — plugin bez zmeny, bez bumpu verzie).** Rozhodnutie Michala 11.10.: „Nástroj export testu" ako samostatná dávka
-  bloku 9 pred uzáverom ([brief](../zdroje/bloky/HARDENING/briefy/BRIEF_H19.md)); tlačidlo „Exportovať všetko" zapísané ako **D-154** (zásobník). Dôvod: brána R9 „P == K"
+  bloku 9 pred uzáverom ([brief](bloky/HARDENING/briefy/BRIEF_H19.md)); tlačidlo „Exportovať všetko" zapísané ako **D-154** (zásobník). Dôvod: brána R9 „P == K"
   z H17a/H17b znamenala ručné exporty Michala (~3×) a porovnanie orchestrátorom; teraz ju robí `scripts/export_test.ps1`: pod zámkom `deploy.lock` + `last_run.txt` ako
   runner skopíruje profil `%APPDATA%\NOXUN` raz, pre K (`-Base`, predvolene `origin/main`, dočasný `git worktree add --detach` v `%TEMP%\nxkp\<beh>\t`) aj P (aktuálny checkout)
   nasadí strom, otvorí **kópiu modelu pod rovnakým menom**, sonda `tests/sketchup/su_export_probe.rb` zavolá 4× `ProductionCore.do_*` (okná výberu nahradené, `expect` zo servera,
@@ -30,7 +30,7 @@
   CLAUDE.md (Testovanie, nahrádza ručné R9), PACKAGE_H17 R9, `docs/architecture/rozsirovacie-body.md`. Nahradený text STAV: „H17b: predrecenzia → runner + P == K → PR → merge"
   (→ „H19 hotové"), riadok Testov o ručnom porovnaní P == K, zhrnuté dve staré hlavičky.
 
-- **H17b · koniec exportu (11.10.2026, v0.17.31, PR #471, trieda Ť — výrobná/cenová, predrecenzia povinná).** Druhý rez C-06 / R-15 ([PACKAGE_H17.md](../zdroje/bloky/HARDENING/PACKAGE_H17.md)
+- **H17b · koniec exportu (11.10.2026, v0.17.31, PR #471, trieda Ť — výrobná/cenová, predrecenzia povinná).** Druhý rez C-06 / R-15 ([PACKAGE_H17.md](bloky/HARDENING/PACKAGE_H17.md)
   §6 R8, brief `briefy/BRIEF_H17b.md`): `ExportPrep.start_dir` (štartovací priečinok všetkých 4 pickerov — text a existujúci priečinok, inak `nil`; VEPO overovanie presunuté),
   `ExportPrep.remember_dir` (zápis posledného priečinka, výsledok ignorovaný — H7 D5) a `ExportPrep.name_suffix` (pending + predvolený „projekt" + `ctx.name_note`) namiesto
   4 kópií v `do_export`, `do_hw_csv`, `do_budget_xlsx`, `do_cp_xlsx` (rozpočet a ponuka nechávajú `plan_export_note` pred ňou). **Jediná vedomá zmena N1:** neplatný
@@ -62,7 +62,7 @@
   [REVIEW_BENCH_OCR_GROK_2026-10-10](../zdroje/REVIEW_BENCH_OCR_GROK_2026-10-10/README.md). Pravidlá, VERSION ani STAV sa nemenia.
 
 - **H17a · spoločná príprava exportov `ExportPrep` (9.10.2026, PR #467, v0.17.29, blok 9 HARDENING, C-06, prvý rez R-15).** Michal 9.10.: H17-0 (nástroj porovnania
-  exportov) **zrušené**, robí sa len refaktor ([package](../zdroje/bloky/HARDENING/PACKAGE_H17.md) §00 má prednosť; audit návrhu §15 platí). Nový modul `ui/export_prep.rb`:
+  exportov) **zrušené**, robí sa len refaktor ([package](bloky/HARDENING/PACKAGE_H17.md) §00 má prednosť; audit návrhu §15 platí). Nový modul `ui/export_prep.rb`:
   `ExportPrep.start` = generácia → flush → `ExportSettings.refresh` → brána `expect` **práve raz** (`merge: kind == :vepo`) → čerstvý zber → novšia schéma → chrbát
   (bez `rescue` a pickera); `ExportPrep::Context` s lenivými čítačkami (`project`/`merge`/`name_note` z brány, `collected`, `bom`, `smap`, `hw_exp`, `budget`, `control`),
   pamäť vrátane `nil` — fallback expanzie v `budget_payload` ostal (nil → nil aj nil → platná = 2 expanzie ako main). `do_export`, `do_hw_csv`, `do_budget_xlsx`,
@@ -78,7 +78,7 @@
   Nahradený STAV (v0.17.28): ŠÍRKA 50 PR #466 review kolo 1 → v maine; „Ďalší krok" ŠÍRKA 50 merge + smoke → H17a predrecenzia, K ↔ P, merge.
 
 - **ŠÍRKA 50 · skrinka od 50 mm + 2 nohy pod úzkou dolnou (8.10.2026, PR #466, v0.17.28).** Pokyn Michala 7.–8.10.: najmenšia šírka dolnej aj hornej skrinky 200 → **50 mm**,
-  skrinka užšia než 200 mm má **2 nohy** v strede šírky (vpredu + vzadu), v nákupe 2 ks; jedna dávka (audit BLOCKER 1), [package](../zdroje/bloky/HARDENING/PACKAGE_SIRKA50.md).
+  skrinka užšia než 200 mm má **2 nohy** v strede šírky (vpredu + vzadu), v nákupe 2 ks; jedna dávka (audit BLOCKER 1), [package](bloky/HARDENING/PACKAGE_SIRKA50.md).
   **`CONFIG_SCHEMA` 22 → 23** (vzor 15: starší plugin by 50–199 ticho klampol na 200), aktivačné konštanty bez zmeny; panel zrkadlí `validate!` (šírka ≤ 2 × hrúbka + 10 =
   červená šírka + hrúbka s vetou); preflight čiel berie šírku aj výšku z `CabinetBuilder::MIN` (výška tam bola chybne 200); Mierka pod hranicu `validate!` sa odmietne
   s hláškou (vzor D-120; config-aware klamp šírky len pri rohovej). **Seed pravidiel 7 → 8** (`max 199,999 → 2`, audit FIX 4), tvar v6/v7 v `LEGACY_SEED_SHAPES`,
@@ -123,7 +123,7 @@
   H18 10 PASS + 1402 prípadov bez rozchodov, samostatný encoding PASS. Aktuálny plný clean-git beh implementátora ostáva **5333/0/0**.
   Raw výsledok prenesený verbatim; root overil následný doc-only delta `29a2f6f2..b70836ba` aj vlastný JS beh 1402 PASS.
   Kód, goldeny a verzia bez ďalšej zmeny. Kvótová brána pred PR: Codex weekly 83 % zostáva; GH/CI spracuje root, native hinge/mixed smoke a H18b Q2 čakajú.
-  [PACKAGE_H18 §19](../zdroje/bloky/HARDENING/PACKAGE_H18.md).
+  [PACKAGE_H18 §19](bloky/HARDENING/PACKAGE_H18.md).
 
 - **H18 · oprava P2 slepej delty (3.10.2026, PR #462, v0.17.26).** Zmiešané triedy pri nekompatibilnej knižnici zobrazia uložený skrinkový set ako
   neaktívny text „uložený výber — nepoužíva sa“. Žiadny nový ovládač; Ruby, payload, writer, resolver, nákup a všetky JSON bez zmeny voči `ba4431aa`.
@@ -131,17 +131,17 @@
   oba Dmix/Dmixleg prípady reprodukované. **5333 Ruby/0 FAIL/0 SKIP, 162 JS sád/0 FAIL, M1–M34 zhodené, encoding PASS**.
   Raw výsledok bez prepísania v HARDENING; `-Shoot` z čistého `29a2f6f2` PASS/exit 0 nad Recordom `0e9e9d47`, bez SU/deploy, 0 problémov.
   Fotka `shots_20261003_030654_124956/05_panel_kovanie.png` je zdravý CAB-001 so zásuvkou; nové zmiešané označenie vizuálne nedokazuje.
-  Nová slepá delta pred PR čaká. [PACKAGE_H18 §18](../zdroje/bloky/HARDENING/PACKAGE_H18.md).
+  Nová slepá delta pred PR čaká. [PACKAGE_H18 §18](bloky/HARDENING/PACKAGE_H18.md).
 
 - **H18 · nový T7 Record po oprave predrecenzie (3.10.2026 02:25, v0.17.26).** Čistý kódový HEAD `0e9e9d47`: štandardný ui_foto -Record PASS,
   70 reálnych pushov, zdravý render zásuvkovej CAB-001 so zbalenými Setmi; závesový/blocked vizuálny smoke zostáva otvorený. Stará fotka `f204a536` je historická.
   Vlastný SketchUp PID123448 aj launcher PID113940 exit 0; bez zostávajúcej inštancie či locku. Main `2640f47b`/0.17.25 obnovený, 181 installed súborov,
-  85 live súborov a pôvodný model SHA zhodné; SU slot vrátený. Presné cesty a limity [PACKAGE_H18 §17](../zdroje/bloky/HARDENING/PACKAGE_H18.md#17--oprava-predrecenzie-codex-3102026--aktuálne-dôkazy-majú-prednosť-pred-16).
+  85 live súborov a pôvodný model SHA zhodné; SU slot vrátený. Presné cesty a limity [PACKAGE_H18 §17](bloky/HARDENING/PACKAGE_H18.md#17--oprava-predrecenzie-codex-3102026--aktuálne-dôkazy-majú-prednosť-pred-16).
 
 - **H18 · oprava predrecenzie (3.10.2026, PR #462, v0.17.26).** Predrecenzia `54f55246`: 0 P1 / 2 P2, raw výsledok zachovaný.
   Pri blocked knižnici sa uložený starší cab výber závesov nestratí; plochý cab/owner je disabled „(uložený výber)“, dedenie z effective mapy.
   Koncept 3A, writer, resolver a nákup nezmenené. Pôvodných päť R0 JSON bez diffu; samostatný oracle zo starej reťaze a 160 regresií v štyroch stavoch.
-  **5332 Ruby/0 FAIL, 162 JS sád/0 FAIL, M1–M29 zhodené, encoding PASS**; nový Record a slepá delta čakajú. Dôkazy [PACKAGE_H18 §17](../zdroje/bloky/HARDENING/PACKAGE_H18.md#17--oprava-predrecenzie-codex-3102026--aktuálne-dôkazy-majú-prednosť-pred-16).
+  **5332 Ruby/0 FAIL, 162 JS sád/0 FAIL, M1–M29 zhodené, encoding PASS**; nový Record a slepá delta čakajú. Dôkazy [PACKAGE_H18 §17](bloky/HARDENING/PACKAGE_H18.md#17--oprava-predrecenzie-codex-3102026--aktuálne-dôkazy-majú-prednosť-pred-16).
 
 - **H18 · pravdivý výber závesov v Inspectore (3.10.2026, PR #462, v0.17.26, blok 9 HARDENING, D-149; rozhodnutie Michala 3A).**
   Audit-povinná + výrobná/cenová (konzervatívne, len zobrazenie); audit návrhu uzavretý 2.10. (0 BLOCKER, 5 FIX, 3 NOTE), predrecenzia pred PR.
@@ -152,10 +152,10 @@
   zachovaný (jediné vymenované textové opravy `explain`). Zápisová akcia bez zmeny, pripnutá zdrojovým guardom; in-SU nie je brána.
   **Kontroly:** 5331 headless / 0 FAIL, 162 JS sád / 0 FAIL; M1–M23 zhodené (vrátane cenovej M23), stromy po mutáciách obnovené; encoding PASS; ui_foto -Record PASS nad f204a536, PID112260 sa sám zavrel (exit 0); main 0.17.25 obnovený.
   Architektúra prepísaná na mieste, patch a všetky cache značky 0.17.26. D-149 archivované, **D-150 otvorené a H18b čaká na odpoveď Q2**;
-  D-151/D-152 v zásobníku, D-153 ostáva podmienený návrh. Package [H18](../zdroje/bloky/HARDENING/PACKAGE_H18.md) §15, surový audit a brief prenesené do repa.
+  D-151/D-152 v zásobníku, D-153 ostáva podmienený návrh. Package [H18](bloky/HARDENING/PACKAGE_H18.md) §15, surový audit a brief prenesené do repa.
 
 - **H16 · súpis knižníc a úložísk na počítači — príprava D-48 (2.10.2026, PR #461, v0.17.25, blok 9 · HARDENING PO V1, triedenie C-04 = GR-03 · CX k D-48;
-  package [PACKAGE_H16.md](../zdroje/bloky/HARDENING/PACKAGE_H16.md) — **§15 a potvrdenie orchestrátora majú prednosť**, brief [BRIEF_H16.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H16.md)).**
+  package [PACKAGE_H16.md](bloky/HARDENING/PACKAGE_H16.md) — **§15 a potvrdenie orchestrátora majú prednosť**, brief [BRIEF_H16.md](bloky/HARDENING/briefy/BRIEF_H16.md)).**
   Audit-povinná (nový modul), nie výrobná/cenová, predrecenzia povinná. **Bez viditeľnej zmeny** — golden prvého behu (T0, 1. commit na starom kóde) nedotknutý.
   **Register** `core/library_registry.rb` (čisté dáta, hlboko zmrazené): 30 riadkov koreňa `%APPDATA%\NOXUN\Engine` (12 zdieľaných pri D-48 = 9 knižníc + 3 priečinky
   príloh, 18 len pre tento PC) s druhom, zámkom a jeho režimom (`module caller mixed self none`), verziami zo STANDARD §13.1, prílohami, vzormi finálnych
@@ -176,7 +176,7 @@
   `Materials.dir`) · veta `kniznice.md` o výnimke `ApplianceCatalog.test_dir_override`. Testy: **5322 headless · 161 JS** + encoding guard; in-SU **3387 / 0** (odporúčaný beh, `-CloseWhenDone`).
   Nahradený stav v STAV: „H15 hotová; ďalej H16–H18".
 - **H15b · seed dáta katalógu a taxonómie kovania v samostatných súboroch (2.10.2026, PR #460, v0.17.24, blok 9 · HARDENING PO V1, triedenie C-03 = CX-03;
-  package [PACKAGE_H15.md](../zdroje/bloky/HARDENING/PACKAGE_H15.md) — **§15 A2 má prednosť**, brief [BRIEF_H15.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H15.md)).**
+  package [PACKAGE_H15.md](bloky/HARDENING/PACKAGE_H15.md) — **§15 A2 má prednosť**, brief [BRIEF_H15.md](bloky/HARDENING/briefy/BRIEF_H15.md)).**
   Audit-povinná (dva nové moduly) + výrobná/cenová (presúva sa zdroj nákupných kódov a seed cien), predrecenzia povinná, in-SU netreba (§8). **Presun 1:1:**
   `SEED_SET_VERSION` + história, manifest `SEED_ROWS` (146 riadkov) so sprievodnými zoznamami, v2 tvar `SEED_ROWS_V2` a zoznamy patchov v2..v5 doslovne do
   `core/hardware_catalog_seed.rb`; `SEED_VERSION`, `SEED_MANUFACTURERS`, `SEED_SERIES` do `core/hardware_taxonomy_seed.rb`; oba tesne pred svojou logikou
@@ -192,8 +192,8 @@
   Testy: **5295 headless · 161 JS** + encoding guard; golden T0 bez regenerácie zelený.
   Nahradený stav v STAV: „H15a hotová, katalóg a výrobcovia nasledujú v H15b".
 - **H15a · seed dáta setov kovania v samostatnom súbore (2.10.2026, PR #459, v0.17.23, blok 9 · HARDENING PO V1, triedenie C-03 = CX-03 · GR-07; package
-  [PACKAGE_H15.md](../zdroje/bloky/HARDENING/PACKAGE_H15.md) — **§15 má prednosť** (A1 golden nákupu s explicitnými materiálmi), surový audit
-  [AUDIT_H15_raw.md](../zdroje/bloky/HARDENING/AUDIT_H15_raw.md), brief [BRIEF_H15.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H15.md)).** Audit-povinná (nový modul)
+  [PACKAGE_H15.md](bloky/HARDENING/PACKAGE_H15.md) — **§15 má prednosť** (A1 golden nákupu s explicitnými materiálmi), surový audit
+  [AUDIT_H15_raw.md](bloky/HARDENING/AUDIT_H15_raw.md), brief [BRIEF_H15.md](bloky/HARDENING/briefy/BRIEF_H15.md)).** Audit-povinná (nový modul)
   + výrobná/cenová (presúva sa zdroj nákupných kódov), predrecenzia povinná. **1. commit = golden T0 pre všetky tri moduly** (`tests/pure/test_h15_seed_golden.rb`,
   ručný generátor a fixtúry `tests/fixtures/h15_golden/`): G1 konštanty (zmrazenie, poradie, SHA-256 `Marshal` a JSON), G2 čerstvá inštalácia plným textom troch
   súborov, G3 upgrade knižnice setov (v1, v4, v7 nohy nedotknuté/premenované, migrácia `leg`, kolízia príchytu, vlastná triedna hodnota, konflikt taxonómie, v8),
@@ -208,7 +208,7 @@
   **Mutácie** M1–M10, M12, M14–M17 a A1 (HK bez materiálov) zhodené (M3 `17.0` → `17` chytí G1 aj `seed_library`). **Predrecenzia** 0/0/2 P3 opravené: guard R5 c chytí aj `MAPPING_ADDITIONS*`/`MAPPING_MIGRATIONS*`/`DEFAULT_SETS*` a presunuté mená; nový golden **G7b** (Tip-On zásuvka, Tip-On dvierka, sokel 18 mm — kódy 272212, 352908, 250831, 245723) vygenerovaný nad stromom mainu `d69f3e55`. Testy: **5284 headless · 161 JS** + encoding
   guard; golden T0 bez regenerácie zelený; in-SU **3387 / 0** na `0dc79fee` (neskôr len dokumentácia). Package a audit skopírované do priečinka bloku.
 - **H11a · načítanie súborov pluginu s jednou hláškou + nástroj quit testu (2.10.2026, PR #458, v0.17.22, blok 9 · HARDENING PO V1, triedenie F-01; package
-  [PACKAGE_H11.md](../zdroje/bloky/HARDENING/PACKAGE_H11.md) časť II + §15/§16 a **§17 (rozhodnutie orchestrátora)**; brief [BRIEF_H11.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H11.md);
+  [PACKAGE_H11.md](bloky/HARDENING/PACKAGE_H11.md) časť II + §15/§16 a **§17 (rozhodnutie orchestrátora)**; brief [BRIEF_H11.md](bloky/HARDENING/briefy/BRIEF_H11.md);
   Q1 Michal 2.10.: chyba súboru = celý plugin vypnutý).** Audit-povinná (nový modul), predrecenzia povinná, nie výrobná/cenová. **Nový modul `core/app_lifecycle.rb`**
   (čistý Ruby, prvý súbor pluginu): bootstrap v `main.rb` s vlastnou chybovou vetvou a sentinelom `LOADED`, 91 súborov `main.rb` + 14 častí `panel.rb` cez
   `AppLifecycle.require_part` (Ruby `require` s absolútnou cestou, záznam chyby, pokračuje sa), `Engine.init_allowed?` pustí init len nad celým pluginom, inak
@@ -222,8 +222,8 @@
   `test_h11a_lifecycle.rb` T0a charakterizácia ručného zatvorenia; 9 textových testov len prefix `require_part`) · **161 JS sád** · encoding guard; mutácie
   načítania M10–M13 a M15 zabité; predrecenzia 0× P1/P2, 4× P3 opravené (veta updatera o `main.rb`, quit test = záznam bez brány — kritériá pre Z1 prepíše H11c, prísnejšia stráž načítania, hlavička testu). Dokumentácia: odsek `app_lifecycle.rb` (ui-lifecycle.md, so zmeraným poradím B), updater, `SKETCHUP_PRAVIDLA.md`, router `ARCHITEKTURA.md`.
 - **H7b · názov zákazky v hlavičke Štúdia + povinný `expect` pri štyroch exportoch (2.10.2026, PR #457, v0.17.21, blok 9 · HARDENING PO V1, triedenie A-05; package
-  [PACKAGE_H7.md](../zdroje/bloky/HARDENING/PACKAGE_H7.md) §6 R-B1–R-B12 + §15–§17 (§17 C1/C2 má prednosť); mockup
-  [MOCKUP_H7_NAZOV_ZAKAZKY.html](../zdroje/bloky/HARDENING/MOCKUP_H7_NAZOV_ZAKAZKY.html) PLATÍ, O1–O9; brief [BRIEF_H7.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H7.md)).**
+  [PACKAGE_H7.md](bloky/HARDENING/PACKAGE_H7.md) §6 R-B1–R-B12 + §15–§17 (§17 C1/C2 má prednosť); mockup
+  [MOCKUP_H7_NAZOV_ZAKAZKY.html](bloky/HARDENING/MOCKUP_H7_NAZOV_ZAKAZKY.html) PLATÍ, O1–O9; brief [BRIEF_H7.md](bloky/HARDENING/briefy/BRIEF_H7.md)).**
   Druhá časť H7, **nový ovládací prvok v UI** (predrecenzia povinná), **nie výrobná/cenová** — mená aj bajty exportov bez zmeny (golden H7a T0a/T0c zelený bez regenerácie,
   `export_file_names` = fixtúra mien pre 11 názvov). **Hlavička Štúdia** v každej sekcii: „Zákazka: <názov> ✎" (`jobHeadHtml`), tri podoby zo servera (`vepo.source`:
   zadaný · podľa súboru · predvolený „projekt" s jantárovou bodkou), `#stModel` zanikol; **editor na mieste** (Enter/blur uloží so zachyteným dokumentom, Escape zruší
@@ -256,8 +256,8 @@
   návrh od neho nezávisí (pri obrátenom poradí export odmietne a stačí klik znova).
 
 - **H7a · nastavenia exportu v jadre + ochrana R-38 (2.10.2026, PR #456, v0.17.20, blok 9 · HARDENING PO V1, triedenie A-05 · C-07 · R-38; package
-  [PACKAGE_H7.md](../zdroje/bloky/HARDENING/PACKAGE_H7.md) §6 R0, R-A1–R-A9 + §15–§17; surové audity `AUDIT_H7_raw.md`, `AUDIT_H7_delta_raw.md`, `AUDIT_H7_delta2_raw.md`;
-  brief [BRIEF_H7.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H7.md)).** Prvá z dvoch častí H7, **výrobná/cenová dávka** (rozsah zmeny len pri poškodenom súbore: pri zlom tvare
+  [PACKAGE_H7.md](bloky/HARDENING/PACKAGE_H7.md) §6 R0, R-A1–R-A9 + §15–§17; surové audity `AUDIT_H7_raw.md`, `AUDIT_H7_delta_raw.md`, `AUDIT_H7_delta2_raw.md`;
+  brief [BRIEF_H7.md](bloky/HARDENING/briefy/BRIEF_H7.md)).** Prvá z dvoch častí H7, **výrobná/cenová dávka** (rozsah zmeny len pri poškodenom súbore: pri zlom tvare
   + dobrej zálohe sa názov zákazky **aj „18 + 36"** berú zo zálohy — dnes `{}` → meno `.skp` a zlúčenie 18/36 proti nastaveniu v zálohe). **Poradie commitov:** (1) golden nad starým
   kódom (`tests/fixtures/h7_golden/` — T0a mená a nadpisy 4 exportov pre 11 názvov, T0b bajty `vepo_settings.json` aj `.bak` po 8 krokoch vrátane zápisu druhej inštancie, T0c štyri exporty
   end-to-end bez stubu názvu a nastavení, 4 scenáre) → (2) ochrana na mieste v `ui/production_core.rb` → (3) čistý presun do **`core/export_settings.rb`** (`Noxun::Engine::ExportSettings`,
@@ -281,8 +281,8 @@
   zo zálohy (Q1 „nie"), `last_dir` zlého typu v troch exportoch (N1 → H17).
 
 - **H6c · kóty náhľadu (2.10.2026, PR #455, v0.17.19, blok 9 · HARDENING PO V1, triedenie D-02; package
-  [PACKAGE_H6.md](../zdroje/bloky/HARDENING/PACKAGE_H6.md) §6 „H6c" + §15; mockup [MOCKUP_H6_INSPECTOR.html](../zdroje/bloky/HARDENING/MOCKUP_H6_INSPECTOR.html) časť E;
-  rozhodnutia Michala 2.10. O10 A, O11 A; brief [BRIEF_H6.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H6.md)).** Tretia z troch častí H6. **Kóty a popisy v náhľade majú stálu veľkosť
+  [PACKAGE_H6.md](bloky/HARDENING/PACKAGE_H6.md) §6 „H6c" + §15; mockup [MOCKUP_H6_INSPECTOR.html](bloky/HARDENING/MOCKUP_H6_INSPECTOR.html) časť E;
+  rozhodnutia Michala 2.10. O10 A, O11 A; brief [BRIEF_H6.md](bloky/HARDENING/briefy/BRIEF_H6.md)).** Tretia z troch častí H6. **Kóty a popisy v náhľade majú stálu veľkosť
   na obrazovke:** 11 px (čísla medzier Čiel 10 px), čiara 1 px (`non-scaling-stroke`), **bez „mm"** („Š 800", „V 864", „H 520", „sokel 100", „telo 764") — pri spodnej 800 × 864
   doteraz 6,5 px, pri vysokej 600 × 2100 3 px, pri malej skrinke nafúknuté na ~15 px. `viewBox` ostáva v **mm** (ťahanie priečky, výber zóny a klik na značku kovania bez zmeny),
   mierka `pvS` (px na mm práve kreslenej kresby) sa berie z aktuálneho `viewBox`, takže 11 px platí aj po zoome; rezerva okraja na kóty (`DIM_EXT` 70 mm, `DIM_TOP`, `DIM_DEPTH_OFF`,
@@ -302,8 +302,8 @@
   v Korpuse, Zónach aj Čelách; výnimky T0 zúžené na pásma 40 a 71; nový test, že sa žiadne dva texty kót neprekrývajú. Golden prípadu `fronts_presah` regenerovaný nad starým kódom
   (oprava nereálnych, prekrývajúcich sa čiel v dátach prípadu, nie zmena správania).
 - **H6b · lišty sektorov a súhrny (2.10.2026, PR #454, v0.17.18, blok 9 · HARDENING PO V1, triedenie D-01 pás + D-05; package
-  [PACKAGE_H6.md](../zdroje/bloky/HARDENING/PACKAGE_H6.md) §6 „H6b" + §15; mockup [MOCKUP_H6_INSPECTOR.html](../zdroje/bloky/HARDENING/MOCKUP_H6_INSPECTOR.html) časti B–D, F;
-  rozhodnutia Michala 2.10. O6, O7, O9, O12; brief [BRIEF_H6.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H6.md)).** Druhá z troch častí H6. **Pás „Skrinka … upravíš
+  [PACKAGE_H6.md](bloky/HARDENING/PACKAGE_H6.md) §6 „H6b" + §15; mockup [MOCKUP_H6_INSPECTOR.html](bloky/HARDENING/MOCKUP_H6_INSPECTOR.html) časti B–D, F;
+  rozhodnutia Michala 2.10. O6, O7, O9, O12; brief [BRIEF_H6.md](bloky/HARDENING/briefy/BRIEF_H6.md)).** Druhá z troch častí H6. **Pás „Skrinka … upravíš
   v Korpuse" (`#ctxNote`) zanikol:** mimo Korpusu je v lište sektora Náhľad **odkaz s rozmermi skrinky** (`#s1Link`, „800 × 864 × 520 · sokel 100 →", tá istá funkcia
   `metaDims` ako lišta Základné, rohová aj „dvere vľavo 450"), klik otvorí Korpus a sektor nezbalí (`nxS1Link` = `nxTipStop` + `setViewContext`), bublina povie materiál
   korpusu (`NXShell.s1LinkTitle`; popis sa prekladá až pri kreslení, takže premenovanie dekoru ju zmení). `sectorVis` vracia `{ basic, mat, link }`. **Lišta sektora
@@ -324,9 +324,9 @@
   pre skrinku" sa reže pred „ · " (žiadne „K009 · ·"), scéna Kovania zahŕňa čelá s presahom dole a dielce rohovej zostavy, `aria-label` odkazu začína viditeľným textom.
 
 - **H6a · nápovedy, spodok panela a stavová veta (2.10.2026, PR #453, v0.17.17, blok 9 · HARDENING PO V1, triedenie D-01 — CU-04, CU-11, GR-22, CS-10; package
-  [PACKAGE_H6.md](../zdroje/bloky/HARDENING/PACKAGE_H6.md) §6 „H6a" + §15; mockup [MOCKUP_H6_INSPECTOR.html](../zdroje/bloky/HARDENING/MOCKUP_H6_INSPECTOR.html);
-  rozhodnutia Michala 2.10. v [ROZHODNUTIA_MICHALA_2026-10-01.md](../zdroje/bloky/HARDENING/ROZHODNUTIA_MICHALA_2026-10-01.md); brief
-  [BRIEF_H6.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H6.md)).** Prvá z troch častí H6 (H6a nápovedy a spodok → H6b lišty a súhrny → H6c kóty). Pomocné vety, ktoré
+  [PACKAGE_H6.md](bloky/HARDENING/PACKAGE_H6.md) §6 „H6a" + §15; mockup [MOCKUP_H6_INSPECTOR.html](bloky/HARDENING/MOCKUP_H6_INSPECTOR.html);
+  rozhodnutia Michala 2.10. v [ROZHODNUTIA_MICHALA_2026-10-01.md](bloky/HARDENING/ROZHODNUTIA_MICHALA_2026-10-01.md); brief
+  [BRIEF_H6.md](bloky/HARDENING/briefy/BRIEF_H6.md)).** Prvá z troch častí H6 (H6a nápovedy a spodok → H6b lišty a súhrny → H6c kóty). Pomocné vety, ktoré
   trvalo zaberali riadky, sú „?" (stavové vety ostali viditeľné): jedno **„?" vedľa kamery pod náhľadom** (text podľa režimu a kontextu — čistá `NXShell.pvHelpText`:
   Zóny a označený dielec = klik na zónu a ťahanie priečky, Čelá = klik na čelo, Kovanie = klik na značku, inak len zoom a posun), „?" v hlavičkách **Štruktúra zón ·
   Položky z pravidiel · Sety · Pravidlá**, v lište **Materiály** (len pri označenej skrinke), v riadku **Spotrebič** (pri prázdnom očakávaní; „očakáva rúru" ostáva ako
@@ -341,7 +341,7 @@
   roly ako Kusovník; Kusovník, VEPO, nákup a rozpočet bez zmeny).
 
 - **H12d · mená rolí na jednom mieste (2.10.2026, PR #452, v0.17.16, blok 9 · HARDENING PO V1, triedenie C-05 — GR-04; package
-  [PACKAGE_H12.md](../zdroje/bloky/HARDENING/PACKAGE_H12.md) R0.6, R4, §15 A3 A5 A6; brief [BRIEF_H12d.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H12d.md)).**
+  [PACKAGE_H12.md](bloky/HARDENING/PACKAGE_H12.md) R0.6, R4, §15 A3 A5 A6; brief [BRIEF_H12d.md](bloky/HARDENING/briefy/BRIEF_H12d.md)).**
   Karta dielca mala vlastnú JS mapu `roleLabel`, ktorá sa od stĺpca Rola v Kusovníku líšila v 9 rolách („Vrch" vs „Strop", „Priečka zvislá", „Zásuvkové
   čelo", surové `drawer_bottom` a `free_panel`); `outputs.md` pritom tvrdil, že je zhodná (F1). Teraz **`PartKeys::ROLE_LABELS` + `role_label`** je jediná
   tabuľka (doslovne bývalá `ProductionCore::ROLE_LABELS`; tá je alias a delegácia), `ZONE_PART_LABELS`/`DRAWER_PART_LABELS` sú z nej odvodené (bajtovo),
@@ -358,7 +358,7 @@
   H14b hotová, ďalší krok H12d. Testy: **5167 headless · 157 JS sád** zelené + encoding guard; in-SU netreba (žiadny builder, observer, undo ani zápis).
 
 - **H14b · jedna cesta prepnutia sekcie, kotvy a kreslenie sekcie z registra (1.10.2026, PR #451, v0.17.15, blok 9 · HARDENING PO V1, triedenie C-02
-  časť 2 — CX-04 + GR-06 klient; package [PACKAGE_H14.md](../zdroje/bloky/HARDENING/PACKAGE_H14.md) §15 A1 A3).**
+  časť 2 — CX-04 + GR-06 klient; package [PACKAGE_H14.md](bloky/HARDENING/PACKAGE_H14.md) §15 A1 A3).**
   Klik v navigácii a deep-link prepínali sekciu dvoma kópiami tých istých háčikov a `renderTools`/`renderBody` mali po 11 vetiev podľa id. Teraz
   **`studioSwitchSection(id, guid)`** je jediná cesta prechodu (whitelist registrom → kontext dokumentu → `closeSectionMenus` → `leave` → `studioSec` →
   `enter`); `studioGoSection` kreslí **len po úspešnom prepnutí** (neznáme id = žiadny zápis do okna, A3); deep-link pridá kotvu z riadka (`anchor`
@@ -373,7 +373,7 @@
   v0.17.14, H14a hotová, ďalší krok H14b. Testy: **5160 headless · 156 JS sád** zelené + encoding guard; in-SU netreba (Ruby len verzia).
 
 - **H14a · register sekcií Štúdia a zoznamy z registra (1.10.2026, PR #450, v0.17.14, blok 9 · HARDENING PO V1, triedenie C-02 časť 1 — CX-05;
-  package [PACKAGE_H14.md](../zdroje/bloky/HARDENING/PACKAGE_H14.md) + audit [AUDIT_H14_raw.md](../zdroje/bloky/HARDENING/AUDIT_H14_raw.md), §15 A2 A4 A5).**
+  package [PACKAGE_H14.md](bloky/HARDENING/PACKAGE_H14.md) + audit [AUDIT_H14_raw.md](bloky/HARDENING/AUDIT_H14_raw.md), §15 A2 A4 A5).**
   Sekcia Štúdia sa prihlasovala na 13 miestach v 4 súboroch (zoznam 3×, `NAV`, `SEC_META`, `REFRESH_STATUS`, `SS_SECTIONS`, dve cesty prechodu, kotvy).
   Nový modul `ui/js/studio_sections.js` (`NXStudioSections`: `ids` · `has` · `get` · `groups` · `inModule` · `fn` · `REFRESH_DEFAULT`, riadky zmrazené)
   je jediný zoznam na klientovi; Ruby `StudioDialog::SECTIONS` ostáva serverovým whitelistom (D1) a paritu (aj poradie) stráži **nezávislá fixtúra**
@@ -391,7 +391,7 @@
   Testy: **5157 headless · 155 JS sád** zelené + encoding guard; in-SU netreba (Ruby len komentár a verzia).
 
 - **H13 · mapa rozširovacích bodov + jedna tabuľka verzií dát (1.10.2026, PR #449, dokumentácia + guard testy, plugin bez zmeny, blok 9 · HARDENING PO V1,
-  triedenie B-06 · B-07; krížový audit CN-02, CN-03, CN-04; brief [BRIEF_H13.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H13.md)).**
+  triedenie B-06 · B-07; krížový audit CN-02, CN-03, CN-04; brief [BRIEF_H13.md](bloky/HARDENING/briefy/BRIEF_H13.md)).**
   Zoznam miest pre nový typ skrinky žil len v archíve rohovej (s číslami riadkov k v0.14.0) a v package H12, čísla schém v piatich dokumentoch.
   Nový súbor mapy [rozsirovacie-body.md](../../docs/architecture/rozsirovacie-body.md) (riadok v rozcestníku, strop 20 kB, sekcia História ako
   ui-lifecycle) má päť scenárov — nový typ skrinky, nová rola dielca, nový stĺpec Kusovníka (trieda podľa hraníc B-09), nová sekcia Štúdia, nové
@@ -413,7 +413,7 @@
   Testy: **5148 headless · 153 JS sád** zelené + encoding guard; in-SU netreba (plugin bez zmeny).
 
 - **H12c · JS Inspectora a Štúdia číta typy skriniek zo servera (1.10.2026, PR #448, v0.17.13, blok 9 · HARDENING PO V1, triedenie C-01; package
-  [PACKAGE_H12.md](../zdroje/bloky/HARDENING/PACKAGE_H12.md) časť H12c, §15 A1 a A6).**
+  [PACKAGE_H12.md](bloky/HARDENING/PACKAGE_H12.md) časť H12c, §15 A1 a A6).**
   JS mal 8 vlastných zoznamov typu a ~60 porovnaní mena (`CAB_TYPES`, `INSERT_TYPES`, `NX_TYPE_LABEL`, `TYPE_LIMITS`, `LEGS_INSERT_TYPES`, `NX_CTX_LOCK`,
   `TPL_TYPE_LOCK`, `TPL_TYPE_WORDS`, `t === 'upper'`…). Nový register **`NXTypes`** v `core.js` nasadí **prvý príkaz `NX.init`** z `cabinet_types`
   (`CabinetTypes.client_payload`); miesta sa pýtajú vlastností s presnou množinou (§0.4): sokel 0 v `currentCarcass`/krížovej kontrole = `hangs`, návrh čiel,
@@ -431,7 +431,7 @@
   STAV pred dávkou: v0.17.12 · H12b hotová · Robí sa H6/H7 (mockupy), H11a · Ďalší krok H12c, H12d.
 
 - **H12b · panel Ruby z registra typov + payload pre klienta (1.10.2026, PR #447, v0.17.12, blok 9 · HARDENING PO V1, triedenie C-01; package
-  [PACKAGE_H12.md](../zdroje/bloky/HARDENING/PACKAGE_H12.md) časť H12b, §15 A2 a A6).**
+  [PACKAGE_H12.md](bloky/HARDENING/PACKAGE_H12.md) časť H12b, §15 A2 a A6).**
   Panel Ruby (`ui/panel/actions_cabinet`, `actions_templates`, `actions_zones`, `actions_appliance`, `payloads`, `sync`) a `templates_dialog.rb` sa už nepýtajú
   mena typu (`== 'dishwasher'`, `== CORNER_TYPE`, `%w[lower upper]`), ale vlastností registra `CabinetTypes`: slot = `!carcass?` (preflight, telo/chrbát,
   `slot_payload`, typ zo šablóny), rozsahy preflightu = `limits`, rohová = `corner?`, čelá = `fronts`, vnútro = `zones`, vlastník spotrebiča = `appliance_owner`,
@@ -451,7 +451,7 @@
   STAV pred dávkou: v0.17.11 · H12a hotová · Robí sa H6/H7 (mockupy), H11a · Ďalší krok H12b, H12c, H12d.
 
 - **H12a · register typov skrinky + jadro (1.10.2026, PR #446, v0.17.11, blok 9 · HARDENING PO V1, triedenie C-01; package
-  [PACKAGE_H12.md](../zdroje/bloky/HARDENING/PACKAGE_H12.md) — §15 audit návrhu 0 BLOCKER · 6 FIX [AUDIT_H12_raw.md](../zdroje/bloky/HARDENING/AUDIT_H12_raw.md);
+  [PACKAGE_H12.md](bloky/HARDENING/PACKAGE_H12.md) — §15 audit návrhu 0 BLOCKER · 6 FIX [AUDIT_H12_raw.md](bloky/HARDENING/AUDIT_H12_raw.md);
   rez H12a → H12b panel Ruby → H12c JS → H12d mená rolí).**
   Typ skrinky sa dodnes rozhodoval ~75 vetvami podľa mena (`== 'upper'`, `when 'dishwasher'`) v 17 súboroch; nový modul `core/cabinet_types.rb`
   (`CabinetTypes`) drží typy a ich **vlastnosti** (§0.4: `hang_z` „visí" a `on_floor` „stojí" ako dve zámerne odlišné množiny, `builder`, `limits`,
@@ -471,8 +471,8 @@
   STAV pred dávkou: v0.17.10 · H11b hotová · Robí sa H6/H7 (mockupy), H11a · Ďalší krok H11a, potom H12–H17.
 
 - **H11b · minimum SketchUp 2026 (1.10.2026, PR #445, v0.17.10, blok 9 · HARDENING PO V1, triedenie F-02; package
-  [PACKAGE_H11.md](../zdroje/bloky/HARDENING/PACKAGE_H11.md) časť I, audit návrhu 2 BLOCKER · 5 FIX · 2 NOTE [AUDIT_H11_raw.md](../zdroje/bloky/HARDENING/AUDIT_H11_raw.md)
-  + delta [AUDIT_H11_delta_raw.md](../zdroje/bloky/HARDENING/AUDIT_H11_delta_raw.md) — rez H11b → H11a (príprava na 2026.2) → H11c (overenie na 2026.2)).**
+  [PACKAGE_H11.md](bloky/HARDENING/PACKAGE_H11.md) časť I, audit návrhu 2 BLOCKER · 5 FIX · 2 NOTE [AUDIT_H11_raw.md](bloky/HARDENING/AUDIT_H11_raw.md)
+  + delta [AUDIT_H11_delta_raw.md](bloky/HARDENING/AUDIT_H11_delta_raw.md) — rez H11b → H11a (príprava na 2026.2) → H11c (overenie na 2026.2)).**
   Loader dodnes verziu SketchUpu nekontroloval (sonda S14: 24.0 aj 26.0 sa zaregistrovali). Teraz `SketchupMinimum.check` (mimo `module Boot`, `MIN_SKETCHUP_MAJOR = 26`)
   beží **pred** `Boot.recover!`: starší SketchUp = `:unsupported`, jedna hláška s verziou, **bez zámku, lease aj registrácie**. Zdroj podľa delta auditu N6 je číselné
   `version_number` (major = číslo / 100 000 000 — **in-SU overené: 26.0.429 → 2600000429**), reťazec je záloha; **oproti package navyše:** keď sú oba zdroje čitateľné
@@ -486,7 +486,7 @@
   bez poistiek, opätovné zapnutie cez `drop_registered`, vypnutie). Predrecenzia nepovinná (bežná dávka, < 300 riadkov kódu pluginu, bez ovládacieho prvku).
   STAV pred dávkou: v0.17.9 · H10b hotová · Robí sa H6/H7 (mockupy) · Ďalší krok H6/H7, potom H11–H17.
 - **H10b · dve okná SketchUpu a rozmerové rady (1.10.2026, PR #444, v0.17.9, blok 9 · HARDENING PO V1, register R-35 — časť rady, R-35 tým uzavreté; package
-  [PACKAGE_H10.md](../zdroje/bloky/HARDENING/PACKAGE_H10.md) časť R2, audit návrhu spoločný s H10a).**
+  [PACKAGE_H10.md](bloky/HARDENING/PACKAGE_H10.md) časť R2, audit návrhu spoločný s H10a).**
   „Uložiť rady" v koliesku Inspectora posielalo všetkých 5 radov tak, ako ich panel dostal pri otvorení — úplná náhrada `dim_series.json`, dve okná sa prebíjali
   „posledný vyhráva" (sonda P2: 700 v Šírkach z okna A zaniklo, keď B zmenilo len Hĺbky). Teraz **zápis po kľúčoch s pôvodnou hodnotou kľúča**:
   `DimSeries.update!(changes, base)` → `[status, rady, kľúče]` pod zámkom v poradí brána degradovaného súboru → starší klient (`:stale_client`, chýba `base`) →
@@ -501,8 +501,8 @@
   **Predrecenzia:** 0× P1, 0× P2, 2× P3 — hláška konfliktu bola len v `#status` pod prekrytím modalu (teraz aj riadok `#serStatus` priamo v sekcii Rozmerové rady)
   a obe okná so zhodnou hodnotou toho istého radu dávali zbytočný konflikt (teraz zhoda = OK); verdikt PR OK. In-SU nie je brána (model sa nemení). STAV pred dávkou: v0.17.8 · H10a hotová · Robí sa H6/H7 (mockupy), nasleduje H10b · Ďalší krok H10b.
 - **H10a · dve okná SketchUpu a globálne pravidlá kovania (1.10.2026, PR #443, v0.17.8, blok 9 · HARDENING PO V1, register R-35 — časť pravidlá; package
-  [PACKAGE_H10.md](../zdroje/bloky/HARDENING/PACKAGE_H10.md), audit návrhu 1 BLOCKER · 3 FIX · 3 NOTE [AUDIT_H10_raw.md](../zdroje/bloky/HARDENING/AUDIT_H10_raw.md)
-  + delta 7/7 RESOLVED [AUDIT_H10_delta_raw.md](../zdroje/bloky/HARDENING/AUDIT_H10_delta_raw.md); rez H10a → H10b).**
+  [PACKAGE_H10.md](bloky/HARDENING/PACKAGE_H10.md), audit návrhu 1 BLOCKER · 3 FIX · 3 NOTE [AUDIT_H10_raw.md](bloky/HARDENING/AUDIT_H10_raw.md)
+  + delta 7/7 RESOLVED [AUDIT_H10_delta_raw.md](bloky/HARDENING/AUDIT_H10_delta_raw.md); rez H10a → H10b).**
   „Aj ako globálnu predvoľbu" bola úplná náhrada `hardware_rules.json` bez revízie — dve okná sa prebíjali „posledný vyhráva" a projekt bez snapshotu dopadol podľa
   sekundovej cache (raz zahodený formulár, raz tichý prepis cudzieho globálu, F8). Teraz **obsahová revízia** (`rules_rev`, nie SHA bajtov — seed-merge mení bajty):
   `HardwareRules.library_check` (`:ok/:blocked/:unreadable`, mapuje bránu **`write_gate` z H9** — krok 0 overil signatúru `[state, reason]`, `write_gate_reason` z package
@@ -517,8 +517,8 @@
   **In-SU (brána):** 3324 / 0 na hlave `c830688a` — `run_h10a` v izolovanom sandboxe (H-PRE bez kroku Späť, vedomé prepísanie, H-RACE + jeden Späť vráti snapshot aj
   kovanie, živé pravidlá bajtovo nedotknuté). STAV pred dávkou: v0.17.7 · H9 hotová · Robí sa H6/H7 (mockupy), nasleduje H10 · Ďalší krok H10.
 - **H9 · súbor nastavení zlého tvaru = poškodený (1.10.2026, PR #442, v0.17.7, blok 9 · HARDENING PO V1, register R-37; package
-  [PACKAGE_H9.md](../zdroje/bloky/HARDENING/PACKAGE_H9.md), audit návrhu 0 BLOCKER · 3 FIX · 1 NOTE [AUDIT_H9_raw.md](../zdroje/bloky/HARDENING/AUDIT_H9_raw.md)
-  + delta 4/4 RESOLVED · 2 FIX · 1 NOTE [AUDIT_H9_delta_raw.md](../zdroje/bloky/HARDENING/AUDIT_H9_delta_raw.md)).**
+  [PACKAGE_H9.md](bloky/HARDENING/PACKAGE_H9.md), audit návrhu 0 BLOCKER · 3 FIX · 1 NOTE [AUDIT_H9_raw.md](bloky/HARDENING/AUDIT_H9_raw.md)
+  + delta 4/4 RESOLVED · 2 FIX · 1 NOTE [AUDIT_H9_delta_raw.md](bloky/HARDENING/AUDIT_H9_delta_raw.md)).**
   Súbor, ktorý sa dá prečítať, ale nemá tvar (`[]`, `{}`, prázdni dodávatelia, prázdne pravidlá bez `seed_version`), sa predtým ticho nahradil seedom (porez 17 €, orez
   10 mm, 13 seed pravidiel kovania, 27 rolí ABS) a auto-zápis či uloženie z okna zničili dobrú zálohu. Teraz `JsonFileStore` má **opt-in predikát tvaru**:
   `read_valid` (primár → `.bak` dobrého tvaru čítaná `fallback: false`, nikdy `.bak.bak` — FIX 1 → `InvalidShape < ParserError`), `shape_ok?` balí výnimky predikátu
@@ -538,7 +538,7 @@
   (presnosť tvrdenia o priznaní v registri a STAV, slabý test logu T14) — opravené, verdikt PR OK. In-SU nie je brána (buildery, undo ani okno sa nemenia). STAV pred dávkou: v0.17.6 · H8 hotová ·
   Robí sa H6/H7 (mockupy), nasleduje H9 · Ďalší krok H9 → H10.
 - **H8 · kus z inej verzie štandardu (1.10.2026, PR #441, v0.17.6, blok 9 · HARDENING PO V1, register R-13; package
-  [PACKAGE_H8.md](../zdroje/bloky/HARDENING/PACKAGE_H8.md), audit návrhu 0 BLOCKER · 4 FIX · 3 NOTE [AUDIT_H8_raw.md](../zdroje/bloky/HARDENING/AUDIT_H8_raw.md)).**
+  [PACKAGE_H8.md](bloky/HARDENING/PACKAGE_H8.md), audit návrhu 0 BLOCKER · 4 FIX · 3 NOTE [AUDIT_H8_raw.md](bloky/HARDENING/AUDIT_H8_raw.md)).**
   Značka verzie štandardu `NOXUN/std` sa od v0.1.0 píše na 9 miestach, ale nikde nečítala (STANDARD §0 sľuboval „označí na revíziu"). Teraz: `Store.read_std`/`std_state_of`
   (5 stavov aktuálny · chýba · starší · novší · neplatný; prísne len `Integer >= 1`, sentinel, výnimka pri čítaní = neplatný bez pádu zberu) → `Bom.collect` aditívny kľúč
   **`std_issues`** v tom istom prechode (jeden záznam na skrinku = korpus + výrobné dielce, dosku pred filtrom `manufactured`, samostatný dielec aj bez `cabinet_id`; RED
@@ -553,7 +553,7 @@
   kroky 2–4 (dielec so značkou 2, doska bez značky, samostatný dielec — jeden ORANGE, klik na kus, kusovník bajtovo rovnaký, zrušená operácia nič nenechá) PASS;
   celý beh **3302 PASS / 0 FAIL** na hlave `d4e87870` (prvý beh bez kroku 1b 3299 / 0 na `38675bda`). STAV pred dávkou: v0.17.5 · H5 hotová · Robí sa H6/H7 (mockupy) · Ďalší krok H6/H7, potom H8–H10.
 - **H5b · UI_DIZAJN ako norma + zastarané vety (1.10.2026, PR #440, v0.17.5 — dokumentácia a komentáre v kóde pluginu, bez zmeny správania; blok 9 · HARDENING PO V1, položky
-  triedenia B-05 a zvyšok B-03, krížový audit CS-06, CN-08, CN-09; brief [BRIEF_H5.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H5.md)) — dávka H5 hotová.**
+  triedenia B-05 a zvyšok B-03, krížový audit CS-06, CN-08, CN-09; brief [BRIEF_H5.md](bloky/HARDENING/briefy/BRIEF_H5.md)) — dávka H5 hotová.**
   `docs/UI_DIZAJN.md` miešal normu s denníkom dávok (21 riadkov s historickými značkami — verzie, `PR B1`, `review #249`, zaniknuté okná a premostenia).
   **Presun, nie mazanie:** plné pôvodné znenie je v [UI_DIZAJN_dennik_do_v0.17.md](UI_DIZAJN_dennik_do_v0.17.md) (kontrola množiny riadkov: 199 zmenených
   alebo presunutých riadkov, 0 chýba v archíve). Živá norma: §1–§3 bez zmeny pravidiel, **§4 len ikony** (inventár doplnený o 8 chýbajúcich kľúčov spritu
@@ -575,7 +575,7 @@
   `studio.js`, `studio_dialog.rb`) — **len komentáre, bez zmeny správania, v0.17.5** (VERSION + `?v=`). **Testy:** 4989 headless · 149 JS sád zelené + encoding guard;
   in-SU netreba (len komentáre).
 - **H5a · mapa okien bez histórie (1.10.2026, PR #439, dokumentačné PR — plugin, VERSION ani `?v=` sa nemenia; blok 9 · HARDENING PO V1, položky triedenia
-  B-02 a časť B-03; brief [BRIEF_H5.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H5.md); briefy H1–H5 a H8–H10 sú od tohto PR v priečinku bloku `briefy/`).** `docs/architecture/ui-lifecycle.md` (551 kB, 4 193 riadkov, 246 riadkov s historickými
+  B-02 a časť B-03; brief [BRIEF_H5.md](bloky/HARDENING/briefy/BRIEF_H5.md); briefy H1–H5 a H8–H10 sú od tohto PR v priečinku bloku `briefy/`).** `docs/architecture/ui-lifecycle.md` (551 kB, 4 193 riadkov, 246 riadkov s historickými
   značkami) bol súčasne kontrakt aj kronika — agent nevedel, ktorá veta ešte platí. **Presun, nie mazanie:** celé pôvodné znenie ide do
   [UI_LIFECYCLE_historia_do_v0.17.md](UI_LIFECYCLE_historia_do_v0.17.md) (jediná zmena = relatívne odkazy prepočítané na archív; overenie `sort -u | comm`:
   0 stratených riadkov) a živá mapa je **prepísaná na aktuálny opis** (253 kB, 0 historických značiek mimo sekcie „História"): každá zo **14 sekcií Štúdia** má
@@ -594,7 +594,7 @@
   **Testy:** 4985 headless (nové guardy dokumentov + 2 paritné testy jednotiek) · 149 JS sád zelené + encoding guard.
 
 - **H4b · texty a vzhľad (1.10.2026, PR #438, v0.17.4, blok 9 · HARDENING PO V1, položky triedenia HARDENING D-06 · D-07 · D-08 · D-09 — nie D-čísla
-  DOGFOODINGU; package [PACKAGE_H4.md](../zdroje/bloky/HARDENING/PACKAGE_H4.md) časť H4b, zladenie §5.1).** **D-06:** núdzové „Obnoviť zálohu" stálo v lište
+  DOGFOODINGU; package [PACKAGE_H4.md](bloky/HARDENING/PACKAGE_H4.md) časť H4b, zladenie §5.1).** **D-06:** núdzové „Obnoviť zálohu" stálo v lište
   Materiálov hneď vedľa bežného „Obnoviť" — teraz je to položka **„Vrátiť katalóg pred migráciou…" v ponuke „⋯"** za „Obnoviť" (Q1 bez odpovede → predvolený
   variant A); „⋯" sa bez zálohy nekreslí, ponuka je overlay, Escape zavrie len ju (`mdMoreOpen` v `nx_esc.js` FLYOUT_FLAGS), výber otvorí ten istý modal
   („Vrátiť katalóg"). Nastavenia rozpočtu „Načítať nanovo" → **„Obnoviť" + `refresh-cw`**; iný význam → **„Vrátiť…"** (vyradený spotrebič, predvoľby setov,
@@ -610,7 +610,7 @@
   Predrecenzia povinná (nový ovládací prvok), výsledok v PR popise.
 
 - **H4a · jednotný zápis čísel a jednotiek + ABS „dookola" (1.10.2026, PR #437, v0.17.3, blok 9 · HARDENING PO V1, položky triedenia HARDENING D-04
-  a D-11 — nie D-čísla DOGFOODINGU; package [PACKAGE_H4.md](../zdroje/bloky/HARDENING/PACKAGE_H4.md) časť H4a).** Okno Štúdio malo 9 vlastných formátovačov,
+  a D-11 — nie D-čísla DOGFOODINGU; package [PACKAGE_H4.md](bloky/HARDENING/PACKAGE_H4.md) časť H4a).** Okno Štúdio malo 9 vlastných formátovačov,
   dva s desatinnou bodkou, a niektoré hodnotu skrývali (hrúbka 18,6 ako „19", bm 70,94 ako „70,9", 2,4 balenia ako „2", MJ „PLATŇA"/„FIX" surovo). Teraz
   **jeden formátovač `nxf*` v `studio.js`** (`nxfMoney` = dvojča `budFmtEur`, `nxfMoneyIn` pre peňažné polia, `nxfQty`/`nxfUnit` podľa kódu MJ so skloňovaním
   platní a paušálov, `nxfMm`, `nxfDim`, `nxfDec`) nasadený v Rozpočte (Materiál, ABS, Kovanie, Služby „37,26 bm × 1,10 €", peňažné polia „68,00" + tlmené €,
@@ -625,7 +625,7 @@
   headless **4969 · 148 JS sád** zelené + encoding guard; in-SU nie (len JS/CSS). Fotky okien pred/po (`ui_foto.ps1 -Shoot`). Predrecenzia povinná (výrobná/cenová — zobrazenie), výsledok v PR popise.
 
 - **H3b · falošná chyba v Ruby konzole po novom súbore (1.10.2026, PR #436, v0.17.2, blok 9 · HARDENING PO V1, položka A-06; package
-  [PACKAGE_H3.md](../zdroje/bloky/HARDENING/PACKAGE_H3.md) §6.6).** **Sonda R-A06-0** (SketchUp 2026, kópia ENGINEtests.skp, slučka `-RubyStartup`): Windows
+  [PACKAGE_H3.md](bloky/HARDENING/PACKAGE_H3.md) §6.6).** **Sonda R-A06-0** (SketchUp 2026, kópia ENGINEtests.skp, slučka `-RubyStartup`): Windows
   **Súbor → Nový** vyčistí dokument aj jeho prekrytia, ale **Ruby objekt modelu ostáva ten istý** (`equal?` a `Model#valid?` true) — `on_model_changed` overlay
   pre zhodný objekt nevypne a modul drží overlay so `Overlay#valid?` false. Chyba sa preto nezapíše pri `file_new`, ale až **pri otvorení Štúdia** (`restore!` →
   `enable!` → `disable!` → `remove_overlay` → RuntimeError „invalid overlay" pre Smer otvárania a Smer kresby; pri hranách až pri ďalšom kliku, Štúdio ich
@@ -639,7 +639,7 @@
   `edge_check.rb`, `grain_check.rb` v `construction.md`; výsledok sondy zapísaný do package §6.6, smoke bod 7 doplnený o klik na hrany.
 
 - **H3a · zavádzajúce údaje v okne Štúdia (1.10.2026, PR #435, v0.17.1, blok 9 · HARDENING PO V1, položky A-01 · A-02 · A-03 · A-04 · A-07 z triedenia;
-  package [PACKAGE_H3.md](../zdroje/bloky/HARDENING/PACKAGE_H3.md), rez H3a → H3b potvrdil orchestrátor).** Mení sa LEN to, čo okno ukazuje — čísla, CSV
+  package [PACKAGE_H3.md](bloky/HARDENING/PACKAGE_H3.md), rez H3a → H3b potvrdil orchestrátor).** Mení sa LEN to, čo okno ukazuje — čísla, CSV
   kovania, XLSX ponuky, VEPO a Rozpočet ostali (zlaté testy `np4_golden`, `kovh_golden`, `np1_vepo`, `kova_golden`, `ceny_m2_golden` bez pregenerovania;
   prvý commit vetvy = charakterizácia `test_h3_charakterizacia.rb` nad mainom). **A-01** Kusovník: súčtový riadok (Dielce aj Platne) už nepíše „odhad
   X – Y platní" sčítaný cez všetky materiály — namiesto neho preklik **Nárezový plán** (existujúca cesta `data-nav`); `totals.plates_*` ostávajú v payloade
@@ -716,7 +716,7 @@
   materiálmi, Nákup kovania ukazuje surové kódy kategórií, pravidlo závesov na stenu platí len pre typ `upper`. Michal roztriedil na interaktívnej stránke:
   **35 Teraz · 29 Po V1 · 11 vyradených**; odpovede: B-08 a B-09 (pravidlá workflowu) súhlas, Lucia má rovnaký SketchUp 2026, G-01 Michal má prístup ku
   konfigurátoru Blum. Blok **9 · HARDENING PO V1** v [PLAN.md](../PLAN.md) — 17 dávok H1–H17 (R-13, R-37, R-35 presunuté zo zásobníka ako H8–H10), poradie bez
-  viazania na noci; priečinok bloku [zdroje/bloky/HARDENING/](../zdroje/bloky/HARDENING/).
+  viazania na noci; priečinok bloku [archiv/bloky/HARDENING/](bloky/HARDENING/).
 
 - **DOCS — smoke bloku CENY PASS (30.9.2026, PR #431, len dokumentácia; verzia pluginu sa nemení).** Michal 30.9. prešiel smoke bloku CENY podľa checklistu
   v [CENY_ZAVER_2026-09-30.md](CENY_ZAVER_2026-09-30.md): **„smoke pass"** — výsledok zapísaný ako celok, nie po bodoch, **bez nálezov**. Dočasná skupina

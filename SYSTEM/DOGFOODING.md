@@ -42,7 +42,7 @@ Smoke bloku 2 **PASS 29.9.2026** (bez chýb); nové postrehy k týmto funkciám 
 - **D-152 · Mŕtvy výber dielca po návrate čela alebo krídla ožije** (H18 F4, sonda H18b, 3.10.2026) — `typ@dielec` vrátane
   `hinge@krídlo` po zmene počtu krídiel či typu čela ostáva v configu; `prune_missing_owners` čistí iba triedne kľúče.
   Nákup ho bez položky nečíta a hlavička H18 ho neráta, pri návrate položky začne platiť. *Zásobník; čistenie existujúcej zákazky
-  potrebuje vlastnú dávku a golden. D-153 ostáva iba podmienený návrh pri H18b-2 v [package](zdroje/bloky/HARDENING/PACKAGE_H18b.md) §14.*
+  potrebuje vlastnú dávku a golden. D-153 ostáva iba podmienený návrh pri H18b-2 v [package](archiv/bloky/HARDENING/PACKAGE_H18b.md) §14.*
 - **D-147 · Nárezový plán: menšie dielce sa neukladajú nad seba v páse** (Michal 29.9.2026, smoke bloku 2) — pásové rozloženie dá do pásu dielce len
   vedľa seba; nad nižším dielcom ostáva voľné miesto (vidno ho ako zvyšok), hoci by sa tam zmestil ďalší menší dielec. Plán je preto opatrnejší (niekedy
   o platňu viac), než by musel. Doladiť heuristiku (vnáranie menších dielcov do voľného miesta pásu) po V1. *Stav: zásobník — Michal: „doladíme po V1".*

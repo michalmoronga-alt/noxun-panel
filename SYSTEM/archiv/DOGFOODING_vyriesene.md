@@ -143,7 +143,7 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 - **D-150 · Výber setu pri krídle klasifikovaných dvierok sa neuloží** (sonda a audit H18, 2.10.2026) — Inspector hlási uloženie,
   ale zápis skladá odmietnutý `class:hinge|…@krídlo`; prestavba ho zahodí a odstráni aj starší platný `hinge@krídlo`.
   **Nákup sa môže zmeniť napriek úspešnej hláške.** Správny smer je existujúci `hinge@krídlo` so zachovanou validáciou triedy;
-  povoliť iba parser nestačí (resolver owner triedny záves nečíta). *Otvorené: návrh [H18b-1](../zdroje/bloky/HARDENING/PACKAGE_H18b.md),
+  povoliť iba parser nestačí (resolver owner triedny záves nečíta). *Otvorené: návrh [H18b-1](bloky/HARDENING/PACKAGE_H18b.md),
   výrobná/cenová dávka, predrecenzia a in-SU brána; **Q2 schválené Michalom 5.10.2026; oprava vo vetve, predrecenzia a in-SU čakajú**. H18 mení iba zobrazenie.*
 
 **Riešenie (H18b-1, PR #463, v0.17.27):** pri klasifikovaných dvierkach aj sklope writer zapisuje existujúci `hinge@<vlastník>`
@@ -159,7 +159,7 @@ všetkých 13 H18b scenárov PASS. Po tomto behu sa mení iba dokumentácia. Pre
 
 **Stav PR:** ready; prvé GH kolo našlo P1 v chýbajúcom uzávere D-150. Tento presun dopĺňa plný text aj index; nové plné GH kolo
 a CI na opravenej hlave ostávajú bránami pred merge. **D-151/D-152 ostávajú zásobník, Q1 A/Q3 A platia; H18b-2 sa nerobí.**
-Zdroj a smoke: [PACKAGE_H18b.md](../zdroje/bloky/HARDENING/PACKAGE_H18b.md), §10 a §15.
+Zdroj a smoke: [PACKAGE_H18b.md](bloky/HARDENING/PACKAGE_H18b.md), §10 a §15.
 
 ### D-149 — Inspector závesov ukazuje skutočne použitý výber, vyriešené 3.10.2026
 
@@ -176,7 +176,7 @@ zrušenie neutrálne hlási „výber zrušený" a obe vetvy nesúladu dvierok v
 Nákup (expanzia + CSV), rozpočet a cenová ponuka nad klasifikovanými závesmi bajtovo nezmenené; 1 242 prípadov,
 1 686 položiek a nezávislý oracle, rozdiely zobrazenia 1 979 → 0; predzmenové goldeny z commitu `76ba4035` zachované.
 Zápis ani výroba sa nemenia. Otvorené **D-150** (zápis pri krídle) a **Q1** (návrat starého výberu na projekt) rieši až H18b
-po rozhodnutí Michala. Zdroj a smoke: [PACKAGE_H18.md](../zdroje/bloky/HARDENING/PACKAGE_H18.md), §10 a §15.
+po rozhodnutí Michala. Zdroj a smoke: [PACKAGE_H18.md](bloky/HARDENING/PACKAGE_H18.md), §10 a §15.
 
 ### V1-03 zvyšok — ceny materiálov/ABS (CENY-M1a/M1b/M2), vyriešené 30.9.2026
 

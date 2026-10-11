@@ -1,5 +1,5 @@
 // H14 · T0 (R0) — CHARAKTERIZACNY ODTLACOK sekcii Studia pred registrom
-// `NXStudioSections` (package `SYSTEM/zdroje/bloky/HARDENING/PACKAGE_H14.md`).
+// `NXStudioSections` (package `SYSTEM/archiv/bloky/HARDENING/PACKAGE_H14.md`).
 //   node tests/js/test_h14_golden.js
 //
 // H14 presuva zoznamy sekcii (navigacia, hlavicka, hlaska „Obnoviť", filter

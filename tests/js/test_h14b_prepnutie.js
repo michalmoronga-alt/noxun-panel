@@ -1,5 +1,5 @@
 // H14b — JEDNA cesta prepnutia sekcie Studia, kotvy a kreslenie z registra
-// (package `SYSTEM/zdroje/bloky/HARDENING/PACKAGE_H14.md`, R1.2a, R3, R5 f, T2, T8).
+// (package `SYSTEM/archiv/bloky/HARDENING/PACKAGE_H14.md`, R1.2a, R3, R5 f, T2, T8).
 //   node tests/js/test_h14b_prepnutie.js
 //
 // Co sa tu dokazuje (golden T0 `test_h14_golden.js` drzi bajtovu zhodu so starym

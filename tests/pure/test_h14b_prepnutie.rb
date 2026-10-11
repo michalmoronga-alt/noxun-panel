@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 # H14b — jedna cesta prepnutia sekcie Studia a kreslenie z registra (package
-# `SYSTEM/zdroje/bloky/HARDENING/PACKAGE_H14.md`, R3, guard R5 d).
+# `SYSTEM/archiv/bloky/HARDENING/PACKAGE_H14.md`, R3, guard R5 d).
 #
 # Sekciu Studia kresli a prepina `studio.js` VYHRADNE podla riadka registra
 # `NXStudioSections` (`tools`, `body`, `leave`, `enter`, `anchor`). Tento guard

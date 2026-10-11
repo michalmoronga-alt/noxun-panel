@@ -136,4 +136,4 @@ D-48 sa ich netýka — v súpise sú kvôli úplnosti „čo plugin ukladá".
 ## História
 
 Kapitola vznikla dávkou H16 bloku 9 · HARDENING (krížový audit V1, C-04 / GR-03, príprava D-48) ako náhrada „záväzného zoznamu
-store-ov" v návrhu zdieľania knižníc zo 6.9.2026; package a surový audit sú v `SYSTEM/zdroje/bloky/HARDENING/`.
+store-ov" v návrhu zdieľania knižníc zo 6.9.2026; package a surový audit sú v `SYSTEM/archiv/bloky/HARDENING/`.

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 # H17 / R0 — GOLDEN T0 SPOLOCNEJ PRIPRAVY EXPORTOV (package
-# `SYSTEM/zdroje/bloky/HARDENING/PACKAGE_H17.md` §6 R0, §15 A2–A5).
+# `SYSTEM/archiv/bloky/HARDENING/PACKAGE_H17.md` §6 R0, §15 A2–A5).
 #
 # PRECO: H17a vyreze spolocny uvod styroch exportov (VEPO, CSV kovania, XLSX
 # rozpoctu a ponuky) do `ExportPrep.start` a ich data do lenivého kontextu.

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 # H17a — STRAZCOVIA spolocnej pripravy exportov `ExportPrep` (package
-# `SYSTEM/zdroje/bloky/HARDENING/PACKAGE_H17.md` §6 R1–R6, §7 T1–T3, §15 A2–A5).
+# `SYSTEM/archiv/bloky/HARDENING/PACKAGE_H17.md` §6 R1–R6, §7 T1–T3, §15 A2–A5).
 #
 #   R4 a  jedno miesto uvodu (zber, brany, refresh, `expect` len v `start`)
 #   R4 b  novy vystup = riadok `KINDS` (mnozina exportov s pickerom == KINDS,

@@ -648,7 +648,7 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
 
 #### Po V1 — zásobník (nezaradené, nestratiť)
 
-- **Z krížového auditu V1 (1.10.2026) — 29 položiek Po V1** (plný zoznam a zdroje: [zdroje/bloky/HARDENING/ROZHODNUTIA_MICHALA_2026-10-01.md](../zdroje/bloky/HARDENING/ROZHODNUTIA_MICHALA_2026-10-01.md);
+- **Z krížového auditu V1 (1.10.2026) — 29 položiek Po V1** (plný zoznam a zdroje: [archiv/bloky/HARDENING/ROZHODNUTIA_MICHALA_2026-10-01.md](bloky/HARDENING/ROZHODNUTIA_MICHALA_2026-10-01.md);
   R-13 → R-37 → R-35 sú od 1.10. v bloku 9 ako H8–H10): najsilnejší **E-01 snímka odovzdanej zákazky + „čo sa zmenilo od objednávky"** (4 audítori nezávisle; súvisí
   **G-02** karta zákazky, **G-05** export všetkého do datovaného priečinka) · kód a API: C-08 zásuvky podľa tvaru receptu (s prvým novým systémom; **G-01** vzorky
   z konfigurátora Blum — Michal má prístup), F-03 spoločný základ prekrytí, F-04 natívne fotenie náhľadu šablóny (jednoduchšia cesta pre **D-107**), F-05 skrytie
