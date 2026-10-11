@@ -57,7 +57,7 @@ Uzáver vo **v0.18.0** mení len dokumentáciu a číslo verzie. **Smoke čaká 
 | H18b-1 | #463 | voľba setu krídla platí (D-150); H18b-2 mimo scope |
 | ŠÍRKA 50 | #466 | skrinka od 50 mm + 2 nohy pod úzkou dolnou |
 | H19 | #472 | export test `scripts\export_test.ps1` (P == K) |
-| Uzáver | #? | dokumentácia a verzia 0.18.0, priečinok bloku do archívu |
+| Uzáver | #473 | dokumentácia a verzia 0.18.0, priečinok bloku do archívu |
 
 ## Overenie
 

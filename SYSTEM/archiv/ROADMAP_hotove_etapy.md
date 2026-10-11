@@ -707,7 +707,7 @@ Tri úrovne — odpoveď na otázku „kedy nový typ korpusu":
 3. **PARAMETER** = individuálna hodnota konkrétnej skrinky.
 Pravidlo: kým sa dá vec vyjadriť hodnotou/variantom existujúceho dielca → parameter/šablóna. Nový typ až keď sa mení topológia.
 
-## BLOK 9 · HARDENING PO V1 — UZAVRETÝ (11.10.2026, v0.18.0; štart PR #432, dávky H1–H19 + uzáver PR #?)
+## BLOK 9 · HARDENING PO V1 — UZAVRETÝ (11.10.2026, v0.18.0; štart PR #432, dávky H1–H19 + uzáver PR #473)
 
 **Hardening po V1** — po dokončení všetkých siedmich bodov V1 (30.9.2026) sa pred novými funkciami spevnili zavádzajúce údaje v oknách, ochrana dát a rozširovacie
 body. Podklad: krížový audit V1 siedmimi audítormi → Michalovo triedenie **35 Teraz · 29 Po V1 · 11 vyradených**; 19 dávok **H1–H19** (+ ŠÍRKA 50, H18b-1, H14 Q1)

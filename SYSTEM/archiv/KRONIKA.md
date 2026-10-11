@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **UZÁVER BLOKU 9 · HARDENING PO V1 (11.10.2026, v0.18.0, PR #?, trieda Ľ — dokumentácia a verzia).** Posledná dávka bloku podľa postupu uzáveru (variant B, vzor PR #429): minor bump
+- **UZÁVER BLOKU 9 · HARDENING PO V1 (11.10.2026, v0.18.0, PR #473, trieda Ľ — dokumentácia a verzia).** Posledná dávka bloku podľa postupu uzáveru (variant B, vzor PR #429): minor bump
   0.17.31 → **0.18.0** (`noxun_engine.rb`, `main.rb`, všetky `?v=` v `ui/*.html`; kód pluginu sa inak nemení), blok 9 plným textom do `archiv/ROADMAP_hotove_etapy.md` (v PLAN ostáva zmienka
   v zozname uzavretých blokov a zásobník), **celý priečinok bloku `SYSTEM/zdroje/bloky/HARDENING/` → `SYSTEM/archiv/bloky/HARDENING/`** (`git mv`; odkazy opravené v SYSTEM, docs a komentároch
   testov, tri odkazy z presunutých dokumentov na `zdroje/` prepísané na nové úrovne), záverečný dokument [HARDENING_ZAVER_2026-10-11.md](HARDENING_ZAVER_2026-10-11.md) (výsledok pre stolára,

@@ -6,7 +6,7 @@
 
 ## Stav
 
-**v0.18.0 · 11.10.2026 — BLOK 9 · HARDENING PO V1 UZAVRETÝ** (štart PR #432, dávky H1–H19 + uzáver PR #?; **smoke čaká na Michala**): zavádzajúce údaje v oknách opravené, ochrana
+**v0.18.0 · 11.10.2026 — BLOK 9 · HARDENING PO V1 UZAVRETÝ** (štart PR #432, dávky H1–H19 + uzáver PR #473; **smoke čaká na Michala**): zavádzajúce údaje v oknách opravené, ochrana
 poškodeného súboru a dvoch okien, minimum SketchUp 2026, typy skriniek a sekcie Štúdia na jednom mieste, súpis knižníc, spoločná príprava exportov, export test; **čísla a exporty bez zmeny**.
 Vedome nové: **skrinka od 50 mm** (ŠÍRKA 50, PR #466: úzka dolná má 2 nohy) a **skutočne použitý set závesov** v Inspectore (H18, H18b-1, PR #462, #463). Pád pri ukončení SketchUpu 2026.2 (#1117)
 sa **nepotvrdil** (H11c, quit test 5× exit 0; kód bez zmeny). Výsledok, dávky a **zlúčený smoke checklist**: [archiv/HARDENING_ZAVER_2026-10-11.md](archiv/HARDENING_ZAVER_2026-10-11.md).
@@ -41,7 +41,7 @@ v [DOGFOODING.md](DOGFOODING.md)). Potom nový blok podľa výberu Michala. **Te
 
 ## Posledné uzávery
 
-- **BLOK 9 · HARDENING PO V1 UZAVRETÝ** (**v0.18.0**, 11.10.2026; štart #432, H1–H19 PR #433–#472 + uzáver PR #?; **smoke čaká**). Priečinok bloku v [archiv/bloky/HARDENING/](archiv/bloky/HARDENING/) ·
+- **BLOK 9 · HARDENING PO V1 UZAVRETÝ** (**v0.18.0**, 11.10.2026; štart #432, H1–H19 PR #433–#472 + uzáver PR #473; **smoke čaká**). Priečinok bloku v [archiv/bloky/HARDENING/](archiv/bloky/HARDENING/) ·
   [výsledok a smoke checklist](archiv/HARDENING_ZAVER_2026-10-11.md).
 - **BLOK CENY UZAVRETÝ** (**v0.17.0**, 30.9.2026; štart #425, CENY-M1a #426 v0.16.1 · CENY-M1b #427 v0.16.2 · CENY-M2 #428 v0.16.3 + uzáver PR #429).
   Odkaz a ručné overenie ceny dosky/ABS bez Demosu, Rozpočet s vekom ručných cien, materiál bez formátu podľa m²; priečinok bloku v [archiv/bloky/CENY/](archiv/bloky/CENY/) · [výsledok](archiv/CENY_ZAVER_2026-09-30.md).
