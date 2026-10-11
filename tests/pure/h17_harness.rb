@@ -274,7 +274,8 @@ module NxH17
   #   cp:      Hash zlucovany do vysledku `Budget.cp_preview`
   #   attrs:   { kluc => hodnota } v slovniku NOXUN modelu (rozpocet)
   #   ui:      :ok | :nil | :empty
-  #   last_dir: :out (default) | :none
+  #   last_dir: :out (default) | :none | ->(out) { hodnota } (H17b N1: ulozeny
+  #             priecinok, ktory neexistuje, cislo, objekt)
   #   foreign: true = cudzi subor v cielovom priecinku VEPO
   def build_model(kind_model)
     case kind_model
@@ -385,7 +386,12 @@ module NxH17
     with_sandbox do |sandbox|
       model = prepare_model(spec)
       Dir.mktmpdir('nx-h17-out-') do |out|
-        ES.save_last_dir(out) if spec.fetch(:last_dir, :out) == :out
+        stored = spec.fetch(:last_dir, :out)
+        if stored == :out
+          ES.save_last_dir(out)
+        elsif stored.is_a?(Proc)
+          ES.save_last_dir(stored.call(out)) # H17b N1: ulozena hodnota z pripadu
+        end
         if spec[:foreign]
           slug = E::VepoExport.project_slug(ES.normalize_project_name(model, ES.project_name(model)))
           FileUtils.mkdir_p(File.join(out, slug))
@@ -555,6 +561,37 @@ module NxH17
       'rozpocet_ceny_podla_planu' => { kind: :budget, attrs: { 'budget_plan_prices' => true } },
       'ponuka_ceny_podla_planu' => { kind: :offer, attrs: { 'budget_plan_prices' => true } }
     }
+  end
+
+  # H17b / R8.4 — VEDOMA ZMENA N1. Ulozeny „posledny priecinok exportu", ktory
+  # neplati: neexistuje (premenovany/zmazany), cislo, objekt. Kazdy pripad ma
+  # ZAKLAD v G1 (sastna cesta s platnym priecinkom) — export musi byt BAJTOVO
+  # ten isty (subory, mena, veta, farba, poradie, ulozeny priecinok po exporte);
+  # jediny rozdiel je startovaci priecinok vyberu = `nil` vo VSETKYCH styroch
+  # exportoch (VEPO tak robil uz pred H17b, CSV a XLSX dostavali surovu hodnotu).
+  # Fixtura G1 sa NEREGENERUJE — ocakavanie sa z nej odvodi (`n1_expected`).
+  N1_STORED = {
+    'neexistuje' => [->(out) { File.join(out, 'premenovany_priecinok') }, '«DIR»/premenovany_priecinok'],
+    'cislo' => [->(_out) { 42 }, 42],
+    'objekt' => [->(_out) { { 'cesta' => 'D:/Export' } }, { 'cesta' => 'D:/Export' }]
+  }.freeze
+  N1_BASE = { vepo: 'vepo_zadany_18_36', hw_csv: 'csv_zadany', budget: 'rozpocet_zadany', offer: 'ponuka_zadany' }.freeze
+
+  def n1_cases
+    N1_STORED.each_with_object({}) do |(what, (value, shown)), out|
+      N1_BASE.each do |kind, base|
+        out["#{kind}_#{what}"] = { kind: kind, last_dir: value, base: base, shown: shown }
+      end
+    end
+  end
+
+  # Ocakavany zaznam N1 = zaznam G1 jeho zakladu, startovaci priecinok `nil`
+  # a `last_dir_before` = ulozena (neplatna) hodnota.
+  def n1_expected(g1, spec)
+    exp = Marshal.load(Marshal.dump(g1.fetch(spec[:base])))
+    exp['pickers'] = exp['pickers'].map { |p| p.merge('start' => nil) }
+    exp['last_dir_before'] = spec[:shown]
+    exp
   end
 
   # G2 — spustace odmietnutia (kazdy × kazdy export z `kinds`). `intro: true` =

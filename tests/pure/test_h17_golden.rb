@@ -75,6 +75,21 @@ NxTest.test('H17 T0 G1: sastna cesta 4 exportov — subory, mena, vety, picker a
   end
 end
 
+NxTest.test('H17b R8.4 N1 (vedoma zmena): neplatny ulozeny priecinok — vyber BEZ startovacieho priecinka, inak bajtovo ako G1') do
+  NxTest.skip!('vyzaduje headless sandbox') unless NxTest.headless?
+  g1 = NxH17.golden('g1')
+  cases = NxH17.n1_cases
+  NxTest.assert_equal(NxH17::N1_STORED.length * NxH17.kinds.length, cases.length, 'kazda hodnota × kazdy export')
+  NxTest.assert_equal(NxH17.kinds.keys.sort, NxH17::N1_BASE.keys.sort, 'N1 pozna kazdy registrovany export')
+  cases.each do |name, spec|
+    got = NxH17.json(NxH17.run(spec))
+    NxTest.assert_equal(1, got['pickers'].length, "N1 #{name}: vyber sa otvoril prave raz")
+    NxTest.assert(got['pickers'].first['start'].nil?, "N1 #{name}: startovaci priecinok nil (dostal #{got['pickers'].first['start'].inspect})")
+    NxTest.assert_equal('«DIR»', got['last_dir'], "N1 #{name}: po exporte sa ulozi platny priecinok")
+    NxH17T.same!(NxH17.n1_expected(g1, spec), got, "N1 #{name}")
+  end
+end
+
 NxTest.test('H17 T0 G1: lokalny cas po rozpocte — VEPO LOG a CSV kovania nesu zamrazeny LOKALNY cas, verzia prave raz') do
   NxTest.skip!('vyzaduje headless sandbox') unless NxTest.headless?
   vepo = NxH17.run(kind: :vepo)
