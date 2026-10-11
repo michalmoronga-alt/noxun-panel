@@ -17,6 +17,19 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **H19 · nástroj export testu (11.10.2026, PR #?, trieda S — plugin bez zmeny, bez bumpu verzie).** Rozhodnutie Michala 11.10.: „Nástroj export testu" ako samostatná dávka
+  bloku 9 pred uzáverom ([brief](../zdroje/bloky/HARDENING/briefy/BRIEF_H19.md)); tlačidlo „Exportovať všetko" zapísané ako **D-154** (zásobník). Dôvod: brána R9 „P == K"
+  z H17a/H17b znamenala ručné exporty Michala (~3×) a porovnanie orchestrátorom; teraz ju robí `scripts/export_test.ps1`: pod zámkom `deploy.lock` + `last_run.txt` ako
+  runner skopíruje profil `%APPDATA%\NOXUN` raz, pre K (`-Base`, predvolene `origin/main`, dočasný `git worktree add --detach` v `%TEMP%\nxkp\<beh>\t`) aj P (aktuálny checkout)
+  nasadí strom, otvorí **kópiu modelu pod rovnakým menom**, sonda `tests/sketchup/su_export_probe.rb` zavolá 4× `ProductionCore.do_*` (okná výberu nahradené, `expect` zo servera,
+  `confirm_unpriced` podľa `unpriced_count`) a SketchUp sa ukončí sám; `scripts/export_compare.rb` (prepis `h17_compare.py` do Ruby, bez nových gemov — vlastná čítačka ZIP)
+  porovná súbory podľa R9.3 aj vety statusu a volania pickera (cesty a dátum normalizované) a skript vypíše `EXPORT-TEST: P == K` / `P != K` (exit 0/1/2). Červená veta statusu
+  (napr. „+ 3 nemapovaných") nie je chyba sondy — porovnáva sa ako každá veta. Poistka: sonda exportuje len model ležiaci v pracovnom priečinku behu. **Overené naostro** na
+  `TEST projekt v0.17.28.skp`: K == P na čistom maine (v0.17.31), negatívna kontrola (zmenená veta rozpočtu + hlavička CSV kovania, necommitnuté) → `P != K` s dvoma
+  rozdielmi, a K = v0.17.30 (`64fb84a5`) → `P == K`. Testy `tests/pure/test_export_compare.rb` (porovnávač, status, CLI, sonda v harness, strážca `KINDS` == sonda). Docs:
+  CLAUDE.md (Testovanie, nahrádza ručné R9), PACKAGE_H17 R9, `docs/architecture/rozsirovacie-body.md`. Nahradený text STAV: „H17b: predrecenzia → runner + P == K → PR → merge"
+  (→ „H19 hotové"), riadok Testov o ručnom porovnaní P == K, zhrnuté dve staré hlavičky.
+
 - **H17b · koniec exportu (11.10.2026, v0.17.31, PR #471, trieda Ť — výrobná/cenová, predrecenzia povinná).** Druhý rez C-06 / R-15 ([PACKAGE_H17.md](../zdroje/bloky/HARDENING/PACKAGE_H17.md)
   §6 R8, brief `briefy/BRIEF_H17b.md`): `ExportPrep.start_dir` (štartovací priečinok všetkých 4 pickerov — text a existujúci priečinok, inak `nil`; VEPO overovanie presunuté),
   `ExportPrep.remember_dir` (zápis posledného priečinka, výsledok ignorovaný — H7 D5) a `ExportPrep.name_suffix` (pending + predvolený „projekt" + `ctx.name_note`) namiesto

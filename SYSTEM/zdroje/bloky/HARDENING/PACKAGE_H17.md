@@ -324,6 +324,9 @@ zastaví" = R4 b. `AUDIT_REGISTER.md` R-15: „prvý rez ✅ H17a (PR #?)". **Gr
 
 ### R9 · Porovnanie s reálnymi exportmi testovacej zákazky — *(prepísané 9.10.2026, rozhodnutie Michala: H17-0 zrušené)*
 
+> **Od 11.10.2026 (H19) robí R9 nástroj `scripts/export_test.ps1`** (`P == K` / `P != K`, pravidlá porovnania R9.3 v `scripts/export_compare.rb`) — **ručné exporty sa nerobia.**
+> Postup nižšie (R9.1–R9.4) ostáva ako záznam pôvodného riešenia a ako zdroj pravidiel porovnania.
+
 **Pôvodný R9 (nástroj `scripts/export_porovnanie.ps1`, kalibrácie K0/K, izolácia profilu) a celá časť H17-0 sú ZRUŠENÉ** (Michal 9.10.2026, §00). Michalova požiadavka 2A
 (porovnanie s reálnou zákazkou) ostáva, ale **bez nástroja v repe** — ako jednoduchý krok pred mergom:
 
