@@ -12,10 +12,12 @@
 # ostava v rezii SketchUpu (kontrakt sa tyka suborov nacitanych z validneho
 # `main.rb`).
 #
-# Ukoncovanie SketchUpu (pad #1117 v 2026.2) tu ZATIAL nie je: quit test H11a na
-# 26.0.429 ukazal, ze SketchUp zatvara okna pluginu PRED `AppObserver#onQuit`
-# (poradie B), takze priznak z `onQuit` by hooky okien nezachytil. Riesenie je
-# davka H11c (zalozny navrh Z1, vlastny audit).
+# Ukoncovanie SketchUpu (pad #1117 v 2026.2) tu NIE JE a netreba ho: quit test
+# H11a na 26.0.429 aj H11c na 26.2.243 (11.10.2026, 5x) ukazal, ze SketchUp
+# zatvara okna pluginu PRED `AppObserver#onQuit` (poradie B), ale vzdy skonci
+# exit 0 bez padu (#1117 sa u nas neprejavil; in-SU sada na 2026.2 3421/0).
+# Zalozny navrh Z1 sa preto nerobi (Michal 11.10.2026; R-42 uzavrete overenim,
+# PACKAGE_H11 §18).
 #
 # Tento subor sa nacitava AKO PRVY (bootstrap v `main.rb` s vlastnou chybovou
 # vetvou) — preto nesmie zavisiet od ziadneho ineho suboru pluginu. Posledny

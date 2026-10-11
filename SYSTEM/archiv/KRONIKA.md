@@ -17,6 +17,10 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **KOMENTÁR H11c v `core/app_lifecycle.rb` (11.10.2026, v0.18.1, PR #?, trieda Ľ — len komentár a verzia).** Hlavičkový komentár ešte opisoval H11c ako budúcu dávku
+  („riešenie je dávka H11c, záložný návrh Z1“); prepísaný na skutočný stav: quit test H11a (26.0.429) aj H11c (26.2.243, 5×) ukázal poradie B, ale vždy exit 0 bez pádu, in-SU na 2026.2
+  3421/0, Z1 sa nerobí (PACKAGE_H11 §18, AUDIT_REGISTER R-42). Grep v `noxun_engine/` (H11c, Z1, #1117, onQuit, F-01, R-42) inú zastaranú vetu nenašiel. Patch bump 0.18.0 → 0.18.1
+  (`noxun_engine.rb`, `main.rb`, všetky `?v=`), STAV. Správanie pluginu bez zmeny. Testy: 5426 Ruby/0/0, 163 JS PASS; in-SU netreba (len komentár).
 - **UZÁVER BLOKU 9 · HARDENING PO V1 (11.10.2026, v0.18.0, PR #473, trieda Ľ — dokumentácia a verzia).** Posledná dávka bloku podľa postupu uzáveru (variant B, vzor PR #429): minor bump
   0.17.31 → **0.18.0** (`noxun_engine.rb`, `main.rb`, všetky `?v=` v `ui/*.html`; kód pluginu sa inak nemení), blok 9 plným textom do `archiv/ROADMAP_hotove_etapy.md` (v PLAN ostáva zmienka
   v zozname uzavretých blokov a zásobník), **celý priečinok bloku `SYSTEM/zdroje/bloky/HARDENING/` → `SYSTEM/archiv/bloky/HARDENING/`** (`git mv`; odkazy opravené v SYSTEM, docs a komentároch
