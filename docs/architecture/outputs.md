@@ -471,9 +471,10 @@ o tom, kam nález vedie, by sa rozišla). `select_target_item` dostal štvrtý v
 sekcia Kovanie žije len nad označenou skrinkou. Nález bez adresy sa správa presne ako pred D4.
 
 **Nastavenia exportu (názov zákazky, 18 + 36, posledný priečinok) žijú od H7a v jadre** — odsek [`export_settings.rb`](#export_settingsrb). Jadro ich len volá: spoločná
-príprava `ExportPrep.start` (H17) zavolá `ExportSettings.refresh` a bránu `expect` (tá číta `project_name` / `merge_18_36`), exporty čítajú `last_dir` a po zápise súboru `save_last_dir` (výsledok **zámerne ignorujú** — zlyhaný posledný priečinok nemá
-zastaviť hotový export, dôvod je v logu); **`pending_name_note(model)`** (text exportu, preto ostal tu) pripojí na koniec záverečnej vety všetkých štyroch exportov upozornenie,
-keď názov zákazky čaká na prenos k súboru (`ExportSettings.name_pending?`, farba statusu sa nemení).
+príprava `ExportPrep.start` (H17) zavolá `ExportSettings.refresh` a bránu `expect` (tá číta `project_name` / `merge_18_36`); posledný priečinok číta a po zápise súboru ukladá
+koniec exportu `ExportPrep.start_dir` / `ExportPrep.remember_dir` (H17b — výsledok zápisu sa **zámerne ignoruje**, zlyhaný posledný priečinok nemá zastaviť hotový export,
+dôvod je v logu); **`pending_name_note(model)`** (text exportu, preto ostal tu) pripojí cez `ExportPrep.name_suffix` na koniec záverečnej vety všetkých štyroch exportov
+upozornenie, keď názov zákazky čaká na prenos k súboru (`ExportSettings.name_pending?`, farba statusu sa nemení).
 
 **Názov zákazky v okne a `expect` (H7b).** **`vepo_payload(model)`** je JEDNA funkcia pre payload `vepo` plného pushu Štúdia aj echo `push_vepo_bar`: prvé tri kľúče
 v pôvodnom poradí a tvare (`project` — už **normalizovaný** `ExportSettings.normalize_project_name`, §17 C2 · `default_project` · `merge_18_36`), za nimi `source`
@@ -627,9 +628,9 @@ Kontrakt stráži `tests/pure/test_st1a_core.rb`, `tests/pure/test_st1a_studio.r
 **(2) tvrdé blokery** `export_blockers` (záporná zostava, nesúlad ponuky s rozpočtom, zliate ID skriniek); **(3) potvrditeľné riadky bez ceny** `export_confirmations` (dvojkrokový export, STANDARD §11.3).
 Rozdiel medzi (1) a (3) je vecný a zámerný: **blokuje sa NEKOMPATIBILNÁ VERZIA dát, nie rozpracovanosť rozpočtu** — tú štandard výslovne pripúšťa a rieši potvrdením. `do_export` (VEPO) ani `do_hw_csv` bránu (1) nemajú: rozpočtové dáta nenesú, takže ich orezanie neskresľuje (rovnaká výnimka ako pri VEPO v P0-HF; stráži to guard test).
 
-### export_prep.rb — spoločná príprava exportov (H17a)
+### export_prep.rb — spoločná príprava a koniec exportov (H17a, H17b)
 
-**Prvý rez R-15 (C-06, blok 9 HARDENING, v0.17.29).** `Noxun::Engine::ExportPrep` (`ui/export_prep.rb`, `module_function`) je **jeden úvod** všetkých exportov Štúdia —
+**Prvý rez R-15 (C-06, blok 9 HARDENING, v0.17.29; koniec exportu H17b v0.17.31).** `Noxun::Engine::ExportPrep` (`ui/export_prep.rb`, `module_function`) je **jeden úvod** všetkých exportov Štúdia —
 VEPO (`do_export`), CSV kovania (`do_hw_csv`), XLSX rozpočtu (`do_budget_xlsx`) a XLSX cenovej ponuky (`do_cp_xlsx`). Do H17a ho každý export opisoval sám (~25 riadkov × 4)
 a nový výstup by musel opísať aj bránu `expect`, novšiu schému a chrbát — zabudnutá brána = súbor pod iným názvom alebo ticho neúplný výrobný súbor. **Pre používateľa sa
 nezmenilo nič** (bajty súborov, mená, vety, farby, poradie brán) — dôkazom je golden T0 `tests/fixtures/h17_golden/` zachytený na nezmenenom kóde a neregenerovaný.
@@ -657,14 +658,22 @@ v poradí `bom` → `hw_exp` → `smap`). Kontext vzniká len v `start`, nikdy s
 
 | Export | Po `start` (ostáva v tele, v dnešnom poradí) |
 |---|---|
-| VEPO | `drawer_stop(ctx.collected, ctx.hw_exp, scope: :kit)` → `last_dir` + overenie + `select_directory` → `ctx.bom`, `ctx.control` → `build(project: ctx.project, merge_18_36: ctx.merge, …)` → „Niet čo exportovať" → `write` → `save_last_dir` → veta + `pending_name_note` + `default_name_note(model, ctx.project)` + `ctx.name_note` |
-| CSV kovania | `ctx.hw_exp` → `nil` / prázdne → `drawer_stop` → duplicity → `hw_csv_file_name(ctx.project)` → `savepanel` → CSV + BOM → `save_last_dir` → veta + to isté |
-| XLSX rozpočtu | `ctx.bom` → `ctx.hw_exp` → `ctx.budget` → `nil` → `budget_std_block` → kovanie → duplicity → potvrdenie → `BudgetXlsx.file_name(ctx.project, now)` → `savepanel` → zápis → `save_last_dir` → `repush` pri `plan_prices` → veta + to isté |
-| XLSX ponuky | `ctx.bom` → `ctx.smap` → `ctx.hw_exp` → `ctx.budget` → `nil` → `budget_std_block` → `cp`, `spec` → kovanie → duplicity + `cp` → potvrdenie → `CpXlsx.file_name(ctx.project, now)` → `savepanel` → hárky, firewall → zápis → `save_last_dir` → `repush` → veta + to isté |
+| VEPO | `drawer_stop(ctx.collected, ctx.hw_exp, scope: :kit)` → `select_directory(directory: ExportPrep.start_dir)` → `ctx.bom`, `ctx.control` → `build(project: ctx.project, merge_18_36: ctx.merge, …)` → „Niet čo exportovať" → `write` → `ExportPrep.remember_dir(dir)` → veta + `ExportPrep.name_suffix(ctx)` |
+| CSV kovania | `ctx.hw_exp` → `nil` / prázdne → `drawer_stop` → duplicity → `hw_csv_file_name(ctx.project)` → `savepanel(…, ExportPrep.start_dir, …)` → CSV + BOM → `remember_dir` → veta + `name_suffix(ctx)` |
+| XLSX rozpočtu | `ctx.bom` → `ctx.hw_exp` → `ctx.budget` → `nil` → `budget_std_block` → kovanie → duplicity → potvrdenie → `BudgetXlsx.file_name(ctx.project, now)` → `savepanel(…, ExportPrep.start_dir, …)` → zápis → `remember_dir` → `repush` pri `plan_prices` → veta + `plan_export_note` + `name_suffix(ctx)` |
+| XLSX ponuky | `ctx.bom` → `ctx.smap` → `ctx.hw_exp` → `ctx.budget` → `nil` → `budget_std_block` → `cp`, `spec` → kovanie → duplicity + `cp` → potvrdenie → `CpXlsx.file_name(ctx.project, now)` → `savepanel(…, ExportPrep.start_dir, …)` → hárky, firewall → zápis → `remember_dir` → `repush` → veta + `plan_export_note` + `name_suffix(ctx)` |
 
 Každý export si nechal svoj `rescue` (štyri rôzne vety) a komentáre „prečo" pri bránach druhu výstupu; komentáre úvodu (1b-6c, H7b §16 B2/§17 C1, KOV-H1, GHOST-D1, D-143,
 audit #15) sú pri `start`. **Brány druhu výstupu sa NEzjednocujú** (kit VEPO `:kit`, duplicity, `budget_std_block`, potvrdenie cien, firewall, „nedá sa zostaviť") — jedno
-nerozlíšené „export povolený" by správanie zmenilo (CX R-15). Koniec exportu (`last_dir`, `save_last_dir`, vety názvu) je zatiaľ v exportoch — voliteľná H17b.
+nerozlíšené „export povolený" by správanie zmenilo (CX R-15).
+
+**Koniec exportu (H17b, v0.17.31) — tiež jedno miesto.** **`start_dir`** = `ExportSettings.last_dir`, ak je to text a priečinok existuje, inak `nil` — štartovací
+priečinok **všetkých štyroch** pickerov (VEPO ho tak overoval aj predtým; **vedomá zmena N1:** CSV kovania a oba XLSX dostávali surovú hodnotu, takže pri
+premenovanom/zmazanom priečinku alebo nie-texte v súbore nastavení mohol `savepanel` zlyhať — teraz sa okno výberu otvorí bez štartovacieho priečinka). **`remember_dir(dir)`**
+= `ExportSettings.save_last_dir(dir)` po hotovom zápise, výsledok sa zámerne ignoruje (zlyhaný zápis nastavení nezastaví hotový export, dôvod je v logu — H7 D5).
+**`name_suffix(ctx)`** = `ProductionCore.pending_name_note(ctx.model)` + `ProductionCore.default_name_note(ctx.model, ctx.project)` + `ctx.name_note` — vety o názve zákazky
+na **konci** záverečného statusu, v tomto poradí, farbu nemenia (rozpočet a ponuka pred ne dávajú `plan_export_note`). Bajty súborov, mená, vety a poradie krokov sa nezmenili
+(golden G1–G3 bez regenerácie). Export tieto tri volá a **nič z nich neskladá sám**.
 
 **Prečo `ui/`:** úvod volá `ProductionCore` (vety statusu, `repush`) a `core/` nesmie volať `ui/`; pamäť kontextu by v `production_core.rb` narazila na zákaz inštančných
 premenných modulu. Načítanie: `main.rb` hneď za `ui/production_core`, pred `ui/studio_dialog` (zmrazený zoznam H11a = 96 častí); `tests/helper.rb` ho načíta ako **výnimku**
@@ -672,9 +681,11 @@ z „UI nie je v helperi" — test, ktorý si `ui/production_core` načíta sám
 
 **Nový výstup** (výkresy, etikety, CNC) = riadok v `KINDS` + `ProductionCore.do_<výstup>`, ktorý začne `ExportPrep.start` — postup v
 [rozsirovacie-body.md](rozsirovacie-body.md) (scenár 8). **Strážcovia:** `tests/pure/test_h17_export_prep.rb` — R4 a (úvod len v `start`), R4 b (exporty s pickerom ==
-`KINDS`, inventár matice G2 == `KINDS`), R4 c (bez stavu), R4 d (načítanie), R4 e (dáta a názov len z `ctx`), R4 f (rozdielne brany), T1 (kontext), T2 (`start`);
-`tests/pure/test_h17_golden.rb` — G1 bajty šťastnej cesty, G2 matica odmietnutí (každý spúšťač × každý export z `KINDS`), G3 súbeh brán, G4 poradie krokov
-(`export_expect_check` práve raz), G5 parita Kontroly (VEPO LOG == push Štúdia), G6 parita Nárezového plánu (`layout_block_reasons`).
+`KINDS`, inventár matice G2 == `KINDS`), R4 c (bez stavu), R4 d (načítanie), R4 e (dáta a názov len z `ctx`), R4 f (rozdielne brany), T1 (kontext), T2 (`start`),
+**R8** (H17b: telo exportu neskladá priečinok ani vety názvu; `ExportSettings.last_dir` / `save_last_dir` a `pending_name_note` / `default_name_note` volá v plugine len
+`ExportPrep`; správanie `start_dir`, `remember_dir`, `name_suffix`); `tests/pure/test_h17_golden.rb` — G1 bajty šťastnej cesty, G2 matica odmietnutí (každý spúšťač ×
+každý export z `KINDS`), G3 súbeh brán, G4 poradie krokov (`export_expect_check` práve raz), G5 parita Kontroly (VEPO LOG == push Štúdia), G6 parita Nárezového plánu
+(`layout_block_reasons`), **N1** (H17b: neplatný uložený priečinok — neexistuje · číslo · objekt — × každý export; očakávanie odvodené z G1, jediný rozdiel štart `nil`).
 
 ## Bez vlastného odseku
 
@@ -1144,8 +1155,9 @@ z disku, I/O chyby vyletia ako neúspešný zápis) je v [model-a-identita.md](m
 
 **Nastavenia exportu v jadre (H7a, C-07, R-38).** `Noxun::Engine::ExportSettings` (`core/export_settings.rb`, `module_function`) je jediná autorita súboru
 `%APPDATA%\NOXUN\Engine\vepo_settings.json` — nastavenia POČÍTAČA, nie zákazky: mapa názvov zákaziek `project_names`, prepínač „18 + 36 spolu" (`merge_18_36`, `!= false`
-= zapnuté) a posledný priečinok exportu (`last_dir`, surová hodnota). Do H7a žil v `ui/production_core.rb`; okno Štúdia (payload a echo `vepo`, `do_set_vepo_opts`) aj štyri
-exporty ho volajú **priamo**, `ProductionCore` nemá žiadne delegáty (dve mená jednej veci by stuby testov strážili starú cestu). Meno súboru, kľúče, kľúč záznamu (cesta / `guid:<DocKey
+= zapnuté) a posledný priečinok exportu (`last_dir`, surová hodnota — štartovací priečinok z nej skladá **len** `ExportPrep.start_dir`: text a existujúci priečinok, inak
+`nil`; zápis ide **len** cez `ExportPrep.remember_dir`, H17b). Do H7a žil v `ui/production_core.rb`; okno Štúdia (payload a echo `vepo`, `do_set_vepo_opts`) a exporty
+(cez `ExportPrep`) ho volajú **priamo**, `ProductionCore` nemá žiadne delegáty (dve mená jednej veci by stuby testov strážili starú cestu). Meno súboru, kľúče, kľúč záznamu (cesta / `guid:<DocKey
 token>` — `doc_token` je presne `ProductionCore.model_guid`), strop 120 znakov, prenos pri prvom uložení a predvolené `projekt` (`DEFAULT_PROJECT_NAME`) sa presunom nezmenili
 (golden `tests/fixtures/h7_golden/` — mená a nadpisy exportov, bajty súboru aj `.bak` po každom kroku, štyri exporty end-to-end). Načíta sa za `core/materials`/`doc_key`,
 pred `ui/production_core`; pri načítaní na súbor nesiaha. Verejné: `path` · `read` · `refresh` · `write_gate` · `update` · `save` · `written?` · `project_names` ·
@@ -1232,8 +1244,8 @@ takže sa migrácia zopakuje hneď, ako zápis prejde (review #243 P2-1). Zápis
 na názov `.skp` a premenovanie súboru sa v okne prejaví samo. Čítajú ho **všetky štyri exporty** (VEPO, CSV kovania, XLSX rozpočtu, XLSX cenovej ponuky) — z DOM sa `project`
 **prestal posielať**, inak by dve okná mali dve pravdy a tá istá zákazka by sa v dvoch výstupoch volala inak. `merge_18_36` ostáva globálny a číta sa rovnakou cestou.
 
-**Zápis `vepo_settings.json` má JEDNY dvere (1b-6c):** súbor je nastavenie POČÍTAČA so **šiestimi zapisovateľmi** — `save_merge_18_36`, štyri zápisy `last_dir` (`save_last_dir`) (VEPO, CSV kovania,
-XLSX rozpočtu, XLSX cenovej ponuky) a mapa `project_names` — a menil sa read-modify-write **bez medziprocesového zámku**. Dve inštancie SketchUpu zdieľajú jeden `%APPDATA%`, takže
+**Zápis `vepo_settings.json` má JEDNY dvere (1b-6c):** súbor je nastavenie POČÍTAČA so **šiestimi zapisovateľmi** — `save_merge_18_36`, štyri zápisy `last_dir` (VEPO, CSV kovania,
+XLSX rozpočtu, XLSX cenovej ponuky — od H17b všetky cez `ExportPrep.remember_dir` → `save_last_dir`) a mapa `project_names` — a menil sa read-modify-write **bez medziprocesového zámku**. Dve inštancie SketchUpu zdieľajú jeden `%APPDATA%`, takže
 zápis jednej vedel zmazať zákazku pomenovanú v druhej; `JsonFileStore` rieši **atomicitu** (tmp+rename, `.bak`), **nie súbeh** — a jeho sekundová cache navyše skryje čerstvý zápis
 suseda. Každý zápis preto ide cez **`update`**: `Materials.with_catalog_lock` (jeden sidecar `.lock` nad tým istým priečinkom, reentrantný — detail v
 [materials.md](materials.md)) + čítanie súboru **nanovo vnútri zámku** (`JsonFileStore.reload!`); blok dostane čerstvé nastavenia a vráti hash na zlúčenie, `nil` = netreba
