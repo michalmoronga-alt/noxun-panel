@@ -6,7 +6,7 @@
 
 ## Stav
 
-**v0.18.0 · 11.10.2026 — BLOK 9 · HARDENING PO V1 UZAVRETÝ** (štart PR #432, dávky H1–H19 + uzáver PR #473; **smoke čaká na Michala**): zavádzajúce údaje v oknách opravené, ochrana
+**v0.18.1 · 11.10.2026 — BLOK 9 · HARDENING PO V1 UZAVRETÝ** (v0.18.0; v0.18.1 len opravený komentár v kóde o H11c, PR #474; štart PR #432, dávky H1–H19 + uzáver PR #473; **smoke čaká na Michala**): zavádzajúce údaje v oknách opravené, ochrana
 poškodeného súboru a dvoch okien, minimum SketchUp 2026, typy skriniek a sekcie Štúdia na jednom mieste, súpis knižníc, spoločná príprava exportov, export test; **čísla a exporty bez zmeny**.
 Vedome nové: **skrinka od 50 mm** (ŠÍRKA 50, PR #466: úzka dolná má 2 nohy) a **skutočne použitý set závesov** v Inspectore (H18, H18b-1, PR #462, #463). Pád pri ukončení SketchUpu 2026.2 (#1117)
 sa **nepotvrdil** (H11c, quit test 5× exit 0; kód bez zmeny). Výsledok, dávky a **zlúčený smoke checklist**: [archiv/HARDENING_ZAVER_2026-10-11.md](archiv/HARDENING_ZAVER_2026-10-11.md).
@@ -24,11 +24,11 @@ ani nevyexportuje** (rohovú by sklopil na dolnú, úzku rozšíril na 200). **R
 **Ochranu pred poškodeným súborom nastavení (H9) má len 0.17.7+, nastavení exportu (H7a) 0.17.20+, ochranu dvoch okien 0.17.8+ (pravidlá) a 0.17.9+ (rady) — aktualizovať obe PC a potom zavrieť všetky okná SketchUpu** (staré okno zapisuje bez ochrany).
 **Aktualizuj plugin na oboch PC (Michal aj Lucia) na 0.17.0 pred prvým uložením odkazu, ručným overením ceny alebo porovnávaním a posielaním ponúk — starší plugin počíta sklo aj dosku bez formátu po starom** (`BUDGET_STD` blok CENY nemení, takže starší plugin nevaruje).
 
-**Testy (v0.18.0 uzáver):** 5426 Ruby/0/0, 163 JS PASS; encoding/docs PASS; plná in-SU sada na SketchUp 2026.2: 3421 PASS / 0 FAIL (11.10.). Export test `scripts\export_test.ps1` (H19, P == K).
+**Testy (v0.18.1):** 5426 Ruby/0/0, 163 JS PASS; encoding/docs PASS; plná in-SU sada na SketchUp 2026.2: 3421 PASS / 0 FAIL (11.10.). Export test `scripts\export_test.ps1` (H19, P == K).
 
 ## Robí sa
 
-**Nič — blok 9 je uzavretý, ďalší blok určí Michal** ([PLAN.md](PLAN.md): zásobník Po V1). Čaká **Michalov smoke bloku 9** (94 bodov v 5 skupinách) a aktualizácia pluginu na 0.18.0 na oboch PC.
+**Nič — blok 9 je uzavretý, ďalší blok určí Michal** ([PLAN.md](PLAN.md): zásobník Po V1). Čaká **Michalov smoke bloku 9** (94 bodov v 5 skupinách) a aktualizácia pluginu na 0.18.1 na oboch PC.
 **Zásobník z bloku:** D-154 „Exportovať všetko" · D-151 · D-152 · D-153 (podmienený) · H18b-2 mimo scope. **Luciin PC:** nevieme, či má SketchUp 2026.2 (H11 Q3 bez odpovede).
 **Otázky bez odpovede, platí návrh:** vymenované v [záverečnom dokumente](archiv/HARDENING_ZAVER_2026-10-11.md) (Otvorené body) · pri prvej rohovej v dielni overiť záves Sensys ·
 **na smoke čakajú aj** D-132 (#367), D-133 (#368), D-134 (#369) — sú v checkliste (B25, C19, C20).
