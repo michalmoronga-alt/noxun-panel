@@ -1701,9 +1701,7 @@ module Noxun
         drawer_stop_msg = drawer_stop(ctx.collected, ctx.hw_exp, scope: :kit)
         return status.call(drawer_stop_msg, true) if drawer_stop_msg
 
-        last = ExportSettings.last_dir
-        start_dir = last.is_a?(String) && File.directory?(last) ? last : nil
-        dir = UI.select_directory(title: 'Priečinok pre VEPO export', directory: start_dir)
+        dir = UI.select_directory(title: 'Priečinok pre VEPO export', directory: ExportPrep.start_dir)
         return status.call('Export zrušený.') if dir.nil? || dir.to_s.empty?
 
         # Nalez 5: JEDEN cerstvy RAW zber -> nad nim kusovnik AJ kontrola;
@@ -1743,10 +1741,10 @@ module Noxun
         target = VepoExport.write(result, dir)
         # Nalez 6: KONTROLA nikdy neblokuje export; jej suhrn ide do statusu.
         ctrl = control_suffix(control)
-        ExportSettings.save_last_dir(dir)
+        ExportPrep.remember_dir(dir)
         # H7a (§15 A1): nazov caka na prenos k suboru -> veta na konci statusu.
         # H7b (R-B3): export pomenovany predvolenym „projekt" -> veta (vylucuju sa).
-        pending = "#{pending_name_note(model)}#{default_name_note(model, ctx.project)}#{ctx.name_note}"
+        pending = ExportPrep.name_suffix(ctx)
         if result['groups'].empty?
           return status.call("Export nevytvoril žiadny CSV — #{result['errors'].length} chybných riadkov. " \
                              "Dôvody v LOGu: #{target}#{ctrl}#{pending}", true)
@@ -1797,19 +1795,19 @@ module Noxun
         # instancia ho po brane (pocas zberu) zmenit nemoze.
         project = ctx.project
         fname = hw_csv_file_name(project)
-        target = UI.savepanel('Uložiť nákupný zoznam kovania', ExportSettings.last_dir, fname)
+        target = UI.savepanel('Uložiť nákupný zoznam kovania', ExportPrep.start_dir, fname)
         return status.call('Export zrušený.') if target.nil? || target.to_s.empty?
 
         csv = HardwareSets.purchase_csv(exp, project: project,
                                         generated_at: Time.now.strftime('%Y-%m-%d %H:%M'))
         File.open(target, 'wb') { |f| f.write("\xEF\xBB\xBF" + csv) } # BOM pre Excel
-        ExportSettings.save_last_dir(File.dirname(target))
+        ExportPrep.remember_dir(File.dirname(target))
         n = Array(exp['rows']).length
         un = Array(exp['unmapped']).length
         dup = dup_id_suffix(warn_dups)
         status.call("Nákupný zoznam: #{n} položiek" \
                     "#{un.positive? ? " + #{un} nemapovaných (v CSV aj KONTROLE)" : ''} → #{target}#{dup}" \
-                    "#{pending_name_note(model)}#{default_name_note(model, project)}#{ctx.name_note}",
+                    "#{ExportPrep.name_suffix(ctx)}",
                     un.positive? || !dup.empty?)
       rescue StandardError => e
         Engine.log_error(e, 'ProductionCore.do_hw_csv')
@@ -3261,7 +3259,7 @@ module Noxun
 
         project = ctx.project # audit #1 + review #457: nazov overeny v brane `expect`
         now = Time.now
-        target = UI.savepanel('Uložiť rozpočet (XLSX)', ExportSettings.last_dir,
+        target = UI.savepanel('Uložiť rozpočet (XLSX)', ExportPrep.start_dir,
                               BudgetXlsx.file_name(project, now))
         return status.call('Export zrušený.') if target.nil? || target.to_s.empty?
 
@@ -3269,7 +3267,7 @@ module Noxun
         # nedoplna, ked ju pouzivatel v nazve prepise.
         target = "#{target}.xlsx" unless File.extname(target.to_s).downcase == '.xlsx'
         XlsxWriter.write(target, BudgetXlsx.sheet(budget, project: project, now: now), now: now)
-        ExportSettings.save_last_dir(File.dirname(target))
+        ExportPrep.remember_dir(File.dirname(target))
         totals = budget['totals'] || {}
         # P0-HF-01: ked pouzivatel podhodnotenie POTVRDIL, hotovy subor to musi
         # priznat (STANDARD §11.3) — a status ostava cerveny.
@@ -3280,8 +3278,7 @@ module Noxun
         # exportoval (repush PRED statusom — push by status inak prekryl).
         repush.call if budget['plan_prices'] == true
         status.call("Rozpočet uložený: #{fmt_eur(totals['total'])} → #{target}#{warn}#{dup}" \
-                    "#{plan_export_note(budget)}#{pending_name_note(model)}#{default_name_note(model, project)}" \
-                    "#{ctx.name_note}",
+                    "#{plan_export_note(budget)}#{ExportPrep.name_suffix(ctx)}",
                     !warn.empty? || !dup.empty?)
       rescue StandardError => e
         Engine.log_error(e, 'ProductionCore.do_budget_xlsx')
@@ -3343,7 +3340,7 @@ module Noxun
 
         project = ctx.project # audit #1 + review #457: nazov overeny v brane `expect`
         now = Time.now
-        target = UI.savepanel('Uložiť cenovú ponuku (XLSX)', ExportSettings.last_dir,
+        target = UI.savepanel('Uložiť cenovú ponuku (XLSX)', ExportPrep.start_dir,
                               CpXlsx.file_name(project, now))
         return status.call('Export zrušený.') if target.nil? || target.to_s.empty?
 
@@ -3351,13 +3348,13 @@ module Noxun
         sheets = CpXlsx.sheets(cp, spec, project: project, now: now)
         hits = CpExport.firewall_hits(CpXlsx.text_cells(sheets))
         XlsxWriter.write_book(target, sheets, now: now)
-        ExportSettings.save_last_dir(File.dirname(target))
+        ExportPrep.remember_dir(File.dirname(target))
         warnings = cp_warnings(hits, warn_dups, unpriced)
         # NP-4 (audit F4): ponuka dovod padu na odhad necita — status ho povie
         # (len Michalovi, nie zakaznikovi) a okno sa obnovi z exportovaneho stavu.
         repush.call if budget['plan_prices'] == true
         status.call("#{cp_status(cp, spec, target, warnings)}#{plan_export_note(budget)}" \
-                    "#{pending_name_note(model)}#{default_name_note(model, project)}#{ctx.name_note}",
+                    "#{ExportPrep.name_suffix(ctx)}",
                     !warnings.empty?)
       rescue StandardError => e
         Engine.log_error(e, 'ProductionCore.do_cp_xlsx')
