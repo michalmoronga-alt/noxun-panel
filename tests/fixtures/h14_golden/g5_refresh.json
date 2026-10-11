@@ -9,7 +9,7 @@
 "hw": {"status":"Načítavam čerstvý katalóg kovania a sety…","calls":["sketchup.refresh_bom(\"\")"]},
 "appl": {"status":"Prepočítavam kusovník…","calls":["sketchup.refresh_bom(\"\")"]},
 "rules": {"status":"Načítavam pravidlá z aktuálneho modelu…","calls":["sketchup.refresh_bom(\"\")"]},
-"tpl": {"status":"Prepočítavam kusovník…","calls":["sketchup.refresh_bom(\"\")"]},
+"tpl": {"status":"Načítavam knižnicu šablón…","calls":["sketchup.refresh_bom(\"\")"]},
 "sup": {"status":"Prepočítavam kusovník…","calls":["sketchup.refresh_bom(\"\")"]},
 "bset": {"status":"Prepočítavam kusovník…","calls":["sketchup.refresh_bom(\"\")"]},
 "about": {"status":"Prepočítavam kusovník…","calls":["sketchup.refresh_bom(\"\")"]}
