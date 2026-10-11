@@ -33,6 +33,9 @@ Smoke bloku 2 **PASS 29.9.2026** (bez chýb); nové postrehy k týmto funkciám 
 
 ## Po V1 — zásobník
 
+- **D-154 · Tlačidlo „Exportovať všetko"** (Michal 11.10.2026, pri dávke H19) — jeden klik v Štúdiu, raz vybraný priečinok; do podpriečinka zákazky (napr. „KLINIKA 11.10.2026")
+  padnú naraz VEPO, CSV kovania, XLSX rozpočtu aj ponuky (dnes sú to štyri samostatné exporty so štyrmi výbermi priečinka). Nová funkcia exportov → mockup na schválenie
+  a plná výrobná brána (export test `scripts\export_test.ps1`). *Stav: zásobník — po uzávere bloku 9.*
 - **D-151 · Výber setu pri klasifikovanom výklope bez systému sa nikdy nepoužije** (sonda H18b, 3.10.2026) — zápis na skrinke
   aj pri čele hlási úspech, resolver ho zastaví ako `lift_system_missing` ešte pred mapovaním; export už dnes stojí na RED.
   Návrh: zápis odmietnuť vetou „čelo nemá systém výklopu (HK top / HL top)". *Zásobník; mimo H18/H18b-1.*

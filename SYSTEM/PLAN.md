@@ -60,6 +60,7 @@ predrecenzia, in-SU) sa určí pri package podľa CLAUDE.md; stĺpec je predpokl
 
 | ✅ H18b-1 · voľba setu krídla platí (D-150 v archíve), v0.17.27 — [package](zdroje/bloky/HARDENING/PACKAGE_H18b.md); predrecenzia 0 P1/P2/P3, in-SU 3400 PASS nad `337f9601` — **PR #463** | — | kód · výrobná/cenová · predrecenzia · in-SU |
 | ✅ ŠÍRKA 50 · skrinka od 50 mm + 2 nohy pod úzkou dolnou (pokyn Michala 7.–8.10.), v0.17.28 — [package](zdroje/bloky/HARDENING/PACKAGE_SIRKA50.md); `CONFIG_SCHEMA` 23, seed pravidiel 8 — **PR #466** | — | kód · audit · výrobná/cenová · predrecenzia · in-SU |
+| ✅ H19 · nástroj export testu `scripts\export_test.ps1` (rozhodnutie Michala 11.10., pred uzáverom bloku) — sám urobí 4 exporty testovacej zákazky na maine (K) a na vetve (P) a vypíše `P == K` / `P != K`; nahrádza ručné R9; plugin bez zmeny, [brief](zdroje/bloky/HARDENING/briefy/BRIEF_H19.md) — **PR #472** | — | nástroj · trieda S |
 
 **Otvorené po H18:** D-151 (výklop bez systému) a D-152 (oživenie mŕtveho výberu) → zásobník. D-150 opravené H18b-1, plný text a index v [archíve](archiv/DOGFOODING_vyriesene.md).
 

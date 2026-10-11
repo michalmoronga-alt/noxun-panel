@@ -206,12 +206,14 @@ ktorý mení výrobné alebo cenové čísla či súbory, je dávka **výrobná/
 | `noxun_engine/ui/studio_dialog.rb` | `StudioDialog.handle_export` · `StudioDialog.push_vepo_bar` | obal a callback okna; po návrate `push_vepo_bar` (echo hlavičky) |
 | `noxun_engine/ui/js/studio.js` | `nxVepoExpect` | volanie z okna nesie `expect` (názov a 18 + 36, ktoré okno ukazuje) |
 | `tests/pure/h17_harness.rb` | `NxH17.g1_cases` · `NxH17.g2_triggers` | prípad šťastnej cesty v golden H17 (matica odmietnutí G2 beží nad `KINDS` sama) |
+| `tests/sketchup/su_export_probe.rb` · `scripts/export_compare.rb` | `NoxunExportProbe::METHODS` · `ExportCompare::METHODS` | nový `do_<výstup>` do oboch zoznamov (sonda export testu ho zavolá, porovnávač porovná jeho vetu); pravidlá porovnania súboru nového výstupu v `ExportCompare.classify` |
 | `docs/architecture/outputs.md` | `export_prep.rb` | odsek výstupu a riadok v tabuľke exportov |
 
 **Čo ťa zastaví:** `tests/pure/test_h17_export_prep.rb` R4 b — funkcia so `UI.savepanel` / `UI.select_directory`, ktorá nie je v `KINDS` alebo nezačína
 `ExportPrep.start`, zhodí test („nový výstup: pridaj riadok do ExportPrep::KINDS a začni ExportPrep.start — žiadna kópia úvodu"); matica G2 overí, že nový
-export odmietnutie úvodu **rešpektuje** (picker ani zápis pri spúšťačoch úvodu). Pred mergom výstupnej dávky orchestrátor porovná ručné exporty testovacej
-zákazky z mainu a z vetvy (P == K).
+export odmietnutie úvodu **rešpektuje** (picker ani zápis pri spúšťačoch úvodu); `tests/pure/test_export_compare.rb` zhodí test, keď `KINDS` nesedí so zoznamom
+exportov sondy. Pred mergom výstupnej dávky beží **export test** `scripts\export_test.ps1` (H19): sám urobí 4 exporty testovacej zákazky na mainu (K) a na vetve (P)
+a vypíše `P == K` / `P != K` (CLAUDE.md, sekcia Testovanie).
 
 ## História
 
