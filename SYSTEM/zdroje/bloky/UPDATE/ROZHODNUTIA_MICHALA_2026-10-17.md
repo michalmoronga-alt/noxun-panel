@@ -44,6 +44,17 @@ Pôvodné rozhodnutia: [../../next_sessions/V1_DEBATA_2026-09-06_LUCIA_KNIZNICE.
 |---|---|---|
 | R12 | Codex v krížovom audite bloku (po tom, čo 1 beh `gpt-6-astra` so širokým zadaním zobral celé 5h okno a 17 b. týždňa bez výsledku) | Krížový audit bloku na **`gpt-6.1-sol` po resete okna, s úzkym zadaním** (vymenované súbory, bez voľného prehľadávania repa); `gpt-6-astra` len na povinné audity packages, tiež úzko |
 
-## Otvorené body pre mockup („návrh — potvrdí Michal")
+## Mockup — schválený 17.10.2026
 
-Doplní koncept a mockup; každý musí dostať Michalovu odpoveď pred písaním packages (CLAUDE.md, Git workflow).
+[MOCKUP_UPDATE_KNIZNICA.html](MOCKUP_UPDATE_KNIZNICA.html) **schválený bez úprav**; všetky body „návrh — potvrdí Michal" uzavreté:
+
+| # | Bod mockupu | Platí |
+|---|---|---|
+| O1 | Kde | box **Zdieľaná knižnica** v sekcii Štúdia **O plugine** (pod aktualizáciou pluginu) |
+| O2 | Správca | ponuka „⋯": na Michalovom PC raz „Toto PC je správca knižnice" s potvrdením; kým nikto, Odoslať vypnuté na oboch; neskôr „Odovzdať správcu…" |
+| O3 | Riadky | **5 skupín** prevzatých/preskočených vždy celé: Materiály (+ ABS pravidlá, vzhľady, fotky dekorov) · Kovanie (katalóg, výrobcovia, sety, pravidlá) · Šablóny (+ náhľady) · Dodávateľ a sadzby · Spotrebiče (+ listy) |
+| O4 | Štart | natívne oznámenie „Na Disku sú novšie knižnice: …" s „Otvoriť O plugine" / „Neskôr" + bodka pri „O plugine" v navigácii, kým je čo aktualizovať |
+| O5 | História | posledných 5 odoslaní per skupina (dátum, poznámka); „Vrátiť" len správca = nová verzia; na PC bez správcu aj „Vrátiť zálohu" pred prepisom |
+| O6 | Pruh | jeden jantárový riadok v oknách Materiály, Kovanie, Šablóny, Spotrebiče, Nastavenia rozpočtu na PC, ktoré nie je správca |
+| O7 | Iná verzia | jantárová veta v boxe, Odoslať aj Aktualizovať čakajú |
+| O8 | Poznámka k odoslaniu | **áno, nepovinné pole** pri Odoslať; Lucia ju vidí pri Aktualizovať a v histórii |
