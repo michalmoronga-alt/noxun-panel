@@ -34,6 +34,8 @@ Pôvodné rozhodnutia: [../../next_sessions/V1_DEBATA_2026-09-06_LUCIA_KNIZNICE.
 |---|---|---|
 | R13 | Lucia dnes do knižníc zapisuje (Prepočítať ceny, skupiny z Demosu, materiál, spotrebič) — ostáva to (A4 B4)? | **Ostáva + banner** v oknách knižníc na PC, ktoré nie je správca: „Zmeny tu sa pri Aktualizovať prepíšu — pošli ich správcovi"; pri Aktualizovať varovanie R4 |
 | R14 | Odoslať / Aktualizovať len pri rovnakej verzii pluginu (A4 B3)? | **Áno, len rovnaká verzia**; inak „najprv aktualizuj plugin" (updater D-52, ten istý koreň) |
+| R16 | Má Lucia rozpracované zákazky s vlastnými materiálmi či spotrebičmi (reconcile O1)? | **Nie — začína s Michalovou knižnicou**; prvé Aktualizovať jej knižnicu nahradí (záloha + varovanie R4), **bez párovania** záznamov |
+| R17 | Aktualizovať prepíše ceny a sadzby (reconcile O2) | **Veta v okne stačí:** „Zmenia sa ceny v … — najbližší rozpočet pôjde podľa nového cenníka"; zmrazenie rozpočtu zákazky mimo bloku |
 | R15 | Fotky dekorov cez Disk alebo dotiahnuť z Demosu (A4 A6)? | **Cez Disk** — ako prílohy verzie katalógu (len fotky, na ktoré katalóg odkazuje), R8 platí |
 
 ## Postup bloku

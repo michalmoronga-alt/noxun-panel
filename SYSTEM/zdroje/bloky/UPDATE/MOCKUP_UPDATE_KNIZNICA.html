@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="sk" data-nx-theme="noxun">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Noxun Engine — mockup UPDATE · zdieľaná knižnica</title>
+<!--
+  Blok UPDATE (D-48) · mockup na schválenie Michalom.
+  Stav: NÁVRH 17.10.2026 — body O1–O8 = „návrh — potvrdí Michal".
+  Rozhodnutia: ROZHODNUTIA_MICHALA_2026-10-17.md (R1–R17) · koncept KONCEPT_UPDATE.md · reconcile RECONCILE_2026-10-17.md.
+  Vzhľad = Štúdio v0.18.1, sekcia O plugine (ui/js/about.js nxAboutHtml + nxUpdaterHtml, studio.html).
+  Tokeny --nx-* = kópia :root z ui/css/panel.css + prepisy témy Lucia (UI_DIZAJN §2, §2.1). --mk-* = LEN anotácie mockupu.
+  Statický mockup: dáta sú vymyslené, tlačidlá len prepínajú ukážky (stav PC, okná).
+-->
+<style>
+  :root{
+    --nx-bg:#f4f5f7; --nx-surface:#fff; --nx-surface-sunken:#eceff1; --nx-surface-th:#f5f7f8;
+    --nx-ink:#263238; --nx-ink-title:#1b3a4b; --nx-ink-strong:#37474f; --nx-ink-label:#455a64;
+    --nx-ink-muted:#607d8b; --nx-ink-soft:#78909c; --nx-ink-faint:#90a4ae;
+    --nx-border:#cfd8dc; --nx-border-strong:#b0bec5; --nx-border-soft:#eceff1;
+    --nx-action:#2e7d32; --nx-action-hover:#1b5e20; --nx-on-accent:#fff;
+    --nx-select:#107787; --nx-select-bg:#e0f2f4; --nx-select-bg-soft:#f0f9fa;
+    --nx-ok-bg:#e8f5e9; --nx-ok-fg:#1b5e20; --nx-ok-border:#c8e6c9;
+    --nx-err-bg:#fdecea; --nx-err-fg:#b71c1c; --nx-err-border:#f5c6cb;
+    --nx-danger:#c62828; --nx-danger-bg:#fbe9e7; --nx-danger-border:#ffccbc;
+    --nx-warn:#ffb74d; --nx-warn-bg:#fff8ef; --nx-warn-bg-soft:#fff3e0; --nx-warn-fg:#e65100;
+    --nx-warnchip-fg:#b26a00; --nx-warnchip-border:#ffcc80; --nx-warnrow-fg:#7a5000; --nx-warnrow-border:#ffe0b2;
+    --nx-modalwarn-fg:#8d5a00;
+    --nx-ghost-hover:#e0e4e7; --nx-scrim:rgba(38,50,56,.45); --nx-modal-shadow:rgba(0,0,0,.25);
+    /* LEN anotácie mockupu */
+    --mk-page:#e6e9ec; --mk-bar:#2b3a42; --mk-bar-ink:#dfe7ec; --mk-bar-sub:#8ea3ae;
+    --mk-win-border:#b6c0c6; --mk-win-head:#dfe4e7; --mk-shadow:rgba(20,30,45,.16);
+    --mk-bg:#fffdf3; --mk-border:#d8cfa8; --mk-ink:#6b5d1f; --mk-pin:#f6d860; --mk-pin-border:#c9a83a; --mk-pin-ink:#4a3f10;
+  }
+  :root[data-nx-theme="lucia"]{
+    --nx-select:#c2185b; --nx-select-bg:#fce4ec; --nx-select-bg-soft:#fdf1f5;
+  }
+  *{box-sizing:border-box}
+  html{overflow-x:clip}
+  html,body{margin:0}
+  body{font-family:"Segoe UI",Tahoma,sans-serif;font-size:13px;color:var(--nx-ink);background:var(--mk-page);padding:0 0 70px}
+  button{font-family:inherit;font-size:inherit}
+  .ic{width:15px;height:15px;flex:0 0 auto;vertical-align:middle;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+
+  .mockbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;padding:8px 16px;background:var(--mk-bar);color:var(--mk-bar-ink)}
+  .mockbar .t{font-weight:600}
+  .mockbar .sp{flex:1}
+  .mockbar .ctl{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--mk-bar-sub)}
+  .mockbar .ctl button{font-size:11px;padding:2px 9px;border-radius:6px;border:1px solid var(--mk-bar-sub);background:transparent;color:var(--mk-bar-ink);cursor:pointer}
+  .mockbar .ctl button.on{background:var(--mk-bar-ink);color:var(--mk-bar)}
+  .page{max-width:1120px;margin:0 auto;padding:0 16px}
+  .card{margin:16px 0 0;background:var(--nx-surface);border:1px solid var(--nx-border);border-radius:8px;padding:12px 16px;line-height:1.5}
+  .card h1{font-size:17px;margin:0 0 6px;color:var(--nx-ink-title)}
+  .card h3{font-size:13.5px;margin:10px 0 4px;color:var(--nx-ink-title)}
+  .card ul{margin:4px 0;padding-left:20px}
+  .note{margin:10px 0 0;padding:8px 12px;border:1px solid var(--mk-border);border-radius:8px;background:var(--mk-bg);color:var(--mk-ink);font-size:12px;line-height:1.5}
+  .pin{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:18px;padding:0 5px;border-radius:9px;
+       background:var(--mk-pin);border:1px solid var(--mk-pin-border);color:var(--mk-pin-ink);font-size:10.5px;font-weight:700;vertical-align:1px}
+  .grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start;margin-top:16px}
+  @media (max-width:900px){.grid{grid-template-columns:1fr}}
+
+  /* ===== okno Štúdia ===== */
+  .win{background:var(--nx-bg);border:1px solid var(--mk-win-border);border-radius:8px;box-shadow:0 4px 16px var(--mk-shadow);overflow:hidden}
+  .winhead{background:var(--mk-win-head);padding:5px 10px;font-size:11.5px;color:var(--nx-ink-muted)}
+  .studio{display:grid;grid-template-columns:150px minmax(0,1fr);min-height:520px}
+  @media (max-width:600px){.studio{grid-template-columns:1fr}.nav{display:none}}
+  .nav{background:var(--nx-surface);border-right:1px solid var(--nx-border);padding:8px 0;font-size:12px}
+  .nav div{padding:4px 12px;color:var(--nx-ink-muted)}
+  .nav .grp{font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--nx-ink-faint);margin-top:6px}
+  .nav .on{background:var(--nx-select-bg);color:var(--nx-select);font-weight:600;border-left:3px solid var(--nx-select);padding-left:9px}
+  .sec{padding:12px 16px}
+  .sechead{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+  .sechead h2{font-size:15px;margin:0;color:var(--nx-ink-title)}
+  .box{background:var(--nx-surface);border:1px solid var(--nx-border);border-radius:8px;padding:10px 12px;margin-bottom:10px}
+  .boxhead{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .boxhead b{font-size:12.5px;color:var(--nx-ink-strong)}
+  .muted{color:var(--nx-ink-muted)}
+  .small{font-size:11.5px}
+  .inforow{display:flex;gap:8px;font-size:12px;padding:2px 0}
+  .inforow .k{width:120px;color:var(--nx-ink-label)}
+
+  .btn{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 11px;border-radius:6px;border:1px solid var(--nx-border-strong);
+       background:var(--nx-surface-sunken);color:var(--nx-ink);cursor:pointer;font-size:12px;white-space:nowrap}
+  .btn:hover{background:var(--nx-ghost-hover)}
+  .btn.pri{background:var(--nx-action);border-color:var(--nx-action);color:var(--nx-on-accent)}
+  .btn.pri:hover{background:var(--nx-action-hover)}
+  .btn[aria-disabled="true"]{opacity:.5;cursor:default}
+  .btn.icon{width:28px;padding:0;justify-content:center}
+  .btn.danger{background:var(--nx-danger-bg);border-color:var(--nx-danger-border);color:var(--nx-danger)}
+
+  table.lib{width:100%;border-collapse:collapse;font-size:12px}
+  table.lib th{background:var(--nx-surface-th);text-align:left;font-weight:600;color:var(--nx-ink-label);padding:5px 8px;border-bottom:1px solid var(--nx-border)}
+  table.lib td{padding:6px 8px;border-bottom:1px solid var(--nx-border-soft);vertical-align:top}
+  table.lib td.st{white-space:nowrap}
+  .chip{display:inline-flex;align-items:center;gap:4px;height:20px;padding:0 7px;border-radius:9px;font-size:11px;font-weight:600;border:1px solid}
+  .chip.ok{background:var(--nx-ok-bg);color:var(--nx-ok-fg);border-color:var(--nx-ok-border)}
+  .chip.new{background:var(--nx-select-bg);color:var(--nx-select);border-color:var(--nx-select)}
+  .chip.loc{background:var(--nx-warn-bg-soft);color:var(--nx-warnchip-fg);border-color:var(--nx-warnchip-border)}
+  .chip.err{background:var(--nx-err-bg);color:var(--nx-err-fg);border-color:var(--nx-err-border)}
+  .chip.wait{background:var(--nx-surface-sunken);color:var(--nx-ink-muted);border-color:var(--nx-border)}
+  .actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
+  .status{margin-top:8px;padding:6px 10px;border-radius:6px;font-size:12px;background:var(--nx-surface-sunken);color:var(--nx-ink-muted)}
+  .warnline{display:flex;gap:8px;align-items:flex-start;padding:6px 10px;border-radius:6px;font-size:12px;background:var(--nx-warn-bg);
+            border:1px solid var(--nx-warnrow-border);color:var(--nx-warnrow-fg);margin:6px 0}
+  .more{position:relative;display:inline-block}
+  .menu{position:absolute;right:0;top:32px;z-index:5;min-width:250px;background:var(--nx-surface);border:1px solid var(--nx-border);border-radius:8px;
+        box-shadow:0 6px 18px var(--nx-modal-shadow);padding:4px 0;display:none}
+  .menu.open{display:block}
+  .menu div{display:flex;gap:8px;align-items:center;padding:6px 12px;font-size:12px;cursor:pointer}
+  .menu div:hover{background:var(--nx-select-bg-soft)}
+
+  /* ===== modaly (D-15 kostra) ===== */
+  .scrim{position:fixed;inset:0;background:var(--nx-scrim);display:none;align-items:center;justify-content:center;z-index:20;padding:16px}
+  .scrim.open{display:flex}
+  .modal{background:var(--nx-surface);border-radius:8px;box-shadow:0 10px 30px var(--nx-modal-shadow);width:min(560px,100%);max-height:90vh;overflow:auto}
+  .modal header{padding:12px 16px;border-bottom:1px solid var(--nx-border-soft);font-weight:600;color:var(--nx-ink-title);font-size:14px}
+  .modal .body{padding:12px 16px;font-size:12.5px;line-height:1.5}
+  .modal footer{display:flex;justify-content:flex-end;gap:8px;padding:10px 16px;border-top:1px solid var(--nx-border-soft)}
+  .diff{margin:6px 0;padding:0;list-style:none}
+  .diff li{padding:3px 0;border-bottom:1px solid var(--nx-border-soft);font-size:12px}
+  .diff .used{color:var(--nx-err-fg);font-weight:600}
+  .seg{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+  .seg label{display:flex;gap:8px;align-items:flex-start;padding:7px 9px;border:1px solid var(--nx-border);border-radius:6px;cursor:pointer}
+  .seg label.on{border-color:var(--nx-select);background:var(--nx-select-bg-soft)}
+
+  /* ===== notifikácia SketchUpu ===== */
+  .notif{background:var(--nx-surface);border:1px solid var(--mk-win-border);border-radius:8px;box-shadow:0 4px 16px var(--mk-shadow);padding:10px 12px;font-size:12px}
+  .notif .row{display:flex;gap:8px;margin-top:8px}
+  /* ===== okno knižnice s pruhom ===== */
+  .libwin .bar{display:flex;gap:8px;align-items:flex-start;padding:6px 10px;font-size:11.5px;background:var(--nx-warn-bg-soft);
+               color:var(--nx-warnchip-fg);border-bottom:1px solid var(--nx-warnchip-border)}
+  .libwin .content{padding:10px 12px;font-size:12px;color:var(--nx-ink-muted)}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M19 12l-7 7-7-7"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.5 9a9 9 0 0 1 14.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0 0 20.5 15"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M1 4v6h6"/><path d="M3.5 15a9 9 0 1 0 2.1-9.4L1 10"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+  <symbol id="i-disk" viewBox="0 0 24 24"><path d="M22 12H2"/><path d="M5.5 5.1L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1z"/></symbol>
+</svg>
+
+<div class="mockbar">
+  <span class="t">Mockup · blok UPDATE · zdieľaná knižnica (D-48)</span>
+  <span class="sp"></span>
+  <span class="ctl">Počítač:
+    <button id="pcM" class="on" onclick="setPc('m')">Michal (správca)</button>
+    <button id="pcL" onclick="setPc('l')">Lucia</button>
+  </span>
+  <span class="ctl">Ukážky:
+    <button onclick="openM('mUpd')">Varovanie pri Aktualizovať</button>
+    <button onclick="openM('mHist')">História</button>
+    <button onclick="openM('mSend')">Odoslať</button>
+  </span>
+</div>
+
+<div class="page">
+  <div class="card">
+    <h1>Čo vidíš</h1>
+    Štúdio → sekcia <b>O plugine</b> dostane box <b>Zdieľaná knižnica</b>. Prepínač hore ukáže to isté okno na <b>tvojom PC</b> (správca — Odoslať aj Aktualizovať)
+    a na <b>Luciinom PC</b> (len Aktualizovať, ružová téma). Žlté značky <span class="pin">O1</span> sú body „návrh — potvrdí Michal".
+    <ul>
+      <li><b>Platí z debaty:</b> správca = ty (R3) · naraz + riadok per katalóg (R6) · pri štarte len oznámenie (R7) · história 5 (R5) · varovanie + preskočiť (R4) ·
+        rovnaká verzia pluginu (R14) · fotky dekorov cez Disk (R15) · veta o cenníku (R17) · pruh v oknách knižníc na Luciinom PC (R13).</li>
+      <li><b>Názov zákazky v .skp</b> (R8) okno nemení — hlavička Štúdia vyzerá ako dnes, len názov ide so zákazkou aj k Lucii.</li>
+    </ul>
+  </div>
+
+  <div class="grid">
+    <!-- ======= OKNO ŠTÚDIA ======= -->
+    <div class="win">
+      <div class="winhead">Noxun Štúdio — KLINIKA</div>
+      <div class="studio">
+        <div class="nav">
+          <div class="grp">Výstupy</div><div>Kusovník</div><div>Kontrola</div><div>Nákup kovania</div><div>Rozpočet</div><div>Cenová ponuka</div><div>Nárezový plán</div>
+          <div class="grp">Knižnice</div><div>Materiály</div><div>Kovanie</div><div>Spotrebiče</div><div>Šablóny</div>
+          <div class="grp">Nastavenia</div><div>Pravidlá</div><div>Nastavenia rozpočtu</div><div class="on">O plugine</div>
+        </div>
+        <div class="sec">
+          <div class="sechead"><h2>O plugine</h2></div>
+
+          <div class="box">
+            <div class="boxhead"><b>Noxun Engine</b> <span class="muted small">v0.19.0</span></div>
+            <div class="inforow"><span class="k">Aktualizácia</span><span>v0.19.0 je najnovšia ✓</span></div>
+          </div>
+
+          <div class="box" id="libbox">
+            <div class="boxhead">
+              <b>Zdieľaná knižnica</b> <span class="pin">O1</span>
+              <span style="flex:1"></span>
+              <button class="btn icon" title="Obnoviť stav knižnice" aria-label="Obnoviť stav knižnice"><svg class="ic"><use href="#i-refresh"/></svg></button>
+              <span class="more">
+                <button class="btn icon" title="Ďalšie akcie" aria-label="Ďalšie akcie" onclick="toggleMenu(event)"><svg class="ic"><use href="#i-more"/></svg></button>
+                <span class="menu" id="menu">
+                  <div onclick="openM('mHist')"><svg class="ic"><use href="#i-clock"/></svg>História a návrat… <span class="pin">O5</span></div>
+                  <div class="onlyL"><svg class="ic"><use href="#i-user"/></svg>Toto PC je správca knižnice… <span class="pin">O2</span></div>
+                  <div class="onlyM"><svg class="ic"><use href="#i-user"/></svg>Odovzdať správcu… <span class="pin">O2</span></div>
+                </span>
+              </span>
+            </div>
+            <div class="inforow"><span class="k">Disk</span><span><svg class="ic" style="width:13px;height:13px"><use href="#i-disk"/></svg> H:\Môj disk\NoxunENGINE data · pripojený</span></div>
+            <div class="inforow"><span class="k">Správca</span><span><b>MICHAL-PC</b> <span class="muted onlyM">(toto PC)</span></span></div>
+            <div class="inforow"><span class="k">Posledné odoslanie</span><span>16.10.2026 18:42 · „nový dekor Pietra, set Blum Clip top"</span></div>
+
+            <table class="lib" style="margin-top:8px">
+              <thead><tr><th>Katalóg <span class="pin">O3</span></th><th>Na Disku</th><th>U mňa</th><th>Stav</th></tr></thead>
+              <tbody id="rows"></tbody>
+            </table>
+
+            <div class="actions">
+              <button class="btn pri onlyM" onclick="openM('mSend')"><svg class="ic"><use href="#i-up"/></svg>Odoslať zmeny (2)</button>
+              <button class="btn" id="btnUpd" onclick="openM('mUpd')"><svg class="ic"><use href="#i-down"/></svg>Aktualizovať</button>
+              <span class="muted small" id="actnote"></span>
+            </div>
+            <div class="status" id="libstatus"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======= PRAVÝ STĹPEC ======= -->
+    <div>
+      <div class="card" style="margin-top:0">
+        <h3>Pri štarte SketchUpu <span class="pin">O4</span></h3>
+        <div class="notif">
+          <b>Noxun Engine</b><br>
+          Na Disku sú novšie knižnice: Materiály, Kovanie.
+          <div class="row"><button class="btn pri">Otvoriť O plugine</button><button class="btn">Neskôr</button></div>
+        </div>
+        <div class="note">Natívne oznámenie SketchUpu (UI::Notification). Nič nesťahuje — len otvorí sekciu O plugine. Keď ho prehliadneš, stav ostáva v O plugine
+          a navigácia Štúdia ukáže pri „O plugine" bodku.</div>
+      </div>
+
+      <div class="card">
+        <h3>Okná knižníc na Luciinom PC <span class="pin">O6</span></h3>
+        <div class="win libwin">
+          <div class="winhead">Materiály</div>
+          <div class="bar"><svg class="ic"><use href="#i-alert"/></svg><span>Knižnicu spravuje MICHAL-PC — tvoje zmeny tu sa pri Aktualizovať prepíšu. Pošli ich správcovi.</span></div>
+          <div class="content">… zoznam dosiek a ABS ako dnes …</div>
+        </div>
+        <div class="note">Jeden riadok, jantárový, len na PC, ktoré nie je správca. Rovnako v Kovaní, Šablónach, Spotrebičoch a Nastaveniach rozpočtu (R13). Na tvojom PC sa nekreslí.</div>
+      </div>
+
+      <div class="card">
+        <h3>Iná verzia pluginu <span class="pin">O7</span></h3>
+        <div class="warnline"><svg class="ic"><use href="#i-alert"/></svg><span>Knižnica na Disku je z <b>v0.19.1</b>, máš v0.19.0 — najprv aktualizuj plugin (box vyššie). Odoslať aj Aktualizovať čakajú.</span></div>
+        <div class="note">R14: synchronizácia len pri rovnakej verzii. Aktualizácia pluginu je na tom istom Disku, takže je to jeden klik nad boxom.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Body „návrh — potvrdí Michal"</h3>
+    <ol>
+      <li><span class="pin">O1</span> <b>Kde:</b> box v sekcii <b>O plugine</b> (spolu s aktualizáciou pluginu — oba „čo je nové na Disku"). Alternatíva: nová sekcia Štúdia „Knižnica".</li>
+      <li><span class="pin">O2</span> <b>Správca:</b> v ponuke „⋯" — na Michalovom PC raz „Toto PC je správca knižnice" (s potvrdením); kým to nikto neurobí, Odoslať je vypnuté na oboch.
+        Neskôr „Odovzdať správcu…" (výmena PC). Lucia ponuku „stať sa správcom" nevidí, kým jej ju neodovzdáš.</li>
+      <li><span class="pin">O3</span> <b>Päť riadkov = päť skupín</b>, ktoré sa prevezmú alebo preskočia vždy celé (aby nevznikla kombinácia, ktorú nemá žiadne PC):
+        Materiály (+ ABS pravidlá, vzhľady, fotky dekorov) · Kovanie (katalóg, výrobcovia, sety, pravidlá) · Šablóny (+ náhľady) · Dodávateľ a sadzby · Spotrebiče (+ listy).</li>
+      <li><span class="pin">O4</span> <b>Oznámenie pri štarte</b> — text a dve tlačidlá ako vľavo; plus bodka pri „O plugine" v navigácii, kým je čo aktualizovať.</li>
+      <li><span class="pin">O5</span> <b>História:</b> posledných 5 odoslaní per skupina s dátumom a poznámkou; „Vrátiť" (len správca) odošle starší obsah ako novú verziu.</li>
+      <li><span class="pin">O6</span> <b>Pruh v oknách knižníc</b> na PC, ktoré nie je správca — text vľavo.</li>
+      <li><span class="pin">O7</span> <b>Iná verzia pluginu</b> — jedna jantárová veta v boxe, tlačidlá čakajú.</li>
+      <li><span class="pin">O8</span> <b>Poznámka k odoslaniu</b> (môj nápad): pri Odoslať krátke voliteľné pole „čo som zmenil" — Lucia ho uvidí pri Aktualizovať a v histórii. Nechceš → pole vypadne.</li>
+    </ol>
+  </div>
+</div>
+
+<!-- ======= MODAL: Aktualizovať s lokálnymi zmenami (R4) ======= -->
+<div class="scrim" id="mUpd" onclick="if(event.target===this)closeM(this)">
+  <div class="modal">
+    <header>Aktualizovať knižnicu z Disku</header>
+    <div class="body">
+      Na Disku sú novšie: <b>Materiály</b> (verzia 14 z 16.10. 18:42) a <b>Kovanie</b> (verzia 9).
+      <div class="warnline"><svg class="ic"><use href="#i-alert"/></svg><span>V <b>Materiáloch</b> máš vlastné zmeny, ktoré na Disku nie sú. Prevzatím sa prepíšu.</span></div>
+      <b>Čo sa zmení v Materiáloch</b>
+      <ul class="diff">
+        <li>+ 3 nové (Pietra Grigia F206 kompakt 12, …)</li>
+        <li>~ 12 zmenená cena</li>
+        <li class="used">− Lucia biela 18 — <b>zmizne, používa ju otvorená zákazka „Byt Novák" (4 dielce)</b></li>
+      </ul>
+      <div class="small muted">Zmenia sa ceny v Materiáloch a Kovaní — najbližší rozpočet pôjde podľa nového cenníka.</div>
+      <div class="seg">
+        <label class="on"><input type="radio" name="r4" checked> <span><b>Prepísať</b> — moja verzia Materiálov sa uloží ako záloha (dá sa vrátiť v História).</span></label>
+        <label><input type="radio" name="r4"> <span><b>Materiály zatiaľ preskočiť</b> — prevezme sa len Kovanie. Pošli zmeny správcovi.</span></label>
+      </div>
+    </div>
+    <footer><button class="btn" onclick="closeM(this.closest('.scrim'))">Zrušiť</button><button class="btn pri" onclick="closeM(this.closest('.scrim'))">Aktualizovať</button></footer>
+  </div>
+</div>
+
+<!-- ======= MODAL: Odoslať ======= -->
+<div class="scrim" id="mSend" onclick="if(event.target===this)closeM(this)">
+  <div class="modal">
+    <header>Odoslať knižnicu na Disk</header>
+    <div class="body">
+      Odošlú sa zmenené: <b>Materiály</b> (verzia 15) a <b>Šablóny</b> (verzia 7). Ostatné sú rovnaké ako na Disku.
+      <div style="margin-top:8px"><span class="pin">O8</span> <label class="small">Poznámka pre Luciu (nepovinná)<br>
+        <input style="width:100%;height:28px;border:1px solid var(--nx-border-strong);border-radius:6px;padding:0 8px" placeholder="napr. nový dekor Pietra, šablóna 3 šuflík"></label></div>
+    </div>
+    <footer><button class="btn" onclick="closeM(this.closest('.scrim'))">Zrušiť</button><button class="btn pri" onclick="closeM(this.closest('.scrim'))">Odoslať</button></footer>
+  </div>
+</div>
+
+<!-- ======= MODAL: História ======= -->
+<div class="scrim" id="mHist" onclick="if(event.target===this)closeM(this)">
+  <div class="modal">
+    <header>História knižnice — Materiály</header>
+    <div class="body">
+      <table class="lib">
+        <thead><tr><th>Verzia</th><th>Kedy</th><th>Poznámka</th><th></th></tr></thead>
+        <tbody>
+          <tr><td>14 <span class="chip ok">aktuálna</span></td><td>16.10. 18:42</td><td>nový dekor Pietra</td><td></td></tr>
+          <tr><td>13</td><td>14.10. 09:10</td><td>ceny Demos október</td><td><button class="btn onlyM"><svg class="ic"><use href="#i-undo"/></svg>Vrátiť</button></td></tr>
+          <tr><td>12</td><td>9.10. 16:55</td><td>—</td><td><button class="btn onlyM"><svg class="ic"><use href="#i-undo"/></svg>Vrátiť</button></td></tr>
+          <tr><td>11</td><td>2.10. 11:20</td><td>ABS 23×0,8</td><td><button class="btn onlyM"><svg class="ic"><use href="#i-undo"/></svg>Vrátiť</button></td></tr>
+          <tr><td>10</td><td>30.9. 08:05</td><td>—</td><td><button class="btn onlyM"><svg class="ic"><use href="#i-undo"/></svg>Vrátiť</button></td></tr>
+        </tbody>
+      </table>
+      <div class="small muted" style="margin-top:6px">Vrátenie odošle obsah zvolenej verzie ako novú verziu 15 — Lucia ju dostane bežným Aktualizovať.
+        <span class="onlyL">Tvoje zálohy pred prepisom: <b>Materiály 17.10. 08:12</b> <button class="btn"><svg class="ic"><use href="#i-undo"/></svg>Vrátiť zálohu</button></span></div>
+    </div>
+    <footer><button class="btn" onclick="closeM(this.closest('.scrim'))">Zavrieť</button></footer>
+  </div>
+</div>
+
+<script>
+  var ROWS = {
+    m: [
+      ['Materiály','14 · 16.10.','15 · upravené','<span class="chip loc">neodoslané zmeny</span>'],
+      ['Kovanie','9 · 16.10.','9','<span class="chip ok">aktuálne</span>'],
+      ['Šablóny','6 · 12.10.','7 · upravené','<span class="chip loc">neodoslané zmeny</span>'],
+      ['Dodávateľ a sadzby','4 · 30.9.','4','<span class="chip ok">aktuálne</span>'],
+      ['Spotrebiče','3 · 5.10.','3','<span class="chip ok">aktuálne</span>']
+    ],
+    l: [
+      ['Materiály','14 · 16.10.','13 · upravené','<span class="chip new">novšia na Disku</span> <span class="chip loc">vlastné zmeny</span>'],
+      ['Kovanie','9 · 16.10.','8','<span class="chip new">novšia na Disku</span>'],
+      ['Šablóny','6 · 12.10.','6','<span class="chip ok">aktuálne</span>'],
+      ['Dodávateľ a sadzby','4 · 30.9.','4','<span class="chip ok">aktuálne</span>'],
+      ['Spotrebiče','3 · 5.10.','—','<span class="chip wait">na Disku sa ešte synchronizuje</span>']
+    ]
+  };
+  function setPc(pc){
+    document.documentElement.setAttribute('data-nx-theme', pc === 'l' ? 'lucia' : 'noxun');
+    document.getElementById('pcM').classList.toggle('on', pc === 'm');
+    document.getElementById('pcL').classList.toggle('on', pc === 'l');
+    document.querySelectorAll('.onlyM').forEach(function(e){ e.style.display = pc === 'm' ? '' : 'none'; });
+    document.querySelectorAll('.onlyL').forEach(function(e){ e.style.display = pc === 'l' ? '' : 'none'; });
+    document.getElementById('rows').innerHTML = ROWS[pc].map(function(r){
+      return '<tr><td><b>'+r[0]+'</b></td><td>'+r[1]+'</td><td>'+r[2]+'</td><td class="st">'+r[3]+'</td></tr>';
+    }).join('');
+    var upd = document.getElementById('btnUpd');
+    if (pc === 'm') {
+      upd.setAttribute('aria-disabled','true'); upd.title = 'Všetko na Disku už máš';
+      document.getElementById('actnote').textContent = 'Aktualizovať netreba — na Disku nie je nič novšie.';
+      document.getElementById('libstatus').textContent = 'Odoslať pošle Materiály a Šablóny; ostatné sú rovnaké ako na Disku.';
+    } else {
+      upd.removeAttribute('aria-disabled'); upd.title = '';
+      document.getElementById('actnote').textContent = 'Odosiela len správca (MICHAL-PC).';
+      document.getElementById('libstatus').textContent = 'Spotrebiče: verzia na Disku ešte nie je celá (Disk ju dosťahuje) — skús o chvíľu, nič sa nemení.';
+    }
+  }
+  function toggleMenu(e){ e.stopPropagation(); document.getElementById('menu').classList.toggle('open'); }
+  document.addEventListener('click', function(){ document.getElementById('menu').classList.remove('open'); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') document.querySelectorAll('.scrim.open').forEach(closeM); });
+  function openM(id){ document.getElementById('menu').classList.remove('open'); document.getElementById(id).classList.add('open'); }
+  function closeM(el){ el.classList.remove('open'); }
+  document.querySelectorAll('.seg label').forEach(function(l){ l.addEventListener('click', function(){
+    l.parentNode.querySelectorAll('label').forEach(function(x){ x.classList.toggle('on', x === l); }); }); });
+  setPc('m');
+</script>
+</body>
+</html>
