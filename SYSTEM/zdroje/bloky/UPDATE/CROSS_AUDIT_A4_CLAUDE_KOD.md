@@ -1,0 +1,48 @@
+# Krížový audit bloku UPDATE — A4 Claude Opus, audit kódu (17.10.2026)
+
+> Surový výstup nového agenta bez kontextu (repo len čítal). Zadanie: rovnaké ako A1–A3. Cesty relatívne k `noxun_engine/`.
+
+## A · Odpovede na §5
+
+1. **Bezpečnosť modelu:** áno s podmienkami. Google (support.google.com/drive/answer/13401938, 17.10.2026): zrkadlené súbory vždy offline; pri rozdielnom obsahu ponechá obe kópie. Nesľubuje poradie, atomický rename ani správanie pri prepise počas sťahovania → Disk = pomalé úložisko bez poradia a zámkov: odtlačok každého súboru overený pred použitím; ukazovateľ posledný so stúpajúcim číslom, Lucia nikdy na nižšie; `flock` nie na H:, zámky lokálne. S jedným zapisovateľom `parent`/`supersedes` odpadá.
+2. **Jednoduchšia cesta:** SketchUp zdieľa len `.skm` kolekcie; Drive API = OAuth (nie); koreň na H: nie (zámky `core/materials.rb:514-519`, `core/appliance_catalog.rb:229-235`; `.tmp-*`, `.bak`, zámky by sa synchronizovali). **SIMPLER NATIVE PATH:** Odoslať = priečinok `library/r0007-<uuid>/` s kópiou všetkých zdieľaných súborov podľa registra + `manifest.json` (odtlačky, verzia pluginu), potom `current.json` posledný; história 5 = 5 priečinkov; prílohy sa duplikujú (pri 2 PC a pár MB OK), `files/<sha1>` netreba. Druhé zjednodušenie: rovnosť verzie pluginu (B3).
+3. **Rez:** U2 nezlučovať s U3, ale U2 nie je „bez zmeny správania" (B1, B2); U1 nezávislá; U4 sa zmenšuje (B9).
+4. **Čísla zákazky:** áno — časť D.
+5. **Zlyhania:** pád počas prevzatia — poradie: prílohy pribudnú (nové mená) → JSON temp+rename pod zámkom → stav „prevzatá verzia" nakoniec; po páde ostanú len nadbytočné prílohy. Dve okná u Lucie: cache `JsonFileStore` chytí novú verziu do 1 s (`core/json_file_store.rb:12,33-41,227-236`), ale stav v pamäti modulov a otvorené okná nie (B6); **ALREADY EXISTS** leases updatera (`core/updater.rb:926`, `:972`) → Aktualizovať odmietnuť pri druhom okne. Odpojenie Disku pri Odoslať: `current.json` posledný → polovičná verzia neviditeľná; nedokončený priečinok upratať.
+6. **Fotky dekorov:** zdieľať netreba — meno z `image_url` deterministické `<sha1(url)[0,10]>_<basename>` (`core/demos/image_cache.rb:31-37`), `image_url` cestuje v `materials.json` (`core/materials.rb:416`); **ALREADY EXISTS** `DemosImageCache.ensure(url)` (`image_cache.rb:61-72`), okno číta len `local_for` (`ui/materials_dialog.rb:322`). **SIMPLER:** po Aktualizovať dotiahnuť chýbajúce fotky na pozadí z Demosu — Michal potvrdí, či takto R8 platí.
+
+## B · Nálezy
+
+- **B1 BLOCKER — import cez `Materials.write` zahodí Michalove vzhľady:** `prepare_appearance_write!` (`core/materials.rb:337`) berie `appearance` vždy z lokálneho disku, nie z payloadu (`core/materials_appearance.rb:182-216`); surová výmena súboru zas obíde brány (`materials.rb:348-366`). → per-store `import_document!` s bránami, celý dokument presne vrátane `appearance`; pred zápisom overiť `.skm` ku každému `appearance.id`.
+- **B2 FIX — zápis pečiatkuje verzie a seed:** `AbsRules.write` (`core/abs_rules.rb:376`); čítanie samo zapisuje: `persist_seed_merge!` (:231-296), `HardwareRules.load_state` (`core/hardware_rules.rb:544-551`), orez ABS (`materials.rb:265-266`), seed záplaty kovania (`core/hardware_catalog.rb:184-186`). `HardwareRules` už doprednú bránu má (KOV-F1, `hardware_rules.rb:616-623`), register nie (F12). → `export_document` (kanonický) + `import_document!` (bez pečiatok a seed-merge); pravidlo kompatibility do registra.
+- **B3 FIX + SIMPLER — falošné „lokálne zmeny":** hash sa mení bez zásahu (seed, normalizácia, lenivá schéma `materials.rb:342-343`, `updated_at`/`price_checked_at`). → **Odoslať aj Aktualizovať len pri zhode verzie pluginu** (`Engine::VERSION` v manifeste), inak „najprv aktualizuj plugin" (zmizne aj dopredná brána a rozdiely seedov); hash nad kanonickým exportom, uložiť po prvom načítaní prevzatej verzie.
+- **B4 FIX — Lucia do knižníc v praxi zapisuje:** „Prepočítať ceny" (`core/price_refresh.rb:9-13`), skupiny z Demosu, materiály, spotrebiče. Koncept nehovorí, či jej editory ostávajú otvorené → R4 by denne prepisoval. → otvorený bod Michala (banner „zmeny sa pri Aktualizovať prepíšu — pošli ich správcovi", neskôr export zmien).
+- **B5 BLOCKER pre R4 „prepísať" — identita záznamov medzi PC nie je rovnaká:** ID materiálov z mena s príponou `-2` (`materials.rb:1559-1564`); seed spotrebiče = náhodné UUID na každom PC (`core/appliance_catalog.rb:1411-1413`); zákazky odkazujú `catalog_id` (`core/budget_store.rb:506-507`, `core/appliance_binding.rb:261`); zmiznutý materiál → záložná hrúbka UNI 16 (`core/cabinet_builder.rb:1770-1776`). → pred prepisom diff zmiznutých/zmenených ID, zvýrazniť použité v otvorenej zákazke (**ALREADY EXISTS** `used_material_ids`, `core/templates.rb:102-104`); prvé pripojenie: spárovať seed spotrebiče podľa obsahu; záloha na obnovu (B7).
+- **B6 FIX — stav v pamäti a otvorené okná:** `HardwareCatalog @state` (`hardware_catalog.rb:144-219`), `ApplianceCatalog @state` (:295-307), `HardwareSets @lib_state` (`hardware_sets.rb:617-678`), `HardwareTaxonomy @state` (`hardware_taxonomy.rb:133-249`), `Materials @catalog_state` (`materials_health.rb:222-249`), `@price_proposals` (`hardware_catalog.rb:229,834`); uloženie zo starého okna prepíše prevzatý záznam. → `reset + assess!` po importe, znovu poslať dáta oknám, druhú inštanciu odmietnuť; vzor bariéry **ALREADY EXISTS** (`ui/supplier_settings_dialog.rb:330-331`, `:570-588`).
+- **B7 FIX — `.bak` nie je záloha R4:** prepíše sa pri ďalšom zápise (`json_file_store.rb:84`, `:190-199`). → pomenovaná záloha ako riadok registra `backup` (inak guard `test_h16_kniznice.rb` padne); zaregistrovať aj lokálny stav synchronizácie.
+- **B8 FIX — závislosti katalógov pri preskočení:** šablóny → `material_id`, sety, `hardware_set_defs` (`templates.rb:127-157`); sety → katalóg kovania a taxonómia; ABS a vzhľady → Materiály. → skupiny závislostí v registri {materials, appearances, abs_rules}, {hardware_catalog, taxonomy, sets, rules}, templates závisí od oboch; preskočenie = varovanie o závislých.
+- **B9 FIX — prílohy spotrebičov sa nesmú mazať:** snapshot v zákazke odkazuje do priečinka katalógu (`appliance_catalog.rb:1343-1345`, `:1381-1386`). → prílohy pri prevzatí len pribúdajú. **ALREADY EXISTS** stabilné mená (`<uuid>.skm` `materials_appearance.rb:109-112,140`; `appliances/<uuid>/…` `appliance_catalog.rb:210-219`; náhľady `template_previews.rb:77-86`) → migrácia v U4 asi netreba; náhľady sa pri novom uložení prepisujú pod tým istým menom → kopírovať podľa obsahu.
+- **B10 NOTE — zámky:** `TemplateStore.with_lock` nekontroluje `flock` a prehltne výnimku (`templates.rb:641`, `:651-653`); `HardwareCatalog.with_lock` nekontroluje `flock` (`hardware_catalog.rb:128`) → jednotné primitívum (F3), knižnice postupne (F4).
+- **B11 FIX — určenie správcu:** „bez súboru je správca prvý, kto odošle" je v rozpore s R3 (Lucia by mohla byť prvá) a Disk môže súbor doručiť neskoro. → Odoslať len po výslovnom „Toto PC je správca" (lokálne nastavenie + súbor na Disku), pri nezhode zablokovať; dve okná u Michala = lokálny zámok odosielania.
+- **B12 NOTE — U1:** prevzatie starého názvu (`core/export_settings.rb:461-472`, `:489-521`) zápisom pri otvorení urobí model zmeneným a pridá undo → zapísať pri prvej zmene/uložení alebo transparentne; rieši audit U1.
+- **B13 NOTE — čítanie s časovým limitom ALREADY EXISTS v UI** (`ui/supplier_settings_dialog.rb:369-423`) → presunúť do core pre kontrolu pri štarte.
+- **B14 NOTE — značky UNI:** po prevzatí Materiálov zapísať obe značky (**ALREADY EXISTS** `write_uni_marker` / `write_drawer_uni_marker`, `core/materials_catalog.rb:1104-1108`, `:1184-1188`), inak UNI záznamy pribudnú späť (:1071-1098).
+
+## C · Rez dávok
+
+| Dávka | Obsah | Audit |
+|---|---|---|
+| U1 | názov zákazky v .skp (nezávislá) | `codex-audit` + predrecenzia |
+| U2 | per-store `export_document`/`import_document!` (B1, B2), reset stavu (B6), vynútenie registra, skupiny závislostí (B8), zálohy a stav (B7), rovnosť verzie pluginu (B3) | `codex-audit`; **nie** „bez zmeny správania" |
+| U3 | čisté jadro: priečinok verzie + manifest, `current.json` posledný, prílohy len pribúdajú (B9), história 5 + návrat, správca (B11), lokálne zmeny nad kanonickým exportom, pracovník s limitom do core (B13), odmietnutie pri druhej inštancii | `codex-audit` |
+| U4 | O plugine: riadky, Odoslať/Aktualizovať, R4 s diffom použitých ID (B5), oznámenie, fotky cez `DemosImageCache.ensure` | predrecenzia, in-SU smoke na oboch PC |
+
+Pôvodná U4 (prílohy) sa rozpustí do U2/U3. U2 + U3 spolu by mali > 1500 riadkov. **Odhad 4 PR** (+1 ak sa U2 rozdelí na Materiály a ostatné). Audit-povinné U1, U2, U3.
+
+## D · Riziká pre zákazky
+
+**Áno, prevzatie môže zmeniť čísla otvorenej alebo neskôr prestavanej zákazky** (rovnako ako dnes lokálna úprava, len hromadne). Živé: hrúbka a hustota materiálu (`cabinet_builder.rb:1443,1709,1764-1776`) → geometria, kusovník, VEPO, hmotnosť do pravidiel kovania; chýbajúce ID → UNI 16; ABS pravidlá bez snapshotu (`cabinet_builder.rb:1456-1458`, `board_builder.rb:990,1059`); Rozpočet číta ceny a sadzby naživo (`core/budget.rb:114-130,189`), bez zmrazenia. Chránené snapshotom: pravidlá kovania (`hardware_rules.rb:28-30,534,981-993`), sety (`hardware_sets.rb:213,2179-2230`), spotrebiče v rozpočte (`appliance_catalog.rb:1341-1388`; prílohy len odkazy). **Odporúčanie:** R4 aj bežné Aktualizovať ukáže pred zápisom „mení otvorenú zákazku" a nikdy nič nemaže bez zoznamu.
+
+## Verdikt
+
+Model je na zrkadlenom Disku životaschopný a výrazne jednoduchší než 6.9.; ešte zjednodušiť (priečinok verzie s odtlačkami, rovnosť verzie pluginu, `textures/` nezdieľať). Pred packages vyriešiť **B1** a **B5**; U2 musí niesť háčiky importu/exportu per store; Michal rozhodne o **B4**.

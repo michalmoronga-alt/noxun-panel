@@ -28,6 +28,20 @@ Pôvodné rozhodnutia: [../../next_sessions/V1_DEBATA_2026-09-06_LUCIA_KNIZNICE.
 | R10 | Luciino PC | **SketchUp 2026 a Google Disk H: zrkadlený** rovnako ako u Michala (Michal 17.10.: „obe sedia") | uzatvára otázku H11 Q3 |
 | R11 | Zdieľaný koreň | `H:\Môj disk\NoxunENGINE data` (6.9., bez zmeny); distribúcia updatera D-52 v tom istom koreni | potvrdené |
 
+## Po krížovom audite (A4 Claude, 17.10.)
+
+| # | Otázka | Rozhodnutie Michala |
+|---|---|---|
+| R13 | Lucia dnes do knižníc zapisuje (Prepočítať ceny, skupiny z Demosu, materiál, spotrebič) — ostáva to (A4 B4)? | **Ostáva + banner** v oknách knižníc na PC, ktoré nie je správca: „Zmeny tu sa pri Aktualizovať prepíšu — pošli ich správcovi"; pri Aktualizovať varovanie R4 |
+| R14 | Odoslať / Aktualizovať len pri rovnakej verzii pluginu (A4 B3)? | **Áno, len rovnaká verzia**; inak „najprv aktualizuj plugin" (updater D-52, ten istý koreň) |
+| R15 | Fotky dekorov cez Disk alebo dotiahnuť z Demosu (A4 A6)? | **Cez Disk** — ako prílohy verzie katalógu (len fotky, na ktoré katalóg odkazuje), R8 platí |
+
+## Postup bloku
+
+| # | Otázka | Rozhodnutie Michala |
+|---|---|---|
+| R12 | Codex v krížovom audite bloku (po tom, čo 1 beh `gpt-6-astra` so širokým zadaním zobral celé 5h okno a 17 b. týždňa bez výsledku) | Krížový audit bloku na **`gpt-6.1-sol` po resete okna, s úzkym zadaním** (vymenované súbory, bez voľného prehľadávania repa); `gpt-6-astra` len na povinné audity packages, tiež úzko |
+
 ## Otvorené body pre mockup („návrh — potvrdí Michal")
 
 Doplní koncept a mockup; každý musí dostať Michalovu odpoveď pred písaním packages (CLAUDE.md, Git workflow).
