@@ -38,6 +38,14 @@ Pôvodné rozhodnutia: [../../next_sessions/V1_DEBATA_2026-09-06_LUCIA_KNIZNICE.
 | R17 | Aktualizovať prepíše ceny a sadzby (reconcile O2) | **Veta v okne stačí:** „Zmenia sa ceny v … — najbližší rozpočet pôjde podľa nového cenníka"; zmrazenie rozpočtu zákazky mimo bloku |
 | R15 | Fotky dekorov cez Disk alebo dotiahnuť z Demosu (A4 A6)? | **Cez Disk** — ako prílohy verzie katalógu (len fotky, na ktoré katalóg odkazuje), R8 platí |
 
+## Z packages (17.10.)
+
+| # | Otázka | Rozhodnutie Michala |
+|---|---|---|
+| R18 | Výklad R14 (PACKAGE_U3 §13 Q1) | **Aktualizovať** len pri rovnakej verzii pluginu; **Odoslať** sa blokuje len keď je knižnica na Disku z **novšieho** pluginu alebo keď správcova verzia pluginu ešte **nie je na Disku** pre druhé PC |
+| R20 | „Uložiť ako" — nesie kópia ten istý názov zákazky (PACKAGE_U1 §13 Q1)? | **Áno, ten istý**; Michal ho prepíše ceruzkou, keď chce (riziko rovnakého priečinka VEPO dvoch variantov vedome prijaté) |
+| R19 | Dvaja správcovia naraz (PACKAGE_U3 §13 Q2) | **Odoslať sa vypne na oboch** s vetou o dvoch správcoch, riešenie ručne v „⋯"; Aktualizovať ide ďalej |
+
 ## Postup bloku
 
 | # | Otázka | Rozhodnutie Michala |
@@ -58,3 +66,4 @@ Pôvodné rozhodnutia: [../../next_sessions/V1_DEBATA_2026-09-06_LUCIA_KNIZNICE.
 | O6 | Pruh | jeden jantárový riadok v oknách Materiály, Kovanie, Šablóny, Spotrebiče, Nastavenia rozpočtu na PC, ktoré nie je správca |
 | O7 | Iná verzia | jantárová veta v boxe, Odoslať aj Aktualizovať čakajú |
 | O8 | Poznámka k odoslaniu | **áno, nepovinné pole** pri Odoslať; Lucia ju vidí pri Aktualizovať a v histórii |
+| O9 | **Ikona stiahnutia** (doplnok Michala po schválení, 17.10. — rámček „platí" v mockupe) | keď je na Disku čo aktualizovať: ikona pri „O plugine" v **navigácii Štúdia** a tlačidlo v **lište Inspectora** pod okom (viditeľnosť tagov); klik z lišty otvorí Štúdio → O plugine na boxe aktualizácie; bez aktualizácie sa nekreslí; nahrádza „bodku" z O4. **R21:** svieti pre **novú knižnicu aj novú verziu pluginu**, tooltip povie čo |

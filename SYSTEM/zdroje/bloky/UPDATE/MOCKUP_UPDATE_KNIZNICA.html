@@ -126,6 +126,13 @@
   /* ===== notifikácia SketchUpu ===== */
   .notif{background:var(--nx-surface);border:1px solid var(--mk-win-border);border-radius:8px;box-shadow:0 4px 16px var(--mk-shadow);padding:10px 12px;font-size:12px}
   .notif .row{display:flex;gap:8px;margin-top:8px}
+  .updic{color:var(--nx-select)}
+  .rail{display:flex;flex-direction:column;align-items:center;gap:10px;width:44px;height:300px;padding:10px 0;background:var(--nx-surface);
+        border:1px solid var(--nx-border);border-radius:8px;color:var(--nx-ink-soft);flex:0 0 auto}
+  .rail .sep{width:22px;border-top:1px solid var(--nx-border)}
+  .rail .grow{flex:1}
+  .railupd{width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:6px;cursor:pointer;
+           border:1px solid var(--nx-select);background:var(--nx-select-bg);color:var(--nx-select)}
   /* ===== okno knižnice s pruhom ===== */
   .libwin .bar{display:flex;gap:8px;align-items:flex-start;padding:6px 10px;font-size:11.5px;background:var(--nx-warn-bg-soft);
                color:var(--nx-warnchip-fg);border-bottom:1px solid var(--nx-warnchip-border)}
@@ -142,6 +149,10 @@
   <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
   <symbol id="i-user" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
   <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+  <symbol id="i-dl" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.2V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 7 19.4l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0-1.2-2.7H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 7l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 2.7-1.2V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 2.7 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0 1.2 2.7H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1.2z"/></symbol>
   <symbol id="i-disk" viewBox="0 0 24 24"><path d="M22 12H2"/><path d="M5.5 5.1L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1z"/></symbol>
 </svg>
 
@@ -179,7 +190,8 @@
         <div class="nav">
           <div class="grp">Výstupy</div><div>Kusovník</div><div>Kontrola</div><div>Nákup kovania</div><div>Rozpočet</div><div>Cenová ponuka</div><div>Nárezový plán</div>
           <div class="grp">Knižnice</div><div>Materiály</div><div>Kovanie</div><div>Spotrebiče</div><div>Šablóny</div>
-          <div class="grp">Nastavenia</div><div>Pravidlá</div><div>Nastavenia rozpočtu</div><div class="on">O plugine</div>
+          <div class="grp">Nastavenia</div><div>Pravidlá</div><div>Nastavenia rozpočtu</div><div class="on" style="display:flex;align-items:center;gap:4px">O plugine
+            <svg class="ic updic" style="width:14px;height:14px" aria-label="Na Disku je čo aktualizovať"><title>Na Disku je novšia knižnica: Materiály, Kovanie</title><use href="#i-dl"/></svg> <span class="pin">O9</span></div>
         </div>
         <div class="sec">
           <div class="sechead"><h2>O plugine</h2></div>
@@ -233,7 +245,26 @@
           <div class="row"><button class="btn pri">Otvoriť O plugine</button><button class="btn">Neskôr</button></div>
         </div>
         <div class="note">Natívne oznámenie SketchUpu (UI::Notification). Nič nesťahuje — len otvorí sekciu O plugine. Keď ho prehliadneš, stav ostáva v O plugine
-          a navigácia Štúdia ukáže pri „O plugine" bodku.</div>
+          a ikona stiahnutia v navigácii Štúdia a v lište Inspectora (O9).</div>
+      </div>
+
+      <div class="card">
+        <h3>Lišta Inspectora <span class="pin">O9</span></h3>
+        <div style="display:flex;gap:14px;align-items:flex-start">
+          <div class="rail">
+            <span><svg class="ic"><use href="#i-box"/></svg></span>
+            <span><svg class="ic"><use href="#i-box"/></svg></span>
+            <span><svg class="ic"><use href="#i-box"/></svg></span>
+            <span class="sep"></span>
+            <span><svg class="ic"><use href="#i-eye"/></svg></span>
+            <button class="railupd" title="Na Disku je novšia knižnica: Materiály, Kovanie — otvoriť Štúdio → O plugine" aria-label="Aktualizácia na Disku — otvoriť O plugine"><svg class="ic"><use href="#i-dl"/></svg></button>
+            <span class="grow"></span>
+            <span><svg class="ic"><use href="#i-gear"/></svg></span>
+          </div>
+          <div class="small">Ikona <b>stiahnutia</b> pod okom (viditeľnosť tagov) sa objaví <b>len</b> keď je na Disku čo aktualizovať — <b>knižnica aj nová verzia pluginu</b> (R21).
+            Klik otvorí <b>Štúdio → O plugine</b> rovno na boxe s aktualizáciou. Tooltip povie čo (napr. „novšia knižnica: Materiály, Kovanie" / „plugin v0.19.1").
+            Bez aktualizácie sa nekreslí — rail neberie miesto. Rovnaká ikona stojí v navigácii Štúdia pri „O plugine".</div>
+        </div>
       </div>
 
       <div class="card">
@@ -266,6 +297,8 @@
       <li><span class="pin">O5</span> <b>História:</b> posledných 5 odoslaní per skupina s dátumom a poznámkou; „Vrátiť" (len správca) odošle starší obsah ako novú verziu.</li>
       <li><span class="pin">O6</span> <b>Pruh v oknách knižníc</b> na PC, ktoré nie je správca — text vľavo.</li>
       <li><span class="pin">O7</span> <b>Iná verzia pluginu</b> — jedna jantárová veta v boxe, tlačidlá čakajú.</li>
+      <li><span class="pin">O9</span> <b>Ikona stiahnutia</b> (doplnok Michala 17.10.) — pri „O plugine" v navigácii Štúdia a v lište Inspectora pod okom; len keď je čo aktualizovať
+        (knižnica aj plugin); klik z lišty otvorí Štúdio → O plugine. Nahrádza „bodku" z O4.</li>
       <li><span class="pin">O8</span> <b>Poznámka k odoslaniu</b> (môj nápad): pri Odoslať krátke voliteľné pole „čo som zmenil" — Lucia ho uvidí pri Aktualizovať a v histórii. Nechceš → pole vypadne.</li>
     </ol>
   </div>
