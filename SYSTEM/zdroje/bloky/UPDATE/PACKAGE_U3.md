@@ -7,7 +7,8 @@
 > [CROSS_AUDIT_A3_RESERS_WEB.md](CROSS_AUDIT_A3_RESERS_WEB.md) (FIX 1–4, NOTE 2) · súpis [kniznice.md](../../../../docs/architecture/kniznice.md) · z návrhu 6.9.
 > ([SYNC_KNIZNICE_NAVRH_2026-09-06.md](../../next_sessions/SYNC_KNIZNICE_NAVRH_2026-09-06.md)) platí len §3 „Čo ostáva".
 > **Trieda Ť · audit-povinná (nový modul) · predrecenzia · U3b výrobná/cenová (export test P == K) · R0 sonda Disku pred zmrazením.** Rez **U3a → U3b** (§2), jeden audit.
-> **Stav kódu:** sonda nad `main` `a9e8c79d` (v0.18.1, po #474). U2 ešte nie je v kóde — U3 používa jej API **presne podľa PACKAGE_U2** (§6 R-I).
+> **Stav kódu:** sonda nad `main` `a9e8c79d` (v0.18.1, po #474). U2 ešte nie je v kóde — U3 používa jej API **presne podľa PACKAGE_U2 vrátane jeho §15** (§6 R-I).
+> **Audit návrhu (Codex astra, 17.10.): 3 BLOCKER · 6 FIX · 1 NOTE — zapracované priamo do §6; mapa nález → požiadavka v §15.**
 
 ---
 
@@ -50,8 +51,8 @@ skús o chvíľu", **nič sa nezmení**; o minútu prebehne prevzatie a jej star
 | **U3a · čítacia strana** | `core/timed_worker.rb` · `core/library_sync.rb` (mená, cesty, lokálny stav cez U2, správca — čítanie, R18) · `core/library_sync_remote.rb` (sken, stavy Disku, celistvosť, história, cudzie mená) · `status` · `diff` | ~480 | ~600 | 1 deň |
 | **U3b · zápisová strana** | `core/library_sync_publish.rb` (založenie správcu, odoslanie, overenie ukazovateľa, zametanie, Vrátiť verziu) · `core/library_sync_take.rb` (staging, prílohy, volanie `import_group!`, výsledok, žurnál) | ~450 | ~650 | 1¼ dňa |
 
-Spolu ~930 riadkov (menej než pôvodne — zálohy, návrat a druhé okno robí U2) → nad ~600 → delenie ostáva. U3a nič nezapisuje mimo lokálneho stavu a môže ísť
-aj pred U2 (API U2 v testoch ako stub s presnými menami); **U3b potrebuje U2 v `main`**. **Poistka:** časť nad ~650 riadkov kódu → stop, rozhodne orchestrátor.
+Spolu ~930 riadkov (menej než pôvodne — zálohy, návrat a druhé okno robí U2) → nad ~600 → delenie ostáva. U3a nič nezapisuje mimo lokálneho stavu; štartuje po **U2a** (skupiny v registri)
+a potrebuje `peek_group` (§12 D10, dodá U2b) — v testoch stub s presnými menami; **U3b potrebuje U2a + U2b + U2c v `main`**. **Poistka:** časť nad ~650 riadkov kódu → stop, rozhodne orchestrátor.
 
 ## 3 · Scope IN
 
@@ -77,7 +78,7 @@ skupiny a riadky `library_backups`/`library_sync` v registri (**U2**) · výber 
   **export test** `scripts\export_test.ps1` **P == K** ako dôkaz, že dávka sama čísla nemení (bez Odoslať/Aktualizovať sa exporty nesmú líšiť).
 - **Predrecenzia:** povinná pre U3a aj U3b.
 - **In-SU:** spúšťače sa nemenia → **nie je brána**. Fotky okien: nie.
-- **R0 sonda Disku:** podmienka **zmrazenia package** (výsledok do §15, prípadná úprava [R0] požiadaviek ako delta audit); nie brána mergu.
+- **R0 sonda Disku:** podmienka **zmrazenia package** (výsledok do §16, prípadná úprava [R0] požiadaviek ako delta audit); nie brána mergu.
 
 ## 6 · Požiadavky
 
@@ -133,7 +134,7 @@ Roly `-Role writer` (Michal) / `-Role reader` (Lucia), spojené menom behu. Čas
 
 - **R-B1 lokálny stav = `LibraryTransfer.sync_state` / `update_sync_state!(group_key, entry)`** (U2 R4.5; súbor `library_sync.json` a jeho riadok registra pridáva **U2**). U3 definuje obsah:
   `entry = { version, id, fingerprint (group_fingerprint po prevzatí/odoslaní — pri prevzatí z `result['fingerprints']` po usadení), plugin, at, origin: take|publish|revert,
-  clean, clean_checked_plugin, pending: {target_id, started_at} | nil, attachments_digest }` — pole `attachments_digest` je **rezervované pre U4** (význam, plnenie
+  publisher_pc_id (R-C4), pending: {target_id, target_version, before_fingerprint, started_at} | nil, attachments_digest }` — pole `attachments_digest` je **rezervované pre U4** (význam, plnenie
   a vplyv na `status`: [PACKAGE_U4.md](PACKAGE_U4.md) R5.1–R5.2); U3 ho len prenáša. Údaje PC cez `LibraryTransfer.update_sync_meta!` (U2 R4.5): `pc_id` (UUID vzniknutý raz),
   `drive_root` (R-A1), `admin` (true = toto PC sa vyhlásilo za správcu, R-C3). Degradovaný stav (U2) = Odoslať aj Aktualizovať odmietnuté s dôvodom.
 - **R-B2 zámok operácie** `library_sync.lock` (`Materials.dir`, nový záznam `LibraryRegistry::LOCKS` — pridáva U3): `flock(LOCK_EX | LOCK_NB)`; obsadený → `:busy` „Iné okno práve odosiela
@@ -142,18 +143,24 @@ Roly `-Role writer` (Michal) / `-Role reader` (Lucia), spojené menom behu. Čas
 
 ### R-C · Správca (R3, R19, O2, A2 B1, A4 B11)
 
-- **R-C1** `library/admin-<NNNNNN>-<r8>.json` = `{ std:1, kind:"noxun_library_admin", seq, pc_id, pc_name, at }`; platí najvyššie `seq`. **Dva rôzne `pc_id` s rovnakým najvyšším
+- **R-C1** `library/admin-<NNNNNN>-<r8>.json` = `{ std:1, kind:"noxun_library_admin", seq, pc_id, pc_name, at }` (kandidát) a `library/admin-act-<NNNNNN>-<r8>.json`
+  `{ …, activated_at }` (aktivácia, R-C3); platí najvyššie `seq`. **Dva rôzne `pc_id` s rovnakým najvyšším
   `seq` → `conflict`: Odoslať (aj Vrátiť verziu) vypnuté na oboch PC s vetou o dvoch správcoch, riešenie ručne v „⋯" (U5); Aktualizovať ide ďalej (R19).**
-- **R-C2 `admin_state`** ∈ `none` · `self` (Disk menuje toto `pc_id` **a** lokálne `admin == true`) · `other` · `mismatch` · `conflict`. **Odoslať a Vrátiť verziu len pri `self`**;
+- **R-C2 `admin_state`** ∈ `none` · `claiming` (vlastný kandidát, aktivácia ešte nie) · `self` (Disk má **aktiváciu** tohto `pc_id` a žiadny iný kandidát/aktiváciu **a** lokálne `admin == true`) · `other` · `mismatch` · `conflict`. **Odoslať a Vrátiť verziu len pri `self`**;
   `none` → vypnuté na oboch (O2). Správcom sa **nikdy** nestáva „prvý, kto odošle".
-- **R-C3 `claim_admin!`** (U3b; U5 po potvrdení): len pri stave Disku `ok`/`empty` a `admin_state == none`; zapíše `admin-000001-<r8>.json` + `update_sync_meta!('admin' => true)`; po zápise znova
-  prečíta adresár → iný súbor s rovnakým `seq` → `conflict`. „Odovzdať správcu" = `seq+1` neskôr (mimo).
+- **R-C3 dvojfázový `claim_admin!`** (U3b; U5 po potvrdení; audit 4): (1) len keď Disk `ok`/`empty` **a sken ukazuje 0 kandidátov aj 0 aktivácií** → zapíše kandidáta
+  + `update_sync_meta!('admin' => true)` → `claiming`; (2) `activate_admin!` smie bežať najskôr po **čakacej lehote T = 15 min [R0]** (podľa nameranej latencie T1/T7) a len keď
+  nový sken stále ukazuje **jediného kandidáta = toto PC**; potom zapíše aktiváciu. Iný kandidát kedykoľvek → `conflict` (R19). Odoslať až pri `self`. „Odovzdať správcu" = `seq+1` (mimo).
+- **R-C4 prijímanie publikácií (audit 4):** ukazovateľ nesie `by_pc_id`; čitateľ berie do úvahy **len ukazovatele aktivovaného správcu**. Prvé prevzatie zapíše `entry.publisher_pc_id`.
+  Pri `conflict` (R19): Odoslať vypnuté na oboch; **Aktualizovať pokračuje len z ukazovateľov `entry.publisher_pc_id`** (doterajší zdroj tohto PC); skupina bez neho (`never_taken`)
+  čaká na ručné vyriešenie. Ukazovatele cudzieho `pc_id` = `foreign_publisher` (hlásené, nikdy prevzaté, nikdy mazané). PC, ktoré je samo kandidátom v konflikte, neprijíma nič od druhého.
 
 ### R-D · Sken Disku a celistvosť verzie (A3 FIX 1)
 
 - **R-D1 `Remote.scan(root, group_keys)`** — **len súborové I/O**, vo vlákne (R-E). Vráti `{ disk, admin, groups:{ g => {heads, current, history, foreign} } }`. Žiadne
   `Sketchup.*`, `UI.*`, zápis, volanie `LibraryTransfer` ani `JsonFileStore` (guard nad zdrojom).
 - **R-D2** aktuálna verzia = najvyššie `NNNNNN` platného ukazovateľa; dva platné s rovnakým číslom a iným `id` → `head_conflict` (nič sa nepreberá, Odoslať vypnuté).
+  **Cudzie meno začínajúce `head-` alebo `admin`** (konfliktná kópia ukazovateľa či správcu) = **záväzný blok** `head_conflict` / `conflict` danej skupiny/koreňa, nie len hlásenie (audit 4).
 - **R-D3 `verify_version`:** ukazovateľ parsuje → priečinok `id` je → `manifest.json` parsuje, SHA256 = `manifest_sha256`, `group/version/id` sedia → každá položka `documents`
   a `attachments` má presne `size` a `sha256` → `group_fingerprint` sedí. **Ktorékoľvek zlyhanie = `syncing`** („verzia N sa ešte synchronizuje"), nikdy čiastočné prevzatie.
   Zlá cesta, stropy, zlé `kind/std` = `broken` („verzia N je poškodená — požiadaj správcu o nové odoslanie").
@@ -174,36 +181,45 @@ Roly `-Role writer` (Michal) / `-Role reader` (Lucia), spojené menom behu. Čas
 
 ### R-F · Stav per skupina a kontrola pri štarte (R6, R7, O4)
 
-- **R-F1 `status(scan, local:)`** — hlavné vlákno; `local` = `fingerprints` z `export_group` per skupina. `state` ∈ `current` · `newer` · `local_changes` (lokálny `group_fingerprint`
-  ≠ `entry.fingerprint`) · `newer_and_local` · `syncing` · `broken` · `plugin_newer_on_disk` / `plugin_older_on_disk` · `not_on_disk` · `never_taken` (prvé pripojenie, R16) ·
-  `pending` (R-J5) · `head_conflict`; + `disk_version`, `local_version`, `note`, `can_send`, `can_take`, `reason`.
+- **R-F1 `status(scan, local:)`** — hlavné vlákno; `local` = výsledok **`LibraryTransfer.peek_group(g)`** (bez bariéry, bez zápisu — §12 D10; `export_group` sa v `status` **nevolá**,
+  vyžaduje zatvorené okná — U2 §15.0, audit 5). `:unknown` z `peek_group` → stav `unknown` („stav sa overí pri Aktualizovať/Odoslať"), **nikdy `current`**. `state` ∈ `current` · `newer` ·
+  `local_changes` (lokálny `group_fingerprint` ≠ `entry.fingerprint` a ≠ odtlačok aktuálnej verzie na Disku) · `newer_and_local` · `syncing` · `broken` · `plugin_newer_on_disk` / `plugin_older_on_disk` · `not_on_disk` · `never_taken` (prvé pripojenie, R16) ·
+  `pending` (R-J5) · `blocked` (`LibraryTransfer.pending_block` — U2 §15.1) · `disk_behind` (Disk ukazuje nižšiu verziu, než toto PC prevzalo — „synchronizácia beží"; nič sa nepreberá,
+  audit 3) · `unknown` · `head_conflict` · `foreign_publisher`; + `disk_version`, `local_version`, `note`, `can_send`, `can_take`, `reason`.
 - **R-F2 `startup_check`** = (beží až po `LibraryTransfer.recover_pending!` pri boote — R-J5) sken vo vlákne + `status` → skupiny `newer`/`newer_and_local`/`never_taken` pre O4 a príznak bodky. **Nič nesťahuje ani nezapisuje.**
-- **R-F3 zmena verzie pluginu:** keď `entry.plugin ≠ Engine::VERSION` a `entry.clean` (posledné vyhodnotenie pod starou verziou bez lokálnych zmien), stav sa **prebázuje**
-  (nový odtlačok = `fingerprint`, seedové migrácie nie sú zmeny používateľa); inak `local_changes`. `clean` sa aktualizuje pri každom `status` (zápis len pri zmene) — D4.
+- **R-F3 zmena verzie pluginu (audit 2 — bez prebázovania):** keď `entry.plugin ≠ Engine::VERSION`, lokálny odtlačok sa **nesmie** vyhlásiť za východisko. Platí len:
+  lokálny `group_fingerprint` = odtlačok aktuálnej verzie na Disku (už odoslanej novým pluginom) → `current` a `entry` sa zarovná; inak **konzervatívne `local_changes`** s dôvodom
+  „po aktualizácii pluginu sa vlastné zmeny nedajú odlíšiť" → prevzatie len cez varovanie R4 (záloha U2). Polia `clean*` zanikajú.
 
 ### R-G · Verzia pluginu (R14, R18, O7)
 
 - **R-G1 Aktualizovať** len keď `LibraryTransfer.import_allowed?(head.plugin)` (U2 R5 — jediná autorita); Disk novší → `plugin_newer_on_disk` („najprv aktualizuj plugin"); starší →
   `plugin_older_on_disk` („správca ju po aktualizácii pluginu odošle znova").
 - **R-G2 Odoslať (R18)** odmietne, keď (a) `LibraryTransfer.export_allowed?(head.plugin)` je `false` pre ktorýkoľvek aktuálny ukazovateľ (Disk z **novšieho**
-  pluginu — U2 R5), alebo (b, druhá podmienka R18 — posudzuje U3) `Updater.check(Updater.source_dir, VERSION)` vráti `older` (správcova
-  verzia ešte nie je na Disku pre druhé PC). Distribúcia nečitateľná → odmietnutie s dôvodom „nedá sa overiť aktualizácia pluginu na Disku" (fail-closed; §12 D2).
+  pluginu — U2 R5), alebo (b, druhá podmienka R18 — posudzuje U3; audit 6) distribúcia **nedokazuje** dostupnosť správcovej verzie: povolené len keď
+  `Updater.check(Updater.source_dir, VERSION)['state'] == 'same'` **a** `Updater.source_manifest(Updater.source_dir) == Updater.source_manifest(plugins_dir)` (balík na Disku je
+  bajtovo ten, ktorý beží — úplný a tej istej verzie); `newer`/`older`/nezhoda manifestu → „aktualizácia pluginu na Disku nie je tvoja verzia alebo ešte nie je celá".
+  Nečitateľná → odmietnutie (fail-closed; §12 D2). **Kontrola beží vo `TimedWorker` (limit 60 s [R0]) pred exportom; hlavné vlákno len vyhodnotí výsledok** (audit 7).
   Odoslanie z novšieho pluginu než na Disku je povolené (R18).
 
 ### R-H · Odoslanie (U3b; A2 B3, O8)
 
-- **R-H1 `publish_prepare(groups:, note:)`** (hlavné vlákno): `admin_state == self`, R-G2, zámok R-B2 → per skupina `LibraryTransfer.export_group(g)` (neúspech = skupina `failed`
-  s vetou U2 R4.7) → `canonical_bytes` dokumentov + prílohy podľa `attachment_refs` do outboxu `Materials.dir/library_outbox/<id>/` (tvar verzie) → tiket. Predvolené skupiny =
-  `local_changes` a `not_on_disk`; nezmenená (= `entry.fingerprint` = aktuálna verzia na Disku) sa neodosiela.
+- **R-H1 `publish_prepare(groups:, note:, precheck:)`** (hlavné vlákno, synchrónne podľa U2 §15.0 — volajúci U5 zatvoril okná): `admin_state == self`, výsledok R-G2 z `precheck`
+  (worker), zámok R-B2 → per skupina `LibraryTransfer.export_group(g)` (kódy U2 vrátane `:dialogs_open`, `:other_instance`, `:busy_snapshot` = skupina `failed` s vetou U2) →
+  `canonical_bytes` + prílohy do outboxu `Materials.dir/library_outbox/<id>/` → tiket. **Výber skupín (audit 1):** odošle sa skupina, ktorej **čerstvý** `group_fingerprint` z
+  `export_group` ≠ odtlačok aktuálnej verzie na Disku, **alebo** `head.plugin ≠ Engine::VERSION` (nová verzia pluginu = povinné nové odoslanie, inak by ju R-G1 odmietlo),
+  alebo skupina na Disku nie je. `entry.fingerprint` sa na výber **nepoužíva**.
 - **R-H2 `publish_run(ticket)`** (vlákno): `N` = max(najvyšší viditeľný ukazovateľ, `entry.version`) + 1 → `v<N>-<r8>/` → `d/*`, `a/*` → `manifest.json` → **čítanie späť**
   (veľkosť + SHA256) → `head-<N>-<r8>.json` posledný → znova zoznam ukazovateľov.
 - **R-H3 výsledok per skupina:** `sent` · `failed` (zvyšok na Disku bez ukazovateľa = neviditeľný) · `skipped`; pri `sent` aj `attachments_skipped`
   (`{entry_key => [{rel, reason}]}` z packetu — prílohy, ktoré U4 nepreniesol; U5 z neho skladá vetu „bez N fotiek“).
-- **R-H4 (A2 B3):** po zápise iný ukazovateľ s číslom ≥ N a iným `id` → `failed` „odoslanie neprešlo, skús znova"; lokálne ostáva neodoslaná zmena (D5).
+- **R-H4 (A2 B3):** po zápise iný ukazovateľ s číslom ≥ N a iným `id` (alebo konfliktná kópia) → `failed` „odoslanie neprešlo" + `head_conflict` (R-D2) — nič sa neopakuje automaticky.
 - **R-H5 [R0]** zápis na H: priamo pod finálnym menom v jedinečnom priečinku (čiastočný súbor odhalí manifest).
-- **R-H6 `publish_finish`** (hlavné vlákno): pre `sent` `update_sync_state!(g, …origin: publish, fingerprint: z tiketu)` → zámok uvoľniť → outbox zmazať.
-- **R-H7 zametanie (R5):** správca po úspechu zmaže verzie a ukazovatele s číslom **< N−4** a priečinky `v*` bez ukazovateľa staršie ako 24 h; len vlastné mená (R-A3); zlyhanie =
-  úspech s poznámkou; nikdy verziu, ktorú drží tiket Vrátiť. **[R0]** T6.
+- **R-H6 `publish_finish`** (hlavné vlákno): pre `sent` `update_sync_state!(g, …origin: publish, fingerprint: z tiketu)`; pre `failed` zápis `id` do lokálneho záznamu
+  **nepublikovaných pokusov** `library_outbox/failed.json` (pre R-H7) → zámok uvoľniť → outbox zmazať.
+- **R-H7 zametanie (R5, audit 9):** ponechá **5 najnovších skutočných publikácií** (priečinok + platný ukazovateľ aktivovaného správcu); zmaže len (a) staršie publikácie — vždy
+  **ukazovateľ aj priečinok spolu**, a (b) priečinky `v*`, ktorých `id` je v `failed.json` tohto PC (preukázateľne nepublikované). Priečinok bez ukazovateľa, ktorý nie je v `failed.json`,
+  sa **nikdy nemaže** (ukazovateľ môže doraziť neskôr). Žiadne kritérium veku ani hodín. Zlyhanie = úspech s poznámkou; nikdy verziu, ktorú drží tiket Vrátiť. **[R0]** T6.
 
 ### R-I · API U2, ktoré U3 používa (presne podľa PACKAGE_U2)
 
@@ -218,6 +234,10 @@ Roly `-Role writer` (Michal) / `-Role reader` (Lucia), spojené menom behu. Čas
 | verzia | `import_allowed?(v)`, `export_allowed?(disk_v)`, `compare_versions(a, b)` (R5) | R-G1, R-G2 |
 | obnova po páde | `recover_pending!(plugins_dir)` (R4.9; volá `main.rb` pri boote pred `Materials.boot_cutover!`; žurnál `library_import.pending.json`, `last_recovery`, `pending_issue`) | R-J5 |
 | zneplatnenie zobrazenia | výsledok `import_group!`/`restore_backup!` s `'refresh' => true` (R4.10) | R-J4 (U3 prenesie, `push_state` robí U5) |
+| podmienky operácií | U2 §15.0: bez inej inštancie, okná knižníc zatvorené (`:dialogs_open`), synchrónne na hlavnom vlákne | U3 volá `export_group`/`import_group!`/`restore_backup!` len synchrónne; bariéru okien robí U5 |
+| blok po prerušení | `pending_block(entry_key = nil)` (U2 §15.1) | R-F1 `blocked`, R-J2 |
+| čítanie stavu bez bariéry | **`peek_group(g)` — požiadavka §12 D10** | R-F1, R-N1 |
+| doklad dokončenia | **`import_group!(…, tag:)`, `import_done(tag)`, `ack_import_done!(tag)` — požiadavka §12 D11** | R-J5 |
 
 **Doplnené v U2** (§12 D6): (a) `update_sync_meta!` pre údaje PC (`pc_id`, `drive_root`, `admin`); (b) predpoklad R4.2 krok 2 „prílohy už ležia" — U3 ich uloží
 pred `import_group!` (R-M), ale riadky prílohy majú v registri `lock` (`materials.lock`, `appliances.json.lock`, `templates.json.lock` drží volajúci) → U3 potrebuje
@@ -227,19 +247,22 @@ pred `import_group!` (R-M), ale riadky prílohy majú v registri `lock` (`materi
 
 - **R-J1 `take_prepare(groups:)`** (vlákno): `verify_version` → kópia celej verzie do `Materials.dir/library_staging/<id>/` → **opätovné overenie stagingu** (Disk mohol súbor
   vymeniť) → tiket. Neúspešná skupina = `syncing`/`broken`, ostatné pokračujú.
-- **R-J2 `take_commit(ticket, decisions:, plugins_dir:)`** (hlavné vlákno): zámok R-B2 · R-G1 · `decisions = { g => :take | :overwrite | :skip }`: skupina s lokálnymi zmenami
-  bez `:overwrite` sa preskočí (R4); lokálny `fingerprint` sa prepočíta znova (`export_group`) — zmena od `status` bez `:overwrite` → `skipped_changed`. Vráti aj
+- **R-J2 `take_commit(ticket, decisions:, plugins_dir:)`** (hlavné vlákno, synchrónne — U2 §15.0): zámok R-B2 · R-G1 · `pending_block` → `blocked` · **zastaraný tiket (audit 3):**
+  pod zámkom sa odmietne (`stale_ticket`, nezávisle od `:overwrite`), keď `ticket.version ≤ entry.version` alebo tiket nie je **posledný pripravený** v tomto procese (sekvencia
+  tiketov); cesta dozadu existuje len cez Vrátiť (R-L2). `decisions = { g => {action: :take | :overwrite | :skip, seen_fingerprint:} }`: lokálny odtlačok sa prepočíta
+  (`export_group`) a **≠ `seen_fingerprint`** (odtlačok, nad ktorým používateľ rozhodol) → `skipped_changed` **aj pri `:overwrite`**; lokálne zmeny bez `:overwrite` → `skipped` (R4). Vráti aj
   `dependents_skipped` z `LibraryRegistry.dependents` (text U5).
-- **R-J3 poradie per skupina** (v poradí `GROUPS`): (1) `pending` do stavu · (2) prílohy R-M · (3) packet = `{group, plugin_version: manifest.plugin, documents: JSON.parse(staged d/*),
-  attachment_refs, fingerprints}` → `import_group!(g, packet, plugins_dir:, reason: 'prevzatie verzie N')` · (4) `:ok` → `update_sync_state!` (`fingerprint` z `result['fingerprints']`
-  po usadení, `pending: nil`); iný kód → výsledok so slovenskou vetou U2, `pending: nil` okrem `:failed_restore_failed` (ostáva, U5 ponúkne „Vrátiť zálohu").
+- **R-J3 poradie per skupina** (v poradí `GROUPS`): (1) `pending = {target_id, target_version, before_fingerprint, started_at}` do stavu · (2) prílohy R-M · (3) packet = `{group, plugin_version: manifest.plugin, documents: JSON.parse(staged d/*),
+  attachment_refs, fingerprints}` → `import_group!(g, packet, plugins_dir:, reason: 'prevzatie verzie N', tag: target_id)` · (4) `:ok` → `update_sync_state!` (`fingerprint` z `result['fingerprints']`
+  po usadení, `publisher_pc_id`, `pending: nil`) → `ack_import_done!(target_id)`; iný kód → výsledok so slovenskou vetou U2, `pending: nil` okrem `:failed_restore_failed` (ostáva, U5 ponúkne „Vrátiť zálohu").
   `:other_instance` / `:other_instance_unknown` na prvej skupine → zvyšok sa nespúšťa („Zavri ostatné okná SketchUpu").
 - **R-J4 výsledok per skupina:** `taken` · `skipped` · `skipped_changed` · `syncing` · `broken` · `plugin_mismatch` · + kódy U2 R4.7 bez prekladu; `'refresh'` z U2 sa prenesie (U5). Staging sa zmaže po dobehu;
   zvyšky staršie ako 24 h zmaže najbližšie `take_prepare`.
 - **R-J5 (A1 S1) prerušené prevzatie:** `version`/`id`/`fingerprint` prevzatej verzie sa do `entry` zapíšu **až po `:ok` celej skupiny** (R-J3 krok 4), nikdy po jednom store-e.
   Pád počas `import_group!` rieši pri štarte **`LibraryTransfer.recover_pending!`** (U2 R4.9, žurnál `library_import.pending.json`, volá ho `main.rb` pred `Materials.boot_cutover!`,
-  teda pred `startup_check`). U3 potom: `entry.pending` + `last_recovery` → `pending: nil` (skupina má pôvodný obsah); `pending_issue` → stav `pending` („Prevzatie sa prerušilo
-  a návrat zlyhal — vráť zálohu"), Aktualizovať tej skupiny vypnuté, kým sa nevyrieši. Polovičná skupina sa nikdy nepoužije bez pokusu o návrat.
+  teda pred `startup_check`). U3 potom pri `entry.pending` (audit 8 — všetky tri intervaly): **(a)** `import_done(target_id)` existuje (U2 dokončila, pád pred zápisom U3) →
+  dopíše `entry` z jeho `fingerprints` a `ack_import_done!`; **(b)** `last_recovery` alebo `peek_group` = `before_fingerprint` (pád pred importom alebo obnovené) → `pending: nil`;
+  **(c)** `pending_issue` alebo nič z toho → stav `pending` („Prevzatie sa prerušilo — vráť zálohu"), Aktualizovať skupiny vypnuté (U2 `pending_block` zároveň blokuje výpočty). Polovičná skupina sa nikdy nepoužije bez pokusu o návrat.
 
 ### R-K · Zálohy (O5) — len cez U2
 
@@ -261,9 +284,10 @@ U3 vlastné zálohy nerobí. „Vrátiť zálohu" = `restore_backup!(id, plugins
 - **R-M2** prílohy idú **pred** `import_group!` (U2 R4.2 krok 2 ich overuje — `:missing_attachments`).
 - **R-M3** dočasné mená príloh registruje **U4** ([PACKAGE_U4.md](PACKAGE_U4.md)); U3 žiadne nepridáva.
 
-### R-N · Zoznam zmien pre varovanie R4 (A4 B5, R17) — nad výstupom `export_group`, bez nového API U2
+### R-N · Zoznam zmien pre varovanie R4 (A4 B5, R17) — nad `peek_group`, overené `export_group` pri commite
 
-- **R-N1 `diff(g, ticket, used_ids: {})`** (hlavné vlákno): lokálne `packet['documents']` z `export_group` vs. dokumenty zo stagingu tiketu (tie isté bajty, ktoré sa importujú).
+- **R-N1 `diff(g, ticket, used_ids: {})`** (hlavné vlákno, pred rozhodnutím R4 pri otvorenom okne): lokálne dokumenty z `peek_group(g)` vs. dokumenty zo stagingu tiketu
+  (tie isté bajty, ktoré sa importujú); výsledok nesie `seen_fingerprint` pre R-J2. `peek_group` `:unknown` → `diff: :unknown` (U5 ukáže všeobecné varovanie R4).
   Per knižnica `{ added:[{id,label}], changed:[{id,label,fields}], removed:[{id,label,used}] }`; `used = used_ids[entry_key].include?(id)` — množinu použitých ID otvorenej zákazky
   dodá U5 (potrebuje model; napr. `Materials.used_material_ids`), U3 ju len prenesie do výsledku.
 - **R-N2 tabuľka záznamov** v U3 (`LibrarySync::RECORDS`): per `entry_key` cesta k poľu záznamov, kľúč identity a popisu (napr. `materials` → pole položiek, `id`, `name`);
@@ -290,20 +314,22 @@ U3b so skutočnou U2):
 | celistvosť | chýbajúci/skrátený/iný súbor, iný SHA manifestu, ukazovateľ pred priečinkom → `syncing`; `..`/absolútna cesta/strop → `broken`; `EACCES` → `syncing` |
 | stavy Disku | `no_drive`, `no_root`, `empty`, `missing_known`, `ok`, `timeout` (fake spawn), `error` |
 | timed worker | single-flight, dobehnutý zahodený, nezabíja sa, výnimka → `error` |
-| správca | `none` → Odoslať vypnuté na oboch; `self`; `other`; `mismatch`; `conflict` → Odoslať vypnuté, Aktualizovať ide (R19); claim pri `syncing` odmietnutý |
-| R14/R18 | Aktualizovať pri inom pluginu odmietnuté (dva dôvody); Odoslať pri novšom na Disku odmietnuté, pri novšom lokálne povolené; `Updater.check` `older` → odmietnuté; nečitateľná distribúcia → odmietnuté |
-| odoslanie | ukazovateľ až po čítaní späť; zlyhanie kopírovania → bez ukazovateľa, stav nezmenený; súbežný ukazovateľ → `failed`; nezmenená skupina `skipped`; zametanie necháva 5, nemaže cudzie |
+| správca | `none` → Odoslať vypnuté; `claiming` → Odoslať vypnuté; aktivácia pred lehotou T / pri druhom kandidátovi odmietnutá; dva kandidáti doručení oneskorene → `conflict`, Odoslať vypnuté na oboch, Aktualizovať len od `publisher_pc_id`; ukazovateľ cudzieho `pc_id` nikdy neprevzatý; konfliktná kópia `head-…` blokuje |
+| R14/R18 | Aktualizovať pri inom pluginu odmietnuté (dva dôvody); Odoslať pri novšom na Disku odmietnuté; distribúcia `newer`, `older`, `same` s iným manifestom, nečitateľná → odmietnuté; `same` + zhodný manifest → povolené; precheck nikdy na hlavnom vlákne (fake worker) |
+| odoslanie | ukazovateľ až po čítaní späť; zlyhanie kopírovania → bez ukazovateľa, stav nezmenený; súbežný ukazovateľ → `failed`; úprava po odoslaní A → B sa odošle (audit 1); po zmene VERSION sa odošlú všetky skupiny; zametanie necháva 5 publikácií, nemaže priečinok bez ukazovateľa mimo `failed.json` |
 | zámok | druhá operácia počas prvej → `:busy`; uvoľnený po chybe |
 | prevzatie | staging overený znova (súbor vymenený medzi kópiou a overením); prílohy pred `import_group!`; príloha sa nikdy nezmaže; lokálne zmeny bez `:overwrite` → `skipped`; zmena po `status` → `skipped_changed`; kódy U2 (`:failed_restored`, `:failed_restore_failed` → `pending` ostáva, `:other_instance` zastaví zvyšok) prenesené bez zmeny |
-| prerušenie (A1 S1) | pád simulovaný medzi dvoma store-mi skupiny → `entry` bez novej verzie, pri „štarte" `recover_pending!` pred skenom → bajty = pred prevzatím; zlyhaná obnova → `pending`, Aktualizovať skupiny vypnuté |
+| prerušenie (A1 S1, audit 8) | pád pred importom, počas importu, **po úspechu U2 a pred `update_sync_state!`** → po „štarte" (a)/(b)/(c) R-J5; zlyhaná obnova → `pending` |
+| zastaraný tiket (audit 3) | tikety N a N+1, commit N po N+1 → `stale_ticket` aj s `:overwrite`; lokálna zmena po rozhodnutí → `skipped_changed` aj s `:overwrite`; Disk nižší než prevzatý → `disk_behind` |
+| bez bariéry (audit 5) | `status` nevolá `export_group`; `peek_group :unknown` → `unknown`, nikdy `current`; `:dialogs_open` z U2 prenesené |
 | Vrátiť | verzia K → lokálne K + Disk N+1 s `reverted_from`; K z iného pluginu odmietnuté |
-| lokálne zmeny | po prevzatí `current`; po úprave `local_changes`; prebázovanie len pri `clean` (R-F3) |
+| lokálne zmeny | po prevzatí `current`; po úprave `local_changes`; po zmene VERSION úprava pred aktualizáciou ostane `local_changes` (audit 2) |
 | diff | pridané/zmenené/zmiznuté, `used` z `used_ids`, `price_changed` |
 | guardy | čistota (R-O4); telá vlákien (R-E4); žiadny `JsonFileStore`/`.tmp` nad `<root>`; register (S13) |
 
 **Koncový scenár („dve PC" = dva sandboxy `Materials.dir` + jeden „Disk"):** A claim → odošle všetko (v1) → B `never_taken` → prevezme → `current` → A zmení Materiály, odošle (v2)
 s poznámkou → B `newer` + poznámka → B zmení Materiály → `newer_and_local` → `:skip` (Kovanie prevzaté) → `:overwrite` → záloha U2 + prevzatie → A Vrátiť v1 → B dostane v3 = v1.
-**DoD:** Ruby a všetky JS sady zelené (každá zvlášť), encoding guard, R0 v §15 pred implementáciou; **U3b: export test P == K**.
+**DoD:** Ruby a všetky JS sady zelené (každá zvlášť), encoding guard, R0 v §16 pred implementáciou; **U3b: export test P == K**.
 **Akceptačná brána uzáveru bloku (A1 S6 — nie U3a/U3b, až po U4 a U5):** na dvoch skutočných PC cez skutočný Disk: odoslanie (vrátane príloh) → prevzatie na druhom PC
 → Vrátiť staršiu verziu → druhé PC ju prevezme: knižnice, prílohy a lokálny stav (`entry`, zálohy) sedia s verziou; postup = §10 bod 4.
 
@@ -315,9 +341,9 @@ Nie je brána (spúšťače sa nemenia — §5). Overenie na reálnom Disku a dv
 
 1. **Disk doručí inak, než predpokladáme [R0]** → manifest + SHA256 nezávisí od poradia; najhorší dôsledok = dlhšie `syncing`.
 2. **Prepis mení čísla zákazky** (A4 D, R17) → diff s `used`, záloha a návrat U2, odmietnutie druhého okna; rozhodnutie a texty U5.
-3. **Prehliadnuté lokálne zmeny po aktualizácii pluginu** (R-F3) → úprava medzi posledným `status` a aktualizáciou sa vstrebe do východiska (D4).
+3. **Po aktualizácii pluginu varovanie R4 aj bez úprav** (R-F3 konzervatívne) → zmizne, keď správca odošle novou verziou a odtlačky sa zhodnú; cena = jedno zbytočné varovanie.
 4. **Zaseknuté vlákno nad H:** drží `library_sync.lock` do dobehu → `:busy` v tom okne do reštartu.
-5. **Dvaja správcovia** → Odoslať vypnuté na oboch, ručne (R19).
+5. **Dvaja správcovia** (oneskorená synchronizácia dlhšia než T) → `conflict`, Odoslať vypnuté, cudzie publikácie sa neprijímajú (R-C3, R-C4, R19).
 6. **API U2 sa pri implementácii zmení** → U3b štartuje až po mergi U2; zmena mien = zladenie package pred U3b.
 7. **Veľkosť príloh** (U4) → stropy na verziu, história 5 = až 5× na Disku; R0 T1 zmeria čas.
 8. **Cesta s diakritikou** (`Môj disk`) → R0 T8 + testy s UTF-8 cestou.
@@ -344,8 +370,8 @@ D-48 v DOGFOODING ostáva otvorený (zatvorí U5) · PR popis: predrecenzia, odk
 - **D1 trieda:** potvrdené orchestrátorom 17.10. — U3a nie výrobná/cenová, **U3b áno** + export test P == K.
 - **D2 R18 fail-closed** — **potvrdené orchestrátorom 17.10.:** keď sa distribúcia pluginu na Disku nedá prečítať, Odoslať sa odmietne (R18 „verzia nie je na Disku" sa nedá overiť).
 - **D3 časový limit v core** — potvrdené: nový `TimedWorker`, updater D-52b ostáva (N1).
-- **D4 prebázovanie po aktualizácii pluginu** (R-F3) — jednoduchšia cesta so zostatkovým rizikom; presnejšia by potrebovala od U2 `canonicalize` bez zápisu (nové API — nenavrhujem).
-- **D5 súbežný ukazovateľ** na jednom PC nenastane (R-B2), dva PC zakazuje R3 → stačí `failed` + `head_conflict`.
+- **D4 (audit 2)** prebázovanie zrušené — po zmene VERSION konzervatívne `local_changes`, kým sa odtlačok nezhodne s Diskom (R-F3).
+- **D5 (audit 4)** dva odosielajúce PC **môžu** nastať (oneskorená synchronizácia) → dvojfázový správca R-C3, prijímanie len od aktivovaného/`publisher_pc_id` R-C4, konfliktné kópie blokujú.
 - **D6 čo chýba v U2** (vyriešiť v PACKAGE_U2 pred U3b): **(a)** `update_sync_state!` prijíma len `group_key ∈ GROUPS` — údaje PC (`pc_id`, `drive_root`,
   `admin`) → U2 dopĺňa `update_sync_meta!` (R4.5); **(b)** verejný `LibraryTransfer.with_store_lock(entry_key)`
   (R4.4 je dnes interný) na ukladanie príloh pod zámkom ich riadku pred `import_group!`. Riadky `library_backups/` a `library_sync.json` pridáva U2 (potvrdené); U3 len `library_sync.lock`,
@@ -354,6 +380,14 @@ D-48 v DOGFOODING ostáva otvorený (zatvorí U5) · PR popis: predrecenzia, odk
   dostane len počet zmien.
 - **D8 rozloženie verzie** = priečinok s kópiou dokumentov a príloh pod menami z obsahu (A4 SIMPLER); duplikácia príloh medzi verziami prijateľná.
 - **D9 koreň** = per-PC hodnota s predvoľbou R11, bez UI na zmenu.
+- **D10 požiadavka na U2 — `LibraryTransfer.peek_group(group_key)`** (audit 5): čisto na čítanie, **bez bariéry** (smie bežať pri otvorených oknách a v O plugine), bez zámku na
+  čakanie (zámok `LOCK_SH | LOCK_NB`, obsadený → `:unknown`), **bez akéhokoľvek zápisu** (žiadne seed, seed-merge, `migrate!`, `.bak`, UNI, cache stav modulov sa nemení), bez
+  `Sketchup`. Pre každú knižnicu skupiny číta primár zo disku **bez fallbacku na `.bak`**. Výsledok `[:ok, {'documents' => {entry_key => doc}, 'fingerprints' => {entry_key => sha256}}]`
+  **len keď** primár existuje, parsuje sa, nie je degradovaný a je usadený (dokument je presne ten, ktorý by `export_group` vrátil bez zmeny — inak by sa odtlačky líšili);
+  inak `[:unknown, veta]` (napr. chýba, poškodený, pred migráciou, `pending_block`, zámok obsadený). Odtlačok = `fingerprint(doc)` rovnako ako R4.6. Prílohy sa nečítajú.
+- **D11 požiadavka na U2 — doklad dokončenia prevzatia** (audit 8): `import_group!(…, tag: String)` po úspechu (pred zmazaním žurnálu) zapíše trvalý záznam
+  `{tag, group, fingerprints, finished_at}` (napr. `library_import.done.json`, riadok registra `marker`/`local`); `import_done(tag)` → Hash | nil; `ack_import_done!(tag)` ho zmaže.
+  U3 ho používa len v R-J5 (a). Bez `tag:` sa nič nezapisuje (spätná kompatibilita).
 
 ## 13 · Otázky pre Michala
 
@@ -367,6 +401,21 @@ D-48 v DOGFOODING ostáva otvorený (zatvorí U5) · PR popis: predrecenzia, odk
 - **N3:** F10 `Debug.report` po U3 môže pridať `LibrarySync.status` — porovnanie Michal vs. Lucia jedným príkazom.
 - **N4:** nápad do U5: v histórii ukazovať aj PC a verziu pluginu odoslania (údaje nesie ukazovateľ).
 
-## 15 · Výsledok sondy R0
+## 15 · Audit návrhu — zapracovanie (Codex `gpt-6-astra`, 17.10.2026; [AUDIT_U3_raw.md](AUDIT_U3_raw.md))
+
+| # | Nález | Verdikt | Zapracovanie |
+|---|---|---|---|
+| 1 | BLOCKER nezmenená skupina sa porovnáva so starým `entry` | platný | **R-H1** výber podľa čerstvého exportu vs. Disk + povinné odoslanie po zmene VERSION |
+| 2 | BLOCKER prebázovanie skryje zmeny | platný | **R-F3** bez prebázovania, konzervatívne `local_changes`; D4 |
+| 3 | BLOCKER starý tiket prepíše novšiu verziu | platný | **R-J2** `stale_ticket` pod zámkom, `seen_fingerprint`; **R-F1** `disk_behind` |
+| 4 | FIX dvaja správcovia pri oneskorení | platný | **R-C3** dvojfázový claim s lehotou T [R0], **R-C4** prijímanie len od aktivovaného správcu/`publisher_pc_id`, **R-D2** konfliktné kópie blokujú; R19 |
+| 5 | FIX stav a diff cez `export_group` s bariérou | platný | **R-F1**, **R-N1** cez `peek_group` (**D10** požiadavka na U2), `:unknown` ≠ `current`; export len v commite |
+| 6 | FIX R18 nepreukazuje dostupnosť verzie | platný | **R-G2** `same` + zhodný manifest balíka na Disku a bežiaceho pluginu |
+| 7 | FIX kontrola distribúcie bez limitu | platný | **R-G2** precheck vo `TimedWorker`, **R-H1** len vyhodnotí |
+| 8 | FIX pád medzi U2 a zápisom U3 | platný | **R-J5** (a)/(b)/(c), **D11** doklad `tag` od U2, `before_fingerprint` v `pending` |
+| 9 | FIX zametanie maže priečinok bez ukazovateľa | platný | **R-H7** 5 skutočných publikácií, mazanie len s ukazovateľom alebo z `failed.json`, bez veku |
+| 10 | NOTE S1–S5 nie všetky uzavreté | platný ako stav | S1–S3 = návrh U2 §15 (dôkaz až implementáciou U2b); S4 čiastočne do smoke U5 (U2 §15.7); S5 v U3 opravené bodmi 1 a 6; R0 nedokazuje budúce poradie — návrh od poradia nezávisí (R-D3), mená konfliktov blokujú konzervatívne (R-D2) |
+
+## 16 · Výsledok sondy R0
 
 *(doplní sa po behu na oboch PC; dovtedy package nie je zmrazený — požiadavky [R0] sú predbežné)*
