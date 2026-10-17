@@ -105,7 +105,7 @@ Roly `-Role writer` (Michal) / `-Role reader` (Lucia), spojené menom behu. Čas
 
 ### R-A · Rozloženie zdieľaného koreňa a mená (A2 B2, A3 FIX 2/4, R5, R11)
 
-- **R-A1 koreň:** per-PC hodnota `root` v lokálnom stave (R-B1), predvolená `H:/Môj disk/NoxunENGINE data` (R11). Knižnica = `<root>/library/`. Distribúcia D-52 ostáva svojou cestou.
+- **R-A1 koreň:** per-PC hodnota `drive_root` v meta `sync_state` (R-B1; v texte `<root>`), predvolená `H:/Môj disk/NoxunENGINE data` (R11). Knižnica = `<root>/library/`. Distribúcia D-52 ostáva svojou cestou.
 - **R-A2 rozloženie** (jediné mená, ktoré motor zapisuje a uznáva, všetko ASCII; `<skupina>` = kľúče `LibraryRegistry::GROUPS` z U2 R1.2):
 
 ```
@@ -134,8 +134,8 @@ Roly `-Role writer` (Michal) / `-Role reader` (Lucia), spojené menom behu. Čas
 - **R-B1 lokálny stav = `LibraryTransfer.sync_state` / `update_sync_state!(group_key, entry)`** (U2 R4.5; súbor `library_sync.json` a jeho riadok registra pridáva **U2**). U3 definuje obsah:
   `entry = { version, id, fingerprint (group_fingerprint po prevzatí/odoslaní — pri prevzatí z `result['fingerprints']` po usadení), plugin, at, origin: take|publish|revert,
   clean, clean_checked_plugin, pending: {target_id, started_at} | nil, attachments_digest }` — pole `attachments_digest` je **rezervované pre U4** (význam, plnenie
-  a vplyv na `status`: [PACKAGE_U4.md](PACKAGE_U4.md) R5.1–R5.2); U3 ho len prenáša. PC údaje (`pc_id` UUID vzniknutý raz, `root`, `admin_claimed`) v pseudo-skupine — **U2 dnes overuje
-  `group_key ∈ GROUPS`** → chýba miesto pre údaje mimo skupín (§12 D6a). Degradovaný stav (U2) = Odoslať aj Aktualizovať odmietnuté s dôvodom.
+  a vplyv na `status`: [PACKAGE_U4.md](PACKAGE_U4.md) R5.1–R5.2); U3 ho len prenáša. Údaje PC cez `LibraryTransfer.update_sync_meta!` (U2 R4.5): `pc_id` (UUID vzniknutý raz),
+  `drive_root` (R-A1), `admin` (true = toto PC sa vyhlásilo za správcu, R-C3). Degradovaný stav (U2) = Odoslať aj Aktualizovať odmietnuté s dôvodom.
 - **R-B2 zámok operácie** `library_sync.lock` (`Materials.dir`, nový záznam `LibraryRegistry::LOCKS` — pridáva U3): `flock(LOCK_EX | LOCK_NB)`; obsadený → `:busy` „Iné okno práve odosiela
   alebo aktualizuje knižnicu". Drží sa počas celej operácie vrátane vlákna. **Vonkajší** voči zámkom U2 (`materials.lock` a ďalšie berie `LibraryTransfer` vnútri, postupne — F4).
 - **R-B3** `pc_name` = `ENV['COMPUTERNAME']` (len zobrazenie). Strata stavu = nové `pc_id` → PC prestane byť správcom (bezpečné zlyhanie).
@@ -144,9 +144,9 @@ Roly `-Role writer` (Michal) / `-Role reader` (Lucia), spojené menom behu. Čas
 
 - **R-C1** `library/admin-<NNNNNN>-<r8>.json` = `{ std:1, kind:"noxun_library_admin", seq, pc_id, pc_name, at }`; platí najvyššie `seq`. **Dva rôzne `pc_id` s rovnakým najvyšším
   `seq` → `conflict`: Odoslať (aj Vrátiť verziu) vypnuté na oboch PC s vetou o dvoch správcoch, riešenie ručne v „⋯" (U5); Aktualizovať ide ďalej (R19).**
-- **R-C2 `admin_state`** ∈ `none` · `self` (Disk menuje toto `pc_id` **a** lokálne `admin_claimed`) · `other` · `mismatch` · `conflict`. **Odoslať a Vrátiť verziu len pri `self`**;
+- **R-C2 `admin_state`** ∈ `none` · `self` (Disk menuje toto `pc_id` **a** lokálne `admin == true`) · `other` · `mismatch` · `conflict`. **Odoslať a Vrátiť verziu len pri `self`**;
   `none` → vypnuté na oboch (O2). Správcom sa **nikdy** nestáva „prvý, kto odošle".
-- **R-C3 `claim_admin!`** (U3b; U5 po potvrdení): len pri stave Disku `ok`/`empty` a `admin_state == none`; zapíše `admin-000001-<r8>.json` + `admin_claimed`; po zápise znova
+- **R-C3 `claim_admin!`** (U3b; U5 po potvrdení): len pri stave Disku `ok`/`empty` a `admin_state == none`; zapíše `admin-000001-<r8>.json` + `update_sync_meta!('admin' => true)`; po zápise znova
   prečíta adresár → iný súbor s rovnakým `seq` → `conflict`. „Odovzdať správcu" = `seq+1` neskôr (mimo).
 
 ### R-D · Sken Disku a celistvosť verzie (A3 FIX 1)
@@ -196,7 +196,8 @@ Roly `-Role writer` (Michal) / `-Role reader` (Lucia), spojené menom behu. Čas
   `local_changes` a `not_on_disk`; nezmenená (= `entry.fingerprint` = aktuálna verzia na Disku) sa neodosiela.
 - **R-H2 `publish_run(ticket)`** (vlákno): `N` = max(najvyšší viditeľný ukazovateľ, `entry.version`) + 1 → `v<N>-<r8>/` → `d/*`, `a/*` → `manifest.json` → **čítanie späť**
   (veľkosť + SHA256) → `head-<N>-<r8>.json` posledný → znova zoznam ukazovateľov.
-- **R-H3 výsledok per skupina:** `sent` · `failed` (zvyšok na Disku bez ukazovateľa = neviditeľný) · `skipped`.
+- **R-H3 výsledok per skupina:** `sent` · `failed` (zvyšok na Disku bez ukazovateľa = neviditeľný) · `skipped`; pri `sent` aj `attachments_skipped`
+  (`{entry_key => [{rel, reason}]}` z packetu — prílohy, ktoré U4 nepreniesol; U5 z neho skladá vetu „bez N fotiek“).
 - **R-H4 (A2 B3):** po zápise iný ukazovateľ s číslom ≥ N a iným `id` → `failed` „odoslanie neprešlo, skús znova"; lokálne ostáva neodoslaná zmena (D5).
 - **R-H5 [R0]** zápis na H: priamo pod finálnym menom v jedinečnom priečinku (čiastočný súbor odhalí manifest).
 - **R-H6 `publish_finish`** (hlavné vlákno): pre `sent` `update_sync_state!(g, …origin: publish, fingerprint: z tiketu)` → zámok uvoľniť → outbox zmazať.
@@ -215,7 +216,7 @@ Roly `-Role writer` (Michal) / `-Role reader` (Lucia), spojené menom behu. Čas
 | lokálny stav | `sync_state`, `update_sync_state!(g, entry)` (R4.5) | obsah `entry` R-B1 |
 | verzia | `compatible?(plugin_version)` (R5) | R-G1 |
 
-**Chýba v U2** (§12 D6): (a) miesto v `sync_state` pre údaje PC mimo skupín (`pc_id`, `root`, `admin_claimed`); (b) predpoklad R4.2 krok 2 „prílohy už ležia" — U3 ich uloží
+**Doplnené v U2** (§12 D6): (a) `update_sync_meta!` pre údaje PC (`pc_id`, `drive_root`, `admin`); (b) predpoklad R4.2 krok 2 „prílohy už ležia" — U3 ich uloží
 pred `import_group!` (R-M), ale riadky prílohy majú v registri `lock` (`materials.lock`, `appliances.json.lock`, `templates.json.lock` drží volajúci) → U3 potrebuje
 **verejný obal zámku** `LibraryTransfer.with_store_lock(entry_key)` (dnes R4.4 interný) alebo `place_attachments!` v U2.
 
@@ -291,7 +292,7 @@ U3b so skutočnou U2):
 | Vrátiť | verzia K → lokálne K + Disk N+1 s `reverted_from`; K z iného pluginu odmietnuté |
 | lokálne zmeny | po prevzatí `current`; po úprave `local_changes`; prebázovanie len pri `clean` (R-F3) |
 | diff | pridané/zmenené/zmiznuté, `used` z `used_ids`, `price_changed` |
-| guardy | čistota (R-O4); telá vlákien (R-E4); žiadny `JsonFileStore`/`.tmp` nad `root`; register (S13) |
+| guardy | čistota (R-O4); telá vlákien (R-E4); žiadny `JsonFileStore`/`.tmp` nad `<root>`; register (S13) |
 
 **Koncový scenár („dve PC" = dva sandboxy `Materials.dir` + jeden „Disk"):** A claim → odošle všetko (v1) → B `never_taken` → prevezme → `current` → A zmení Materiály, odošle (v2)
 s poznámkou → B `newer` + poznámka → B zmení Materiály → `newer_and_local` → `:skip` (Kovanie prevzaté) → `:overwrite` → záloha U2 + prevzatie → A Vrátiť v1 → B dostane v3 = v1.
@@ -334,8 +335,8 @@ D-48 v DOGFOODING ostáva otvorený (zatvorí U5) · PR popis: predrecenzia, odk
 - **D3 časový limit v core** — potvrdené: nový `TimedWorker`, updater D-52b ostáva (N1).
 - **D4 prebázovanie po aktualizácii pluginu** (R-F3) — jednoduchšia cesta so zostatkovým rizikom; presnejšia by potrebovala od U2 `canonicalize` bez zápisu (nové API — nenavrhujem).
 - **D5 súbežný ukazovateľ** na jednom PC nenastane (R-B2), dva PC zakazuje R3 → stačí `failed` + `head_conflict`.
-- **D6 čo chýba v U2** (vyriešiť v PACKAGE_U2 pred U3b): **(a)** `update_sync_state!` prijíma len `group_key ∈ GROUPS` — U3 potrebuje miesto pre údaje PC (`pc_id`, `root`,
-  `admin_claimed`): návrh = vyhradený kľúč `'_pc'` povolený v U2 alebo samostatná metóda `update_sync_meta!(hash)`; **(b)** verejný `LibraryTransfer.with_store_lock(entry_key)`
+- **D6 čo chýba v U2** (vyriešiť v PACKAGE_U2 pred U3b): **(a)** `update_sync_state!` prijíma len `group_key ∈ GROUPS` — údaje PC (`pc_id`, `drive_root`,
+  `admin`) → U2 dopĺňa `update_sync_meta!` (R4.5); **(b)** verejný `LibraryTransfer.with_store_lock(entry_key)`
   (R4.4 je dnes interný) na ukladanie príloh pod zámkom ich riadku pred `import_group!`. Riadky `library_backups/` a `library_sync.json` pridáva U2 (potvrdené); U3 len `library_sync.lock`,
   `library_staging/`, `library_outbox/`.
 - **D7 diff** (R-N) je celý v U3 nad `export_group` a stagingom; tabuľka `RECORDS` sa opiera o tvary dokumentov — implementátor ich pred písaním overí sondou; store bez stabilného ID

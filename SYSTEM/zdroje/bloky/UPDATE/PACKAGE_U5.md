@@ -5,7 +5,7 @@
 > **Autorita:** [ROZHODNUTIA_MICHALA_2026-10-17.md](ROZHODNUTIA_MICHALA_2026-10-17.md) — R3–R7, R13, R14, R16–R19, R21 a mockup **O1–O9** (záväzné) ·
 > [MOCKUP_UPDATE_KNIZNICA.html](MOCKUP_UPDATE_KNIZNICA.html) (schválený bez úprav + rámik O9) · smer [RECONCILE_2026-10-17.md](RECONCILE_2026-10-17.md) §2 riadky „U5", §3 ·
 > API **presne podľa** [PACKAGE_U2.md](PACKAGE_U2.md) R4.8 a [PACKAGE_U3.md](PACKAGE_U3.md) R-C, R-E, R-F, R-H, R-J, R-K, R-L, R-N · dôkazy
-> [CROSS_AUDIT_A4_CLAUDE_KOD.md](CROSS_AUDIT_A4_CLAUDE_KOD.md) B4, B5, B6, B8, B11 · [CROSS_AUDIT_A2_GROK.md](CROSS_AUDIT_A2_GROK.md) B6 · A3 FIX 5. **PACKAGE_U4 zatiaľ neexistuje** — U5 od U4 nič nevolá (§6 R-U4).
+> [CROSS_AUDIT_A4_CLAUDE_KOD.md](CROSS_AUDIT_A4_CLAUDE_KOD.md) B4, B5, B6, B8, B11 · [CROSS_AUDIT_A2_GROK.md](CROSS_AUDIT_A2_GROK.md) B6 · A3 FIX 5 · [PACKAGE_U4.md](PACKAGE_U4.md) R3.2, R4.3 (len texty výsledkov — §6 R-N).
 > **Trieda Ť** (nové moduly + > 300 riadkov; výrobná/cenová — §5) · **rez U5a → U5b** (§2) · `codex-audit` · predrecenzia · export test P == K · ui_foto · smoke na oboch PC.
 > **Stav kódu:** sonda nad `docs/update-start` `1468dfe2` (kód = `main` `a9e8c79d`, v0.18.1). U2–U4 v kóde ešte nie sú; riadky nižšie platia k tejto hlave.
 
@@ -17,13 +17,13 @@ Cesty relatívne k `noxun_engine/`.
 
 | # | Tvrdenie | Dôkaz | Verdikt |
 |---|---|---|---|
-| S1 | „Okná knižníc" z O6 nie sú samostatné okná — sú to **sekcie Štúdia** `mat`, `hw`, `appl`, `tpl`, `bset`; plugin má len Inspector, Štúdio a Z-dialog nástrojov (guard počtu a mien okien) | `ui/js/studio_sections.js:80-116`; `HtmlDialog.new` len `ui/panel.rb:94`, `ui/studio_dialog.rb:1372`, `tools/mower.rb:409`; ui-lifecycle.md `### Satelitné okná` | PRAVDA → pruh O6 = riadok v lište sekcie, bariéra = zatvorenie Inspectora, Štúdia a Z-dialogu |
+| S1 | „Okná knižníc" (O6) sú **sekcie Štúdia** `mat`, `hw`, `appl`, `rules`, `tpl`, `bset`; okná sú len Inspector, Štúdio, Z-dialog (guard) | `ui/js/studio_sections.js:80-116`; `HtmlDialog.new` len `ui/panel.rb:94`, `ui/studio_dialog.rb:1372`, `tools/mower.rb:409` | PRAVDA → pruh = riadok v sekcii, bariéra = zatvoriť 3 okná |
 | S2 | Sekcia `about` = riadok registra s háčikom `enter: 'ssOnAboutEnter'`, kreslí ju `studio_settings.js`, markup `about.js` (`nxAboutHtml(info, updater)` — updater len v Štúdiu) | `studio_sections.js:117-121`; `ui/js/about.js:78-118`; `studio_settings.js:392`, `:504` | PRAVDA |
 | S3 | Riadok registra má mechanizmus **badge** pri položke navigácie (`badge` → `navCounts` → `navBadgeHtml`) a **kotvu deep-linku** (`anchor: {fn, phase, miss}`) | `studio_sections.js:16-32`; `ui/js/studio.js:595-608`, `:1249` | PRAVDA → ikona O9 = nový druh badge `upd`; kotva `library` |
 | S4 | Server sekcie `about` = `SupplierSettingsDialog`; akcie len z uzavretého whitelistu `SECTION_ACTIONS`; Štúdio ich zapája blokom per modul | `ui/supplier_settings_dialog.rb:50`, `:89-107`; `ui/studio_dialog.rb:1217` (vzor ďalších modulov `:731`, `:960`, `:1056`, `:1107`, `:1142`) | PRAVDA → nový modul `LibrarySyncDialog` so svojím whitelistom a blokom zapojenia |
 | S5 | Payload `about` sa skladá pri **každom** pushi Štúdia a zámerne nesiaha na sieť/Disk (kontrola verzie je explicitná akcia) | `supplier_settings_dialog.rb:215-230` | PRAVDA → stav knižnice tiež len explicitnou akciou (sken vo vlákne), do payloadu ide len posledný doručený výsledok |
-| S6 | Vzor asynchrónneho čítania: vlákno len súborové I/O, poll `UI.start_timer` 0,2 s, deadline 4 s, token (cesta, `StudioDialog.instance_token`, sekvencia), vlákno sa nezabíja, seamy `test_clock/test_spawn/test_schedule/test_notify` | `supplier_settings_dialog.rb:57-58`, `:85`, `:354-463`, `:748-765` | PRAVDA → U5 berie `TimedWorker` z U3 (R-E2) + rovnaké seamy |
-| S7 | Bariéra: `close_plugin_dialogs` (Panel, Štúdio, Z-dialog) → poll `dialogs_closed?` (= dobehnutý `set_on_closed`, nie viditeľnosť) → limit 3 s → akcia; výsledok **natívne** (`UI.messagebox` cez `updater_message`) | `supplier_settings_dialog.rb:330-332`, `:548-589`, `:739-745`; `ui/panel.rb:67-69` | PRAVDA → ten istý vzor pre prevzatie (A4 B6) |
+| S6 | Async vzor: vlákno len I/O, poll 0,2 s, deadline 4 s, token (cesta, `instance_token`, sekvencia), vlákno sa nezabíja, seamy `test_*` | `supplier_settings_dialog.rb:57-58`, `:85`, `:354-463`, `:748-765` | PRAVDA → `TimedWorker` U3 R-E2 + seamy |
+| S7 | Bariéra: `close_plugin_dialogs` → poll `dialogs_closed?` (dobehnutý `set_on_closed`) → limit 3 s → akcia; výsledok natívne | `supplier_settings_dialog.rb:330-332`, `:548-589`, `:739-745`; `ui/panel.rb:67-69` | PRAVDA → vzor pre prevzatie (A4 B6) |
 | S8 | Počas behu updatera sa okná neotvárajú (`Engine.update_in_progress?` vo vstupoch) | ui-lifecycle.md odsek `updater.rb`, „Bariéra pred swapom" | PRAVDA → rozšíriť o beh prevzatia (R-B5) |
 | S9 | `StudioDialog.show(open_section:, anchor:)` existuje; Inspector ho volá cez `openStudio(section, anchor)` → callback `open_studio` | `studio_dialog.rb:136-143`; `ui/js/actions.js:11-17`; `ui/panel.rb:264`, `:328` | PRAVDA → klik z railu = `openStudio('about','library')` |
 | S10 | Rail Inspectora: funkčná sekcia končí ikonou `eye` (Viditeľnosť tagov, `#railTagyBox`), pod ňou `railgap` + koliesko + Štúdio; bublina `.railtip`, nie `title` | `ui/panel.html:71-78`; UI_DIZAJN §5.1, §5.13 | PRAVDA → nové tlačidlo `#railUpd` hneď za `#railTagyBox` |
@@ -32,8 +32,7 @@ Cesty relatívne k `noxun_engine/`.
 | S13 | Init pluginu (menu, toolbar, `Tools.install!`) beží v `main.rb` pod `init_allowed?` | `main.rb:605-614`, `:690-716` | PRAVDA → háčik kontroly pri štarte za `Tools.install!` |
 | S14 | `Materials.used_material_ids(model)` = Hash `id => [kde]`, prechádza **aktívny model aj globálne šablóny** | `core/materials_catalog.rb:488-500` | PRAVDA → `used_ids` pre `materials` (A4 B5) |
 | S15 | Pre spotrebiče **nie je** hotová funkcia „ID použité zákazkou"; zákazka odkazuje `catalog_id` v rozpočte | `core/budget_store.rb:506-507` (A4 B5); `core/appliance_binding.rb:261` | PRAVDA (presné čítanie **NEOVERENÉ** — R-D2) |
-| S16 | Ikony v sprite: `cloud-download` (Pridať z Demosu, Aktualizovať plugin), `download` (export súboru), `refresh-cw` (Obnoviť), `rotate-ccw` (Vrátiť…), `more-horizontal` (⋯), `alert`, `info`; **nie je** `cloud-upload`, `user`, `clock` | `ui/js/icons.js` (kľúče); UI_DIZAJN §4 | PRAVDA → §6 R-I |
-| S17 | Inventár ikon je úplný a strážený; nová ikona len keď nie je významovo správna existujúca | UI_DIZAJN §4 pätka; `tests/pure/test_docs_navigacia.rb` | PRAVDA |
+| S16 | Sprite má `cloud-download`, `download`, `refresh-cw`, `rotate-ccw`, `more-horizontal`, `alert`, `info`; nemá `cloud-upload`, `user`, `clock`; inventár strážený, nová ikona len s novým významom | `ui/js/icons.js`; UI_DIZAJN §4; `tests/pure/test_docs_navigacia.rb` | PRAVDA → R-I |
 | S18 | D-15 `NXModal` má typ `custom` (vlastný uzol volajúceho v karte), `danger`, `busyLock`, modal bez polí = fokus na potvrdenie | `ui/js/nx_modal.js:17-21`, `:125`; UI_DIZAJN §5.12 | PRAVDA → modaly U5 sú D-15 s `custom` |
 | S19 | `?v=` v `ui/*.html` = VERSION (guard) | UI_DIZAJN §6; `tests/pure/test_guards.rb` | PRAVDA |
 | S20 | Hranica UI updatera: „**žiadny auto-check na pozadí**" | ui-lifecycle.md odsek `updater.rb`, „Hranice" | PRAVDA → R21 ju vedome mení (kontrola pri štarte, R-G) — prepísať odsek |
@@ -49,17 +48,15 @@ a pri vlastných zmenách dá voľbu **prepísať (so zálohou) / tento katalóg
 na každom PC) a raz **„Toto PC je správca knižnice…"** (O2). Pri štarte SketchUpu **oznámenie** (O4), keď je na Disku čo prevziať, a **ikona stiahnutia** pri „O plugine"
 v navigácii Štúdia a v lište Inspectora pod okom (O9) — **aj pre novú verziu pluginu** (R21). Na Luciinom PC jantárový **pruh** v sekciách knižníc (O6/R13).
 
-**Príklad:** Lucia ráno spustí SketchUp → „Na Disku sú novšie knižnice: Materiály, Kovanie" → Otvoriť O plugine → Aktualizovať → okno: „Materiály verzia 14 (16.10. 18:42,
-„nový dekor Pietra") · + 3 nové · ~ 12 zmenená cena · − Lucia biela 18 — **zmizne, používa ju otvorená zákazka**" · „Zmenia sa ceny v Materiáloch a Kovaní…" · vyberie
-„Materiály zatiaľ preskočiť" → Aktualizovať → okná pluginu sa na chvíľu zavrú, prevezme sa Kovanie, hláška „Kovanie prevzaté · Materiály preskočené" a Štúdio sa znova
-otvorí na O plugine s čerstvým stavom.
+**Príklad:** Lucia ráno → oznámenie „Na Disku sú novšie knižnice: Materiály, Kovanie" → Aktualizovať → okno: „− Lucia biela 18 — **zmizne, používa ju otvorená
+zákazka**" · „Zmenia sa ceny…" → „Materiály zatiaľ preskočiť" → okná sa na chvíľu zavrú, prevezme sa Kovanie, hláška a Štúdio sa znova otvorí na O plugine.
 
 ## 2 · Rez a odhad
 
 | Časť | Obsah | Kód pluginu (odhad) | Testy | Odhad |
 |---|---|---|---|---|
 | **U5a · box a akcie** | `ui/library_sync_dialog.rb` (server boxu: sken, stav, Odoslať, príprava + potvrdenie Aktualizovať, bariéra, Vrátiť zálohu, správca, O7) · `about.js` box + `studio_settings.js` modaly Odoslať / Aktualizovať (R4) / Správca / Zálohy · CSS · zapojenie v `studio_dialog.rb` · vstupy okien počas behu | ~620 (Ruby ~330, JS ~240, CSS ~50) | ~550 | 2 dni |
-| **U5b · oznámenia a história** | História a Vrátiť verziu (správca) · `ui/update_notice.rb` (kontrola pri štarte: knižnica + plugin R21, `UI::Notification` O4, stav ikony) · badge `upd` v navigácii · `#railUpd` v Inspectore · pruh O6 v 5 sekciách | ~430 (Ruby ~170, JS ~200, CSS/HTML ~60) | ~400 | 1½ dňa |
+| **U5b · oznámenia a história** | História a Vrátiť verziu (správca) · `ui/update_notice.rb` (kontrola pri štarte: knižnica + plugin R21, `UI::Notification` O4, stav ikony) · badge `upd` v navigácii · `#railUpd` v Inspectore · pruh O6 v 6 sekciách | ~430 (Ruby ~170, JS ~200, CSS/HTML ~60) | ~400 | 1½ dňa |
 
 Spolu ~1050 riadkov → nad ~600 → **delenie U5a / U5b** (brief). Jeden audit návrhu pre obe; každá vlastný PR z čerstvého `main`. U5a sama o sebe dáva Michalovi
 a Lucii úplnú funkciu (Odoslať, Aktualizovať s R4, záloha a jej vrátenie); U5b pridá upozornenia, históriu a pruh. **Poistka:** U5a nad ~700 riadkov kódu pluginu →
@@ -72,7 +69,7 @@ a vstupy · (6) docs. **U5b:** (1) R0b · (2) `UpdateNotice` + háčik v `main.r
 
 R0 charakterizácia · R-A box a payload · R-B server, akcie a bariéra · R-C Aktualizovať a okno R4 · R-D použité záznamy otvorenej zákazky · R-E Odoslať (O8) ·
 R-F správca a „⋯" (O2) · R-G kontrola pri štarte a oznámenie (O4, R21) · R-H ikona stiahnutia (O9) · R-I ikony a texty · R-J História, Vrátiť, zálohy (O5) ·
-R-K pruh v sekciách (O6/R13) · R-L iná verzia pluginu (O7, R14, R18) · R-M dokumentácia.
+R-K pruh v sekciách (O6/R13) · R-L iná verzia pluginu (O7, R14, R18) · R-N texty výsledkov príloh (U4) · R-M dokumentácia.
 
 ## 4 · Scope OUT
 
@@ -80,7 +77,7 @@ Logika synchronizácie, Disk, manifest, správca na Disku, stavy skupín, diff (
 stavu v pamäti (**U2**) · prílohy a fotky dekorov (**U4**) · názov zákazky v .skp (**U1**) · **„Odovzdať správcu…"** (O2 „neskôr" — položka sa **nekreslí**, UI_DIZAJN §5.15
 „ovládač, ktorý by visel neaktívne celý blok, sa skryje") · zmena cesty koreňa v UI (U3 D9) · export lokálnych zmien Lucie správcovi (A4 B4 „neskôr") ·
 zmrazenie rozpočtu zákazky (R17 mimo bloku) · párovanie seed spotrebičov (R16) · zmena D-52b aplikovania pluginu (ostáva, R-G len pridáva kontrolu pri štarte) ·
-pruh v sekcii Pravidlá (O6 ho nemenuje — §12 D7).
+zmena čítacej sekcie Pravidlá na editovateľnú (pruh áno, obsah bez zmeny — §12 D7).
 
 ## 5 · Trieda a brány
 
@@ -115,20 +112,10 @@ pruh v sekcii Pravidlá (O6 ho nemenuje — §12 D7).
 - **R-A3 tabuľka** (`table.libtbl`, vlastná trieda — UI_DIZAJN §5.15, žiadna zdieľaná flex trieda na `<tr>`): stĺpce **Katalóg · Na Disku · U mňa · Stav**; 5 riadkov v poradí
   `LibraryRegistry.groups` (U2 R1.2). „Na Disku" = `verzia · dátum`, „U mňa" = `local_version` + „ · upravená" pri lokálnych zmenách. **Stav = chip** podľa `state` z U3 R-F1:
 
-  | `state` (U3) | Chip (trieda, text) |
-  |---|---|
-  | `current` | `ok` „aktuálne" |
-  | `newer` | `new` „novšia na Disku" |
-  | `local_changes` | správca: `loc` „neodoslané zmeny" · ostatní: `loc` „vlastné zmeny" |
-  | `newer_and_local` | `new` + `loc` (oba) |
-  | `never_taken` | `new` „ešte neprevzaté" |
-  | `not_on_disk` | správca: `loc` „na Disku ešte nie je" · ostatní: `wait` „na Disku ešte nie je" |
-  | `syncing` | `wait` „na Disku sa ešte synchronizuje" |
-  | `broken` | `err` „verzia na Disku je poškodená" |
-  | `plugin_newer_on_disk` / `plugin_older_on_disk` | `err` „iná verzia pluginu" (veta R-L) |
-  | `pending` | `err` „prevzatie sa prerušilo" |
-  | `head_conflict` | `err` „dve verzie s rovnakým číslom" |
-
+  `current` → `ok` „aktuálne" · `newer` → `new` „novšia na Disku" · `local_changes` → `loc` „neodoslané zmeny" (správca) / „vlastné zmeny" (ostatní) ·
+  `newer_and_local` → `new` + `loc` · `never_taken` → `new` „ešte neprevzaté" · `not_on_disk` → `loc` (správca) / `wait` „na Disku ešte nie je" · `syncing` → `wait`
+  „na Disku sa ešte synchronizuje" · `broken` → `err` „verzia na Disku je poškodená" · `plugin_newer_on_disk`/`plugin_older_on_disk` → `err` „iná verzia pluginu" (R-L) ·
+  `pending` → `err` „prevzatie sa prerušilo" · `head_conflict` → `err` „dve verzie s rovnakým číslom".
   Chip `new` je výberová rodina (teal), `loc` jantár (`--nx-warn-bg-soft` / `--nx-warnchip-fg` / `--nx-warnchip-border`), `err` stavové `--nx-err-*`, `wait` `--nx-surface-sunken`.
   **Žiadny nový token** (§1 „Žiadna vizuálna zmena bez zámeru").
 - **R-A4 akcie pod tabuľkou:** **Odoslať zmeny (N)** (`primary`, ikona `cloud-upload`, len správca — R-E) · **Aktualizovať** (`ghostbtn`, `cloud-download`) · vpravo stavová
@@ -183,7 +170,7 @@ pruh v sekcii Pravidlá (O6 ho nemenuje — §12 D7).
   Zoznam dlhší ako 8 riadkov per skupina sa zbalí na „… a ďalších N" **okrem** riadkov s `used`. · **Veta R17** (keď niektorá skupina `price_changed`): „Zmenia sa ceny
   v <skupiny> — najbližší rozpočet pôjde podľa nového cenníka." · prvé pripojenie (`never_taken`, R16): „Tvoja knižnica sa nahradí Michalovou; doterajšia ostane ako záloha."
 - **R-C4 voľba per skupina s lokálnymi zmenami** (segmentový prepínač `.segrow` — §1 „jedna voľba z N", nie rádiá): **„Prepísať — moja verzia sa uloží ako záloha
-  (dá sa vrátiť v História)"** (`:overwrite`) / **„<Skupina> zatiaľ preskočiť — pošli zmeny správcovi"** (`:skip`). **Predvolená = preskočiť** (bezpečnejšia — §12 D4).
+  (dá sa vrátiť v História)"** (`:overwrite`) / **„<Skupina> zatiaľ preskočiť — pošli zmeny správcovi"** (`:skip`). **Predvolená = preskočiť** (vedomá odchýlka od mockupu — §12 D4).
   Skupina bez lokálnych zmien = `:take` bez voľby. Preskočenie skupiny, od ktorej iná prevzatá závisí (`LibraryRegistry.dependents`, U2 R1.3) → jantárová veta
   „Šablóny odkazujú na Materiály — kým Materiály preskočíš, niektoré šablóny môžu ukazovať na záznamy, ktoré u teba nie sú." (A4 B8; varovanie, nie blokovanie — U2 R4.2).
 - **R-C5 potvrdenie** „Aktualizovať" (`primary`; pri všetkých `:skip` `aria-disabled` „Nie je čo prevziať") → `lib_take_commit {ticket_id, decisions}` → bariéra R-B3 →
@@ -217,7 +204,7 @@ pruh v sekcii Pravidlá (O6 ho nemenuje — §12 D7).
 
 - **R-F1 „Toto PC je správca knižnice…"** kreslí sa **len** pri `admin.state == none` a Disku `ok`/`empty` (mockup: kým nikto; Lucia ponuku „stať sa správcom" po založení
   nevidí). Potvrdenie D-15 bez polí: „Toto PC (<COMPUTERNAME>) bude jediné, ktoré smie odosielať knižnicu na Disk. Druhé PC bude len aktualizovať." → `lib_claim_admin`
-  → `LibrarySync.claim_admin!` (U3 R-C3; zápis na H: — §12 D5) → `lib_scan`. Výsledok `conflict` → veta R-F3.
+  → `LibrarySync.claim_admin!` (U3 R-C3, hlavné vlákno — §12 D5) → `lib_scan`. Výsledok `conflict` → veta R-F3.
 - **R-F2** „Odovzdať správcu…" sa **nekreslí** (Scope OUT).
 - **R-F3 dvaja správcovia (R19):** veta v riadku Správca (jantár): „Na Disku sú zapísaní dvaja správcovia — odosielanie je vypnuté na oboch PC. Ozvi sa Michalovi
   (ručné riešenie)." Aktualizovať ide ďalej. `mismatch` (Disk menuje toto PC, lokálne nie / naopak) → „Toto PC nie je potvrdené ako správca — odosielanie vypnuté."
@@ -257,7 +244,7 @@ pruh v sekcii Pravidlá (O6 ho nemenuje — §12 D7).
 
 - **Existujúce:** `cloud-download` (Aktualizovať knižnicu, ikona O9 — ten istý význam „stiahni nové zo zdroja" ako Aktualizovať plugin), `refresh-cw` (Obnoviť stav), `more-horizontal`
   (⋯), `rotate-ccw` (História a návrat…, Vrátiť, Vrátiť zálohu — §1 „Vrátiť…"), `alert` (veta O7/R19), `info`.
-- **Nová ikona: `cloud-upload`** (Lucide, pár k `cloud-download`) — Odoslať zmeny; riadok do inventára §4 (guard S17). **Bez** `user`, `clock`, `disk` z mockupu —
+- **Nová ikona: `cloud-upload`** (Lucide, pár k `cloud-download`) — Odoslať zmeny; riadok do inventára §4 (guard S16). **Bez** `user`, `clock`, `disk` z mockupu —
   položky ponuky a riadky `.inforow` sú text (§12 D6).
 - Texty bez žargónu (§1): „Disk", „správca", „verzia", „záloha"; nie „head", „manifest", „seed", „sync". Verzia „v0.19.0" (malé v).
 
@@ -275,10 +262,10 @@ pruh v sekcii Pravidlá (O6 ho nemenuje — §12 D7).
 
 ### R-K · Pruh v sekciách knižníc (O6, R13) — U5b
 
-- **R-K1** sekcie `mat`, `hw`, `tpl`, `appl`, `bset` (S1): **jeden jantárový riadok** navrchu tela sekcie (`.libbar`: `--nx-warn-bg-soft`, `--nx-warnchip-fg`,
+- **R-K1** sekcie `mat`, `hw`, `tpl`, `appl`, `bset` (S1) **a `rules`** (edituje pravidlá kovania a ukazuje ABS pravidlá zo zdieľaných skupín — zámer R13, §12 D7): **jeden jantárový riadok** navrchu tela sekcie (`.libbar`: `--nx-warn-bg-soft`, `--nx-warnchip-fg`,
   `--nx-warnchip-border`, ikona `alert`): „Knižnicu spravuje <PC správcu> — tvoje zmeny tu sa pri Aktualizovať prepíšu. Pošli ich správcovi." **Kreslí sa len** pri
   `admin.state ∈ {other, mismatch}` (existuje správca a nie je to toto PC; §12 D7). Na PC správcu ani bez správcu sa nekreslí.
-- **R-K2** jedna funkcia `nxLibBarHtml(upd)` (v `about.js` alebo `studio_settings.js`) volaná z kreslenia tela týchto 5 sekcií cez register — vlastnosť riadku
+- **R-K2** jedna funkcia `nxLibBarHtml(upd)` (v `about.js` alebo `studio_settings.js`) volaná z kreslenia tela týchto 6 sekcií cez register — vlastnosť riadku
   `libbar: true` v `studio_sections.js` (nie vetva podľa id; guard H14a). Dáta = `admin` z `last_payload`/`UpdateNotice` v payloade Štúdia (bez nového skenu).
 - **R-K3** pruh je **stavová veta** (§1 — nie tooltip), jeden riadok, dlhý text výpustka + plný text v `title`. Úpravy v sekciách ostávajú povolené (R13 „ostáva").
 
@@ -289,6 +276,13 @@ pruh v sekcii Pravidlá (O6 ho nemenuje — §12 D7).
 - **R-L2** `plugin_older_on_disk`: „Knižnica na Disku je zo staršieho pluginu (v0.18.9) — správca ju po aktualizácii pluginu odošle znova." (Aktualizovať čaká, U3 R-G1.)
 - **R-L3** Odoslať odmietnuté podľa R18 (`send_reason` U3 R-G2: novší plugin na Disku / správcova verzia ešte nie je v distribúcii / distribúcia nečitateľná) — veta
   v `title` a `#libNote`, text zo servera (U3).
+
+### R-N · Výsledky príloh z U4 (len texty; U4 R3.2, R4.3, D9)
+
+- **Odoslať:** `attachments_skipped` z packetu skupiny (U4 R3.2) → dovetok riadku výsledku „odoslané bez N fotiek (u teba chýbajú)". Packet vzniká v U3 `publish_prepare` —
+  výsledok per skupina ho nesie podľa U3 R-H3 (§12 D12).
+- **Aktualizovať:** `attachments.conflict > 0` vo výsledku skupiny (U4 R4.3) → dovetok „N vzhľadov sa líši od Michalových — ponechané tvoje". Ostatné počty sa neukazujú.
+- `:missing_attachments` (U2 R4.7, U4 R3.2) → veta U2 bez úprav.
 
 ### R-M · Dokumentácia (na mieste)
 
@@ -336,8 +330,8 @@ volanie stubu až po zatvorení, znovuotvorenie Štúdia na `about` a uvoľnenie
 | 1 | Prepis zmení čísla otvorenej zákazky (A4 D) | iná cena/hrúbka pri prepočte | R4 zoznam s `used`, veta R17, predvolené preskočiť, záloha U2 |
 | 2 | Okno knižnice uloží starý obsah po prevzatí (A4 B6) | prevzaté dáta prepísané | bariéra R-B3 + znovuotvorenie z čerstvých dát |
 | 3 | Bariéra sa zasekne (okno sa nezavrie) | Aktualizovať nespustené | limit 3 s, zrušenie bez zápisu, veta; vzor overený updaterom |
-| 4 | Visiaci H: počas skenu pri štarte | brzdenie SketchUpu | sken len vo vlákne, oneskorenie 8 s, ticho pri timeoute |
-| 5 | `claim_admin!` zapisuje na H: na hlavnom vlákne | krátke zamrznutie | §12 D5 (vlákno v U3 alebo prijaté) |
+| 4 | Visiaci H: pri štarte | brzdenie SketchUpu | vlákno, oneskorenie 8 s, ticho pri timeoute |
+| 5 | `claim_admin!` zapisuje na H: na hlavnom vlákne | krátke zamrznutie | malý lokálny zápis do zrkadla, prijaté (§12 D5) |
 | 6 | Ikona O9 svieti „falošne" (napr. `never_taken` u Michala pred prvým odoslaním) | zbytočné upozornenie | `never_taken` sa počíta len keď na Disku verzia je; u správcu sa `not_on_disk` neráta |
 | 7 | API U2/U3/U4 sa pri implementácii zmení | rozpor mien | U5 štartuje až po mergi U4; zmena mien = zladenie package pred štartom |
 | 8 | Dlhý zoznam zmien v R4 | neprehľadné okno | zbaľovanie > 8 okrem `used`, karta `md` so scrollom tela |
@@ -355,7 +349,7 @@ volanie stubu až po zatvorení, znovuotvorenie Štúdia na `about` a uvoľnenie
 8. **Tvoje PC:** zmeň cenu jednej dosky → riadok Materiály „neodoslané zmeny", Odoslať zmeny (1) → odošli s poznámkou → na Luciinom PC Obnoviť stav → „novšia na Disku" + poznámka.
 9. **Luciino PC:** zatvor a spusti SketchUp → do ~10 s oznámenie „Na Disku sú novšie knižnice: Materiály" → Otvoriť O plugine → Štúdio otvorené rovno na boxe.
 10. Pri „O plugine" v navigácii a v lište Inspectora pod okom **ikona stiahnutia**; po Aktualizovať zmizne. Klik na ikonu v Inspectore otvorí Štúdio na boxe.
-11. **Luciino PC:** Štúdio → Materiály (aj Kovanie, Šablóny, Spotrebiče, Nastavenia rozpočtu) → jantárový pruh „Knižnicu spravuje <tvoje PC>…". Na tvojom PC pruh nie je.
+11. **Luciino PC:** Štúdio → Materiály (aj Kovanie, Šablóny, Spotrebiče, Pravidlá, Nastavenia rozpočtu) → jantárový pruh „Knižnicu spravuje <tvoje PC>…". Na tvojom PC pruh nie je.
 12. **Tvoje PC:** ⋯ → História a návrat… → Materiály → pri predošlej verzii **Vrátiť** → na Luciinom PC Aktualizovať → cena dosky je späť.
 13. Hláška „nepodarilo sa", zaseknuté okno alebo chýbajúce okno po aktualizácii → nahlás (napíš, na ktorom PC a ktorý krok).
 
@@ -367,32 +361,30 @@ druhy `badge` v hlavičke `studio_sections.js`, rail §5.1 · `SYSTEM/STAV.md` p
 **DOGFOODING D-48 → `DOGFOODING_vyriesene.md`** (plný text + PR + riadok navrch INDEXU) **až s U5b** (U5a ho nechá otvorený) · predrecenzia v PR popise.
 **Po U5b nasleduje uzáver bloku UPDATE** (minor, `release/UPDATE`, smoke §10 na oboch PC).
 
-## 12 · Rozhodnutia autora na potvrdenie orchestrátorom
+## 12 · Rozhodnutia — potvrdené orchestrátorom 17.10.2026
 
-- **D1 výrobná/cenová áno** (konzistentne s U2 D1 a U3b D1): nový ovládač prepisuje katalógy s cenami; dôkaz = export test P == K.
+- **D1 výrobná/cenová áno** (ako U2 D1, U3b D1): nový ovládač prepisuje katalógy s cenami; dôkaz = export test P == K.
 - **D2 rez U5a / U5b** (U5a = úplná funkcia vrátane zálohy, U5b = upozornenia, história, pruh); jeden audit.
-- **D3 presun `close_plugin_dialogs`/`dialogs_closed?` do `Engine`** — jedna bariéra pre updater aj knižnicu; guard D-52b pripína text `updater_worker` (U3 S11), nie
-  tieto metódy — implementátor overí guardy `test_d52b_updater_ui.rb` pred presunom; ak pripínajú, ostane delegácia zo `SupplierSettingsDialog`.
-- **D4 predvolená voľba R4 = preskočiť** (mockup kreslí „Prepísať" ako prvú voľbu bez predvoľby; preskočiť je bezpečnejšie pre zákazky).
-- **D5 `claim_admin!` na hlavnom vlákne** (U3 R-C3 neurčuje vlákno; zápis jedného malého súboru na zrkadlený H: je lokálny) — alternatíva: U3 dá `claim_admin_run` do `TimedWorker`.
-  Odporúčam doplniť do PACKAGE_U3 pred U3b.
-- **D6 bez ikon `user`, `clock`, `disk`** z mockupu — mockup kreslí ikony pri položkách „⋯" a riadku Disk; UI_DIZAJN §4 pripúšťa novú ikonu len s významom, ktorý nemá
-  existujúca. Položky ponuky dostanú `rotate-ccw` (história/návrat) a text bez ikony (správca). Jediná nová ikona `cloud-upload`.
-- **D7 pruh len pri `other`/`mismatch`** (R13 „PC, ktoré nie je správca" — pri `none` nikto nespravuje, pruh by klamal). Sekcia **Pravidlá** (ABS pravidlá len na čítanie,
-  pravidlá kovania patria skupine Kovanie) pruh **nedostane** — O6 ju nemenuje („O6 doslova"); pravidlá kovania sa pritom prevzatím Kovania prepíšu.
+- **D3 ✅ presun `close_plugin_dialogs`/`dialogs_closed?` do `Engine`** — jedna bariéra pre updater aj knižnicu; implementátor pred presunom overí guardy
+  `test_d52b_updater_ui.rb` (pripínajú text `updater_worker`, U3 S11); ak pripínajú aj tieto metódy, ostane delegácia zo `SupplierSettingsDialog`.
+- **D4 ✅ predvolená voľba R4 = preskočiť — VEDOMÁ ODCHÝLKA od mockupu** (mockup ukazuje zvolené „Prepísať"). Dôvod: prepis mení čísla otvorenej zákazky a nechýbajúci
+  klik nesmie potichu prepísať vlastné zmeny; prepísať je jeden klik. Orchestrátor odchýlku oznámi Michalovi; zápis do rozhodnutí bloku a rámik „platí" v mockupe.
+- **D5 ✅ `claim_admin!` na hlavnom vlákne** (zápis jedného malého súboru do zrkadleného H: je lokálny).
+- **D6 bez ikon `user`, `clock`, `disk`** z mockupu (UI_DIZAJN §4 — nová ikona len s novým významom); položky „⋯" `rotate-ccw` alebo text. Jediná nová ikona `cloud-upload`.
+- **D7 ✅ pruh len pri `other`/`mismatch`** (pri `none` nikto nespravuje) **a aj v sekcii Pravidlá** (edituje pravidlá kovania a ukazuje ABS pravidlá zo zdieľaných skupín — zámer R13).
 - **D8 `used_ids`** len pre materiály a spotrebiče (R-D2); kovanie chráni snapshot (A4 D).
-- **D9 kontrola pluginu pri štarte** (R21 bez nej nejde) mení zapísanú hranicu updatera „žiadny auto-check" — len zobrazenie, aplikovanie ostáva klikom.
-- **D10 znovuotvorenie okien po bariére** — Štúdio na `about`/`library`, Inspector len ak bol otvorený; hláška natívne pred znovuotvorením (vzor updatera — v zatvorenom okne by sa nedala ukázať).
-- **D11 nesúlad mien `meta` medzi U2 a U3:** U2 R4.5 `update_sync_meta!` pozná kľúče `pc_id`, `drive_root`, `admin`; PACKAGE_U3 R-B1 píše `pc_id`, `root`, `admin_claimed`.
-  U5 `meta` priamo nečíta (berie `admin`/`root` zo `status` U3) — zladiť v PACKAGE_U3 pred U3b (mimo U5).
+- **D9 kontrola pluginu pri štarte** (R21) mení zapísanú hranicu updatera „žiadny auto-check" — len zobrazenie, aplikovanie ostáva klikom.
+- **D10 znovuotvorenie okien po bariére** — Štúdio na `about`/`library`, Inspector len ak bol otvorený; hláška natívne pred znovuotvorením (vzor updatera).
+- **D11 ✅ mená údajov PC** podľa U2 R4.5 (`pc_id`, `drive_root`, `admin`) — zladí PACKAGE_U3; U5 ich priamo nečíta (berie `admin`/`root` zo `status` U3).
+- **D12 ✅ `attachments_skipped`** nesie výsledok odoslania per skupina U3 R-H3 (zladí PACKAGE_U3) — U5 z neho skladá vetu R-N.
 
 ## 13 · Otázky pre Michala
 
-**Žiadne nevyhnutné.** Ak orchestrátor nepotvrdí D4 alebo D7: „Má byť pri vlastných zmenách predvolené Preskočiť alebo Prepísať?" · „Pruh aj v sekcii Pravidlá?"
+**Žiadne** — uzavreté rozhodnutiami orchestrátora 17.10. (§12); odchýlku D4 Michalovi oznámi orchestrátor.
 
 ## 14 · Nálezy mimo scope
 
-- **N1:** mockup O2 kreslí „Toto PC je správca" ako `onlyL` a „Odovzdať správcu" ako `onlyM` — ilustrácia stavu po založení; package kreslí podľa `admin.state` (R-F1), nie podľa PC.
+- **N1:** mockup kreslí položky správcu podľa PC (`onlyL`/`onlyM`); package podľa `admin.state` (R-F1).
 - **N2:** kontrola pluginu v O plugine (`supplier_settings_dialog.rb:380-404`) a `UpdateNotice` majú dva behy toho istého `Updater.check` — po U5b zjednotiť na `TimedWorker` (U3 N1).
 - **N3:** `Debug.report` (F10) + `UpdateNotice.state` a `LibrarySyncDialog.last_payload` — porovnanie PC Michal/Lucia pri smoke.
 - **N4:** export lokálnych zmien Lucie správcovi (A4 B4 „neskôr") — prirodzený ďalší krok po bloku (napr. „Poslať správcovi" v pruhu O6).
