@@ -1,11 +1,11 @@
 # PACKAGE U2 · Prevzatie a export per knižnica (SYNC-0 + háčiky) — blok UPDATE (D-48)
 
-> **Stav: NÁVRH — čaká audit návrhu (`codex-audit`).** Dátum 17.10.2026. Package do zásoby — **implementácia až po smoke PASS bloku 9 HARDENING**
+> **Stav: NÁVRH — audit návrhu prebehol (Codex astra: 3 BLOCKER · 3 FIX · 1 NOTE), zapracovanie v §15 — §15 MÁ PREDNOSŤ pred §1–§14; čaká delta audit.** Dátum 17.10.2026. Package do zásoby — **implementácia až po smoke PASS bloku 9 HARDENING**
 > (alebo Michalovom „ideme ďalej") a po mergi predchodcu podľa poradia RECONCILE §3 (U1 kedykoľvek · **U2 → U3 → U4 → U5**).
 > **Autorita:** [ROZHODNUTIA_MICHALA_2026-10-17.md](ROZHODNUTIA_MICHALA_2026-10-17.md) (R1–R17, mockup O1–O8 — záväzné) · [RECONCILE_2026-10-17.md](RECONCILE_2026-10-17.md)
 > §2 riadky „U2" a §3 · [CROSS_AUDIT_A4_CLAUDE_KOD.md](CROSS_AUDIT_A4_CLAUDE_KOD.md) **B1, B2, B3, B6, B7, B8, B14** · [CROSS_AUDIT_A2_GROK.md](CROSS_AUDIT_A2_GROK.md) B4, B5, B9 ·
 > súpis [../../../../docs/architecture/kniznice.md](../../../../docs/architecture/kniznice.md) (F3–F5, F12, F13) · [rozsirovacie-body.md](../../../../docs/architecture/rozsirovacie-body.md) scenár 7.
-> **Trieda:** **Ť** (audit-povinná — kontrakt perzistencie, nový modul, nové `STD`) · **výrobná/cenová áno + export test `P == K`** (§12 D1) · **rez U2a / U2b** (§2) · schéma súborov knižníc sa nemení.
+> **Trieda:** **Ť** (audit-povinná — kontrakt perzistencie, nový modul, nové `STD`) · **výrobná/cenová áno + export test `P == K`** (§12 D1) · **rez U2a / U2b / U2c** (§15.8 prednosť pred §2) · schéma súborov knižníc sa nemení.
 > **Stav kódu:** sonda nad `docs/update-start` `4f2ecdd3` (kód = `main` po #474, plugin **v0.18.1**). Riadky = stav k nemu; pri štarte dávky ich implementátor overí znova.
 
 ---
@@ -269,7 +269,7 @@ Reentrancia: obal nesmie nastaviť `@lock_held`/`@lock_depth` modulu; `import_do
 **R4.10 Odvodené výpočty po prevzatí (A1 S4)** — sonda: `core/budget.rb`, `sheet_estimate.rb`, `sheet_layout.rb`, `bom.rb` **nedržia stav v module** (žiadna `@` premenná;
 `BudgetStore` len `@in_write`); Štúdio počíta odhad platní, plán aj rozpočet nanovo v každom `push_state` (`ui/studio_dialog.rb:1647-1723`). Zneplatniť treba len **zobrazenie**:
 `import_group!`/`restore_backup!` vrátia `'refresh' => true` a **U5 povinne** zavolá `push_state(bump: true)` otvorených okien (nová generácia zahodí akcie zo starých dát).
-**Guard:** tieto štyri súbory bez stavových `@` premenných (nová cache = vlastné zneplatnenie + úprava guardu). Zákazky na prestavbu = §14 N5.
+**Guard:** tieto štyri súbory bez stavových `@` premenných (nová cache = vlastné zneplatnenie + úprava guardu). Zákazky na prestavbu = §14 N5; **S4 ostáva čiastočne otvorené** (§15 A7).
 
 **R4.7 Kódy výsledkov** (Symboly; vyhodnocovať cez `case`, nie pravdivosť): `:ok :not_ok :missing :invalid :newer :local_newer :missing_attachments :version_mismatch :other_instance
 :other_instance_unknown :busy :backup_failed :write_failed :failed_restored :failed_restore_failed :unhealthy_restored :unknown_group :broken :busy_snapshot`. Každý s **jednou slovenskou vetou**
@@ -382,3 +382,64 @@ a otvor Spotrebiče → všetko sa uloží a ostane ako predtým. Hláška „ne
 - **N3 · `Materials.write` ignoruje `appearance` z payloadu** (B1, zámer pre okná) — povedať to v komentári `materials.rb:309`.
 - **N5 · Zákazky na prestavbu po prevzatí** (A1 S4: hrúbka, ABS) — označiť ako neaktuálne; návrh do U5/Kontroly (ceny kryje R17).
 - **N4 · F10 `Debug.report`** — `fingerprint` per skupina = porovnanie Michal vs. Lucia; návrh do U3.
+
+## 15 · Audit návrhu — zapracovanie (Codex `gpt-6-astra`, 17.10.2026; [AUDIT_U2_raw.md](AUDIT_U2_raw.md)) · MÁ PREDNOSŤ
+
+**15.0 Princíp „nikto iný nezapisuje" (smer orchestrátora, základ A1 a A6).** `export_group`, `import_group!`, `restore_backup!` aj `rollback!` bežia len keď: (a) **žiadna iná živá
+inštancia SketchUpu** — `Updater.live_leases` prázdne na začiatku **a znova tesne pred prvým zápisom** (po zápise žurnálu, vzor neskorej kontroly `updater.rb:970`), inak odmietnuť
+(`:other_instance`); (b) **okná knižníc sú zatvorené** — `LibraryTransfer::LIBRARY_DIALOGS` (Štúdio, Inspector a satelitné okná knižníc podľa `ui-lifecycle.md` „Satelitné okná";
+presný zoznam NEOVERENÝ, implementátor ho uvedie v PR) a každý odpovie `dialog_closed?` (`ui/studio_dialog.rb:184`, `ui/panel.rb:67`; okno bez metódy ju dostane v U2c — fail-closed:
+bez odpovede = otvorené) → inak `:dialogs_open` (bariéru, ktorá ich zatvorí, robí U5); (c) celá operácia beží **synchrónne na hlavnom vlákne** bez `UI.start_timer` a bez
+čakania na sieť (`PriceRefresh.running?` → `:busy`; asynchrónne callbacky Demosu sa nemôžu vložiť medzi kroky). Tým v procese ani mimo neho nie je zapisovateľ, ktorý rešpektuje
+zámky — postupné čítanie pod zámkami je jedna revízia skupiny a **A→B→A nenastane**. Dva prechody so SHA (R4.1) ostávajú ako lacná poistka. Priznaný zvyšok: zapisovateľ mimo
+pluginu (ručný editor, antivírus) — rovnako ako `json_file_store` (vedome sa nerieši).
+
+| Nález | Verdikt | Zapracovanie |
+|---|---|---|
+| **A1 BLOCKER** nedokončený import neblokuje používanie; druhá inštancia | platný | **15.1** |
+| **A2 BLOCKER** návrat neobnoví neprítomné súbory ani značky; normalizácia po návrate | platný | **15.2** |
+| **A3 BLOCKER** usadenie pred kontrolou primára (šablóny `migrate!` z `.bak`, `templates.rb:478`) | platný | **15.3** |
+| **A4 FIX** opakovateľný návrat so zachovaným `backup_id` | platný | **15.4** |
+| **A5 FIX** rotácia zmaže cieľ obnovy | platný | **15.5** |
+| **A6 FIX** dva odtlačky nedokazujú interval (A→B→A); konzistencia zálohy | platný v pôvodnom návrhu, **vyriešený odstránením súbežných zapisovateľov** (15.0) | **15.6** |
+| **A7 NOTE** S4 len čiastočne; S5 uzavreté | platný | **15.7** |
+
+**15.1 Blokovanie pri nevyriešenom žurnáli (A1).** `LibraryTransfer.pending_block(entry_key = nil)` → `nil` | veta (žurnál existuje a nie je to bežiaca operácia tohto procesu;
+čítanie `File.exist?` + obsah, cache max 1 s ako `JsonFileStore`). Kým platí, pre **knižnice skupiny zo žurnálu**: (1) **zápisy odmietnuté** — brána v `import_document!` a v bežnej
+zápisovej ceste každého store-u skupiny (jeden riadok pred zápisom pod zámkom, vzor `degraded_write_blocked?`; zahŕňa seed, seed-merge, `migrate!`, `boot_cutover!`, UNI doplnenie);
+(2) **výpočty a exporty odmietnuté s vetou** „Knižnica <skupina> je po prerušenom prevzatí zablokovaná — otvor O plugine": spoločný vstup exportov (`ExportPrep`) a výpočet rozpočtu
+(`ProductionCore.do_budget*`) vrátia chybu namiesto výsledku; stavba/prestavba skrinky cez akcie panela sa odmietne v ich spoločnom dispečeri (presné miesto NEOVERENÉ — ak je to
+Ruby spúšťač zo zoznamu CLAUDE.md, **in-SU beh je brána tej časti**). Čítanie pre zobrazenie v oknách ostáva (U5 ukáže červený pruh). **Druhá inštancia pri štarte:** `recover_pending!`
+so živým vlastníkom → `:owner_alive`, nič neobnovuje a boot blok **preskočí** `Materials.boot_cutover!`, `ensure_uni_records!`, `ensure_drawer_uni!` (`main.rb:614-660`); blok trvá, kým
+žurnál nezmizne. **Testy:** druhý proces so žurnálom a živým vlastníkom (stub `lease_alive?`) → SHA súborov skupiny bez zmeny, `do_budget`/export vrátia vetu; zlyhaný návrat → blok trvá
+aj po reštarte; po úspešnom `recover_pending!` blok zmizne.
+
+**15.2 Úplný stav v zálohe a presný návrat (A2).** `backup.json` `files` nesie pre **každú** cestu skupiny — primár, `.bak` každej knižnice a pri `materials` aj `uni_seed.done`,
+`drawer_uni_seed.done` — buď `{'state' => 'present', 'sha256'}` (bajty v `files/`), alebo `{'state' => 'absent'}`. Návrat: `present` → atomický zápis bajtov, `absent` → zmazanie
+súboru, ak medzitým vznikol. Po návrate len `reset_after_import!` + `reload!` + posúdenie — **bez usadenia** (žiadne `load`, seed-merge ani `migrate!`) a **bez R6** (značky sa vrátia
+podľa zálohy). R6 platí len pre úspešné prevzatie. **Testy:** pôvodne chýbajúci primár s `.bak`, degradovaný primár, chýbajúce značky UNI → po vynútenom zlyhaní 2. člena sú všetky
+súbory a značky bajtovo (aj neprítomnosťou) ako pred importom a SHA sa po `reset_after_import!` nezmení.
+
+**15.3 Kontrola primára pred usadením (A3).** `export_document` krok 0 — **pred** akoukoľvek čítacou cestou s vedľajšími zápismi: primár existuje, parsuje sa a nie je degradovaný
+(`JsonFileStore.degraded?` s tvarom, kde ho store má); inak `[:not_ok, …]` / `[:missing, …]` (chýba aj `.bak`) **bez volania** `load`. Usadenie (R3.1 krok 1) až potom; kontrola R3.1
+krok 3 sa po usadení opakuje. **Regresný test:** šablóny — chýbajúci primár + platná `.bak` so starším `std` → `:not_ok`, primár **nevznikne**; rovnako Materiály a Spotrebiče.
+
+**15.4 Opakovateľný návrat `rollback!(backup_id)` (A4).** Interná metóda: **bez novej zálohy a bez nového žurnálu**; žurnál nesie `phase` (`importing` → pred 1. zápisom návratu
+`rolling_back`) a **pôvodné** `backup_id` až do konca. Návrat podľa 15.2 je idempotentný → pád počas neho = `recover_pending!` ho zopakuje z toho istého `backup_id`. Použitie: R4.2
+kroky 5 a 7, `recover_pending!`. Verejné `restore_backup!(target)` (O5): nová záloha B → žurnál `{phase: importing, backup_id: B}` → zápis cieľa podľa 15.2 → pri páde alebo zlyhaní
+`rollback!(B)`. **Testy:** pád (podproces `exit!`) v `importing` aj v `rolling_back` → po štarte skupina = stav zálohy; dvojitý `recover_pending!` = rovnaký výsledok.
+
+**15.5 Rotácia po transakcii (A5).** Mazanie nad 5 na skupinu beží až **po zmazaní žurnálu** a nikdy neodstráni zálohu odkazovanú žurnálom ani cieľ práve bežiaceho `restore_backup!`.
+**Test:** plná história 5, návrat k najstaršej → prebehne, potom ostane 5 najnovších.
+
+**15.6 Snímok skupiny (A6).** R4.1 a záloha (R4.3) čítajú členov postupne pod ich zámkami **za podmienok 15.0**; dva prechody so SHA ostávajú poistkou (nezhoda = niekto zapisuje
+napriek 15.0 → `:busy_snapshot`). Tvrdenie „spoločné okno" v R4.1 sa nahrádza: konzistenciu zaručuje 15.0, nie porovnanie. **Testy:** okno knižnice otvorené (stub `dialog_closed?` →
+`false`) → `:dialogs_open` pred čítaním; druhá inštancia → `:other_instance`; operácia nevolá `UI.start_timer` (zdrojový guard).
+
+**15.7 S4 (A7).** Zobrazenie (R4.10) uzavreté; **označenie zákaziek na prestavbu po zmene hrúbky alebo ABS je čiastočne otvorené** — uzavretie podmienkou smoke/in-SU U5 (prevzatie
+Materiálov so zmenenou hrúbkou nad existujúcou zákazkou → Kontrola ju ukáže ako neaktuálnu). R17 (ceny) sa nemení. S5 uzavreté (R5).
+
+**15.8 Rez po audite (prednosť pred §2).** Odhad rastie o ~170 riadkov (žurnál a blokovanie, presný návrat, `rollback!`, podmienky 15.0) na **~880**:
+**U2a · register a store-y Materiály** (R1, R2, R3 pre Materials a AbsRules, R6, 15.3) ~320 · **U2b · transakcia** (`LibraryTransfer`: R4, R5, 15.0–15.6, brány blokovania v store-och
+skupiny Materiály, `main.rb` boot) ~400 · **U2c · ostatné store-y** (R3 pre 7 modulov + ich brána 15.1 + `dialog_closed?` chýbajúcim oknám) ~300. Každá časť vlastný PR, delta audit
+na 15.0–15.6 pred U2b. Export test `P == K` platí pre všetky tri; in-SU podľa 15.1 (dispečer stavby).
