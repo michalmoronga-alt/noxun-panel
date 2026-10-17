@@ -250,7 +250,7 @@ Reentrancia: obal nesmie nastaviť `@lock_held`/`@lock_depth` modulu; `import_do
   bez zápisu; zlúči `attrs` do `meta` (chýbajúci kľúč ostane), ten istý zámok a brány ako `update_sync_state!`, `groups` nemení. Význam hodnôt (ako vzniká `pc_id`, kedy `admin`) **definuje U3**.
 
 **R4.8 API pre U3/U5 (súhrn):** `export_group` · `import_group!` · `create_backup!` · `backups` · `restore_backup!` · `sync_state` · `update_sync_state!` · `update_sync_meta!` ·
-`with_store_lock` · `import_allowed?` · `export_allowed?` · `compare_versions` · `recover_pending!` · `canonical_bytes` · `fingerprint`; z registra `groups` · `members` · `depends_on` · `dependents`. Nič iné U3/U5 z U2 nevolá.
+`with_store_lock` · **`peek_group`** · **`import_done`** · **`ack_import_done!`** (15.9; `import_group!` s voliteľnými `tag:` a `replacements:`) · `import_allowed?` · `export_allowed?` · `compare_versions` · `recover_pending!` · `canonical_bytes` · `fingerprint`; z registra `groups` · `members` · `depends_on` · `dependents`. Nič iné U3/U5 z U2 nevolá.
 
 **R4.6 Kanonické bajty a odtlačok**
 - `canonical_bytes(doc)` = `JSON.generate` nad kópiou s **rekurzívne zoradenými kľúčmi** Hash-ov (polia v pôvodnom poradí), UTF-8, bez medzier. `fingerprint(doc)` = SHA-256 hex.
@@ -443,3 +443,28 @@ Materiálov so zmenenou hrúbkou nad existujúcou zákazkou → Kontrola ju uká
 **U2a · register a store-y Materiály** (R1, R2, R3 pre Materials a AbsRules, R6, 15.3) ~320 · **U2b · transakcia** (`LibraryTransfer`: R4, R5, 15.0–15.6, brány blokovania v store-och
 skupiny Materiály, `main.rb` boot) ~400 · **U2c · ostatné store-y** (R3 pre 7 modulov + ich brána 15.1 + `dialog_closed?` chýbajúcim oknám) ~300. Každá časť vlastný PR, delta audit
 na 15.0–15.6 pred U2b. Export test `P == K` platí pre všetky tri; in-SU podľa 15.1 (dispečer stavby).
+
+**15.9 Požiadavky U3 a U4 na U2 (po ich auditoch, 17.10.2026)** — mená záväzné podľa [PACKAGE_U3.md](PACKAGE_U3.md) §12 D10/D11, R-J5 a [PACKAGE_U4.md](PACKAGE_U4.md) §15.1.
+
+- **(1) `peek_group(group_key)`** (U3 D10) → `[:ok, {'documents' => {entry_key => doc}, 'fingerprints' => {entry_key => sha256}}]` | `[:unknown, veta]`. Len čítanie: **bez bariéry**
+  15.0 (smie pri otvorených oknách), bez čakania na zámok (`LOCK_SH | LOCK_NB`, obsadený → `:unknown`), **bez akéhokoľvek zápisu** (žiadne `load`, seed, seed-merge, `migrate!`,
+  UNI, zmena stavu modulov), bez `Sketchup`, primár **bez fallbacku na `.bak`**. `:ok` len keď každý primár skupiny existuje, parsuje sa, nie je degradovaný (kontrola 15.3)
+  a je **usadený** = rovnaký, aký by vrátil `export_document` (čisté posúdenie: brána R3.2 krok 2 prejde a store-ová predikcia usadenia nehlási potrebu zápisu — `seed_version`/`std`/
+  `schema` = konštanty tejto verzie, pri šablónach `std == STD`; ak store čistú predikciu nemá, `:unknown`). Inak (chýba, poškodený, pred migráciou, `pending_block`) `:unknown`.
+  Odtlačok = `fingerprint` (R4.6); prílohy sa nečítajú.
+- **(2) Doklad dokončenia** (U3 D11, R-J5): `import_group!(…, tag: nil)`; s `tag` zapíše po úspechu skupiny (po `after_import!` a R6, **pred** zmazaním žurnálu) trvalý záznam
+  `library_import.done.json` = `{tag => {'tag', 'group', 'fingerprints', 'finished_at'}}` (nový riadok registra `library_import_done`, `kind: marker`, `sync: local`, `materials.lock`,
+  `bak: true`, writer `core/library_transfer.rb`). `import_done(tag)` → Hash | `nil`; `ack_import_done!(tag)` záznam zmaže (`true`/`false`). Žurnál si drží `tag`; `recover_pending!`
+  vo fáze po zápise dokladu (prvok `phase: 'done'`) len zmaže žurnál — doklad ostáva do `ack`. Bez `tag` sa nič nezapisuje (spätná kompatibilita).
+- **(3) Náhrady príloh** (U4 15.1): `import_group!(…, replacements: [])` — položky `{rel, new, old, old_sha256, new_sha256}` sa zapíšu do žurnálu pod `'attachments'` **v tom istom
+  zápise** ako `backup_id` (pred prvým premenovaním aj prvým zápisom knižnice; podmienky 15.0 platia). Vykonanie medzi R4.2 krokmi 3 a 4 pod `with_store_lock(row)` každej položky
+  cez `LibraryAttachments.apply_replacement!(item)` (dodá U4; `:ok | :failed`, nikdy výnimku); `:failed` → návrat. `rollback!` (15.4) a `recover_pending!` volajú
+  `revert_replacement!(item)` — idempotentne podľa stavu súborov; `failed > 0` = návrat zlyhal → žurnál, `pending_issue` a `pending_block` ostávajú. **Úspech:** fáza `committing` →
+  `archive_replacement!(item, "library_backups/<backup_id>")` (pôvodný súbor do zálohy prevzatia, `backup.json` `attachments: {rel => sha256}`) → doklad (2) → zmazanie žurnálu.
+  Pád v `committing` → `recover_pending!` **nevracia**, len dokončí presuny. Bez `replacements` sa správanie U2 nemení.
+- **Testy** (`test_u2_transfer.rb`): `peek_group` — zdravá usadená skupina = odtlačky `export_group`; chýbajúci primár s `.bak`, degradovaný, starší `seed_version`, obsadený zámok,
+  `pending_block` → `:unknown`; po volaní SHA všetkých súborov a stav modulov bez zmeny (aj pri otvorenom okne). Doklad — `tag` → `import_done` vráti odtlačky po usadení; pád
+  (`exit!`) po zápise dokladu pred zmazaním žurnálu → `recover_pending!` zmaže žurnál, doklad ostane; `ack_import_done!` ho zmaže; bez `tag` súbor nevznikne. Náhrady — pád medzi
+  každými dvoma krokmi (žurnál, `cieľ→old`, `new→cieľ`, 1. dokument, archivácia) → po `recover_pending!` cieľ pôvodný (`importing`/`rolling_back`) alebo nový s `old` v zálohe
+  (`committing`); stub zlyhania 2. náhrady → návrat aj 1.; zmazaný `old` → `failed`, žurnál a blok ostávajú; dvojitý `recover_pending!` = rovnaký výsledok.
+- **Rez:** (1)–(3) patria do **U2b** (+~90 riadkov → ~490; poistka U2b ~550). `LibraryAttachments` je modul U4 — U2b ho v testoch stubuje presnými menami a volá len ak `replacements` nie je prázdne.

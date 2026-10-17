@@ -16,30 +16,24 @@
 
 | # | Tvrdenie | Dôkaz | Verdikt |
 |---|---|---|---|
-| S1 | `JsonFileStore.write` píše **dočasný súbor vedľa cieľa** `<súbor>.tmp-<pid>-<thread>` a potom `rename` → na zrkadlenom H: by vznikali temp súbory (A2 B2) | `core/json_file_store.rb:79-97`, `:223-225` | PRAVDA → do H: nikdy cez `JsonFileStore` |
-| S2 | `.bak` sa točí pri každom zápise → nie je záloha R4 (A4 B7) | `json_file_store.rb:190-209` | PRAVDA → zálohy U2 R4.3 |
-| S3 | `JsonFileStore.read` má sekundovú cache podľa (mtime, veľkosť) | `json_file_store.rb:12`, `:28-48` | PRAVDA |
-| S4 | `LibraryRegistry` = čisté dáta, `shared` 12 riadkov, **skupiny ani háčiky zatiaľ nemá**; `root` = `Materials.dir` | `core/library_registry.rb:85-195`, `:234-262` | PRAVDA → skupiny dodá U2 R1 |
-| S5 | `Materials.dir` = `%APPDATA%\NOXUN\Engine`, testy `test_dir_override` | `core/materials.rb:228-239` | PRAVDA |
+| S1 | `JsonFileStore.write` píše `<súbor>.tmp-<pid>-<thread>` vedľa cieľa + `rename` → na H: temp súbory (A2 B2) | `json_file_store.rb:79-97`, `:223-225` | PRAVDA → do H: nikdy cez `JsonFileStore` |
+| S4 | `LibraryRegistry` = čisté dáta, 12 zdieľaných riadkov, bez skupín; `root` = `Materials.dir` | `library_registry.rb:85-195`, `:234-262` | PRAVDA → skupiny U2 R1 |
 | S6 | Vzor zámku: `File.open(lock,'a')` + `flock`, `false` = výnimka | `materials.rb:503-528` | PRAVDA (U3 berie `LOCK_EX \| LOCK_NB`) |
-| S7 | `Updater.live_leases(plugins_dir)` = PID ostatných živých inštancií, nezistiteľný stav = `Refused` (fail-closed); lease zapisuje loader | `core/updater.rb:751-787`, `noxun_engine.rb:150-168` | PRAVDA → volá ho U2 `import_group!` |
-| S8 | `Updater.check` číta len hlavičku loadera, `newer/same/older` | `updater.rb:871-889`, `:239-263` | PRAVDA → R-G2 (R18) |
-| S9 | Vzor manifestu `{rel => {size, sha1}}`, `safe_relative!`, `refuse_link!`, stropy `MAX_FILES`/`MAX_TOTAL_BYTES` | `updater.rb:185-186`, `:332-345`, `:377-391`, `:395-436` | PRAVDA → vzor pre manifest verzie |
-| S10 | Čítanie s limitom žije **v UI**: vo vlákne len súborové I/O, poll 0,2 s, deadline 4 s, vlákno sa nezabíja, single-flight na cestu, háčiky `test_clock/test_spawn/test_schedule` | `ui/supplier_settings_dialog.rb:57-58`, `:354-423`, `:748-765` | PRAVDA (A4 B13) |
-| S11 | Guard D-52b pripína **text** `updater_worker` regexom | `tests/pure/test_d52b_updater_ui.rb:1072-1073` | PRAVDA → updater sa nepresúva (D3) |
-| S12 | SketchUp API len z hlavného vlákna | `docs/SKETCHUP_PRAVIDLA.md` „Sieť a systém" | PRAVDA |
-| S13 | Guard `test_h16_kniznice.rb` pripína `SHARED` a `WRITE_SITES` — nový súbor v koreni = riadok registra | `tests/pure/test_h16_kniznice.rb:44`, `:72`, `:234-246`, `:855-856` | PRAVDA |
+| S7 | `Updater.live_leases` = PID ostatných inštancií, nezistiteľné = `Refused` | `updater.rb:751-787` | PRAVDA → volá U2 |
+| S8 | `Updater.check` číta len hlavičku loadera (`newer/same/older`); `source_manifest` = SHA1 + veľkosť celého balíka | `updater.rb:871-889`, `:436-444` | PRAVDA → R-G2 |
+| S9 | Vzor manifestu, `safe_relative!`, `refuse_link!`, stropy | `updater.rb:185-186`, `:332-436` | PRAVDA → manifest verzie |
+| S10 | Čítanie s limitom žije v UI: vlákno len I/O, poll 0,2 s, deadline 4 s, nezabíja sa, single-flight, testovacie háčiky | `supplier_settings_dialog.rb:354-423`, `:748-765` | PRAVDA (A4 B13) |
+| S11 | Guard D-52b pripína text `updater_worker` | `test_d52b_updater_ui.rb:1072` | PRAVDA → D3 |
+| S13 | Guard H16 pripína `SHARED` a `WRITE_SITES` — nový súbor = riadok registra | `test_h16_kniznice.rb:44`, `:72`, `:855` | PRAVDA |
 | S14 | `LibraryTransfer`, `export_group`, `import_group!`, `LibrarySync` v kóde **nie sú** | Grep `noxun_engine/`, `tests/` | PRAVDA → U3b až po mergi U2 |
-| S15 | Mená príloh `<uuid>.skm`, `<uuid>/<uuid>_<slug>.<ext>`, `<druh>-<slug>-<sha16>.png` | `kniznice.md` §2; `appliance_catalog.rb:1058-1073` | PRAVDA |
 
 ---
 
 ## 1 · Cieľ (funkčne)
 
-Pod kapotou vznikne „motor" zdieľanej knižnice — bez okna (okno je U5). Vie: **zistiť stav Disku** (H: chýba / Disk ešte nič nemá alebo sa synchronizuje / v poriadku) bez
-zamrznutia SketchUpu · **povedať per skupinu** (Materiály, Kovanie, Šablóny, Dodávateľ a sadzby, Spotrebiče), či je na Disku novšia verzia, či mám lokálne zmeny, či sa verzia
-ešte dosťahuje alebo je z inej verzie pluginu · na PC **správcu** (len Michal, R3) **odoslať** zmenené skupiny s poznámkou ako novú nemennú verziu · na každom PC **prevziať**
-novšie skupiny celé alebo vôbec (zálohu a návrat robí U2) · pripraviť **zoznam zmien** pre varovanie R4 · ukázať **históriu 5** a **vrátiť** staršiu verziu (= nová verzia).
+„Motor" zdieľanej knižnice bez okna (okno je U5): **stav Disku** bez zamrznutia SketchUpu · **stav per skupina** (novšia na Disku, lokálne zmeny, synchronizuje sa, iný
+plugin) · **odoslanie** zo správcu (R3) s poznámkou ako nová nemenná verzia · **prevzatie** celej skupiny alebo ničoho (záloha a návrat U2) · **zoznam zmien** pre R4 ·
+**história 5** a **Vrátiť** (= nová verzia).
 
 **Príklad:** Michal odošle Materiály (verzia 15). Disk Lucii dotiahne ukazovateľ skôr než `.skm` súbory → Aktualizovať povie „Materiály sa na Disku ešte synchronizujú —
 skús o chvíľu", **nič sa nezmení**; o minútu prebehne prevzatie a jej stará knižnica ostane ako záloha.
@@ -48,11 +42,11 @@ skús o chvíľu", **nič sa nezmení**; o minútu prebehne prevzatie a jej star
 
 | Časť | Obsah | Kód pluginu | Testy | Odhad |
 |---|---|---|---|---|
-| **U3a · čítacia strana** | `core/timed_worker.rb` · `core/library_sync.rb` (mená, cesty, lokálny stav cez U2, správca — čítanie, R18) · `core/library_sync_remote.rb` (sken, stavy Disku, celistvosť, história, cudzie mená) · `status` · `diff` | ~480 | ~600 | 1 deň |
-| **U3b · zápisová strana** | `core/library_sync_publish.rb` (založenie správcu, odoslanie, overenie ukazovateľa, zametanie, Vrátiť verziu) · `core/library_sync_take.rb` (staging, prílohy, volanie `import_group!`, výsledok, žurnál) | ~450 | ~650 | 1¼ dňa |
+| **U3a · čítacia strana** | `timed_worker.rb` · `library_sync.rb` (mená, stav, správca — čítanie, R18 precheck) · `library_sync_remote.rb` (sken, celistvosť, história, cudzie mená) · `status` · `diff` | ~540 | ~700 | 1¼ dňa |
+| **U3b · zápisová strana** | `library_sync_publish.rb` (dvojfázový správca, odoslanie, zametanie, Vrátiť) · `library_sync_take.rb` (staging, tikety, prílohy, `import_group!`, R-J5) | ~520 | ~800 | 1½ dňa |
 
-Spolu ~930 riadkov (menej než pôvodne — zálohy, návrat a druhé okno robí U2) → nad ~600 → delenie ostáva. U3a nič nezapisuje mimo lokálneho stavu; štartuje po **U2a** (skupiny v registri)
-a potrebuje `peek_group` (§12 D10, dodá U2b) — v testoch stub s presnými menami; **U3b potrebuje U2a + U2b + U2c v `main`**. **Poistka:** časť nad ~650 riadkov kódu → stop, rozhodne orchestrátor.
+Spolu ~1060 riadkov (po audite) → delenie ostáva. U3a nič nezapisuje mimo lokálneho stavu; štartuje po **U2a** (skupiny v registri)
+a potrebuje `peek_group` (§12 D10, dodá U2b) — v testoch stub s presnými menami; **U3b potrebuje U2a + U2b + U2c v `main`**. **Poistka:** časť nad ~650 → stop, rozhodne orchestrátor.
 
 ## 3 · Scope IN
 
@@ -60,9 +54,8 @@ R0 sonda Disku (skript mimo pluginu) · R-A rozloženie koreňa a mená · R-B l
 R-F stav per skupina a kontrola pri štarte · R-G verzia pluginu (R14, R18) · R-H odoslanie · R-I použitie API U2 · R-J prevzatie · R-K zálohy (len cez U2) · R-L história a Vrátiť ·
 R-M prílohy (rozhranie pre U4) · R-N zoznam zmien pre R4 · R-O register a dokumentácia.
 
-**Čo z návrhu 6.9. ostáva** (s jedným správcom): nemenné artefakty s jedinečným menom · ukazovateľ zapísaný posledný · prevzatie len celej overenej verzie (§8 bod 1) · JSON +
-prílohy ako celok (§8 bod 3 — cez zálohu a návrat U2) · single-flight čítanie bez únikov vlákien (§8 bod 6). **Odpadá:** `parent`/`supersedes`/lineage, konfliktné okno,
-rekonštrukcia manifestu, `publish.lock` na Disku, `files/<sha>` naprieč verziami, dvojfázové zametanie, dopredná brána (nahradená R14/R18 `import_allowed?` / `export_allowed?`).
+**Z návrhu 6.9. ostáva:** nemenné artefakty, ukazovateľ posledný, prevzatie len celej overenej verzie, single-flight čítanie. **Odpadá:** lineage, konfliktné okno,
+`publish.lock`, `files/<sha>`, dopredná brána (nahradená `import_allowed?` / `export_allowed?`).
 
 ## 4 · Scope OUT
 
@@ -72,12 +65,11 @@ skupiny a riadky `library_backups`/`library_sync` v registri (**U2**) · výber 
 
 ## 5 · Trieda a brány
 
-- **Trieda Ť:** nový modul (audit-povinné). **Audit návrhu povinný**, jeden pre U3a + U3b (R12: `gpt-6-astra`, úzko — tento package + PACKAGE_U2 R1/R4/R5, `json_file_store.rb`,
-  `library_registry.rb`, `updater.rb:185-436, :751-787, :871-889`, `supplier_settings_dialog.rb:354-423, :748-765`). Sonda pred auditom = §0.
+- **Trieda Ť:** nový modul. **Audit návrhu** jeden pre U3a + U3b (R12, úzko) — vykonaný 17.10., zapracovanie §15; delta audit na §15. Sonda = §0.
 - **Výrobná/cenová:** **U3a nie** (len číta). **U3b áno** (orchestrátor 17.10.: zapisuje katalógy, z ktorých sa počítajú ceny a rozmery) — brány výrobnej dávky celé;
-  **export test** `scripts\export_test.ps1` **P == K** ako dôkaz, že dávka sama čísla nemení (bez Odoslať/Aktualizovať sa exporty nesmú líšiť).
+  **export test P == K** (dávka sama čísla nemení).
 - **Predrecenzia:** povinná pre U3a aj U3b.
-- **In-SU:** spúšťače sa nemenia → **nie je brána**. Fotky okien: nie.
+- **In-SU:** spúšťače sa nemenia → **nie je brána** (§8). Fotky okien: nie.
 - **R0 sonda Disku:** podmienka **zmrazenia package** (výsledok do §16, prípadná úprava [R0] požiadaviek ako delta audit); nie brána mergu.
 
 ## 6 · Požiadavky
@@ -86,20 +78,19 @@ skupiny a riadky `library_backups`/`library_sync` v registri (**U2**) · výber 
 
 **Skript mimo pluginu:** `scripts/sonda_disk_d48.rb` (standalone Ruby `C:\Ruby32-x64`, bez `require` pluginu) + spúšťač `scripts/sonda_disk_d48.ps1`. Pracuje **len** v
 `H:\Môj disk\NoxunENGINE data\_sonda\<beh>\` (nikdy v `library\`), na konci po sebe uprace. Výstup `%TEMP%\noxun_sonda_disk\<beh>_<role>.csv` + `_summary.txt`.
-Roly `-Role writer` (Michal) / `-Role reader` (Lucia), spojené menom behu. Časy = monotónne v rámci PC (hodiny PC sa neporovnávajú).
+Roly `-Role writer` (Michal) / `-Role reader` (Lucia); časy monotónne v rámci PC.
 
 | Test | Writer robí | Reader meria (poll 0,5 s, max 15 min) |
 |---|---|---|
-| T1 poradie | priečinok `v000001-<rand>/`: 40 súborov (1 KB JSON, 20× 200 KB PNG, 5× 3 MB, 1× 25 MB) → `manifest.json` → `head-000001-<rand>.json` | čas objavenia a čas **plnej veľkosti + správneho SHA256** každého súboru; prišiel head/manifest pred dátami? |
-| T2 rozpísaný súbor | 50 MB písaných 30 s priamo pod finálnym menom | 0 B / čiastočný obsah / `EACCES`/`EBUSY` / nič |
+| T1 poradie | `v000001-<rand>/` 40 súborov (1 KB–25 MB) → `manifest.json` → `head-…json` | objavenie a **plná veľkosť + SHA256** každého súboru; head pred dátami? |
+| T2 rozpísaný súbor | 50 MB za 30 s pod finálnym menom | 0 B / čiastočný / `EACCES`/`EBUSY` / nič |
 | T3 temp+rename | `x.json.tmp` → `rename` → `x.json` | vidno `.tmp`? obe? len výsledok? |
 | T4 súbežný zápis | obaja v tej istej sekunde iný obsah do `clash.json` | presné **mená konfliktných kópií** a kde ležia |
 | T5 prepis | 3× prepis `ptr.json` za 2 s | ktorá verzia dorazí, vznikne kópia? |
 | T6 mazanie | zmaže starý priečinok verzie počas čítania | chyby čítania, oneskorenie |
 | T7 offline | pozastaví synchronizáciu, zapíše T1, po 5 min obnoví | oneskorenie a poradie |
 | T8 mená | ASCII aj diakritika, cesta 200+ znakov | doručenie a meno |
-| T9 prázdny koreň | — | `File.directory?` koreňa a `library\` počas prvej synchronizácie |
-| T10 latencia | — | `Dir.children` + `File.stat` nad 200 súbormi |
+| T9/T10 | — | koreň počas prvej synchronizácie; `Dir.children` + `stat` nad 200 súbormi; **lehota T pre R-C3** |
 
 **Od výsledku závisí [R0]:** čakanie „ešte sa synchronizuje" (R-D) · regex cudzích mien (R-A3) · `EACCES/EBUSY` = synchronizuje sa (R-D4) · priamy zápis pod finálnym menom
 (R-H5) · limity (R-E3) · zametanie počas čítania (R-H7). **Nezávisí:** tvar manifestu, nemennosť verzií, správca, R14/R18, zámky, zálohy. Správanie mimo predpokladov → delta audit.
@@ -121,8 +112,8 @@ Roly `-Role writer` (Michal) / `-Role reader` (Lucia), spojené menom behu. Čas
 ```
 
   `NNNNNN` = číslo verzie skupiny, `<r8>` = `SecureRandom.hex(4)` per odoslanie (jedinečnosť pri opakovaní po páde).
-- **R-A3 cudzie mená [R0]:** čo nesedí s `\Ahead-(\d{6})-([0-9a-f]{8})\.json\z`, `\Av(\d{6})-([0-9a-f]{8})\z`, `\Aadmin-(\d{6})-([0-9a-f]{8})\.json\z` (vnútri verzie len položky
-  manifestu + `manifest.json`), je **cudzie**: nečíta sa ako pravda, nemaže sa, vráti sa ako `foreign: [mená]`. Konfliktná kópia `head-000015-ab12cd34 (1).json` nie je ukazovateľ.
+- **R-A3 cudzie mená [R0]:** čo nesedí presne s `head-<6 číslic>-<8 hex>.json`, `v<6>-<8 hex>`, `admin-<6>-<8 hex>.json`, `admin-act-<6>-<8 hex>.json`
+  (vnútri verzie len položky manifestu), je **cudzie**: nečíta sa ako pravda, nemaže sa, vráti sa ako `foreign`; konfliktné kópie `head-…`/`admin…` blokujú (R-D2).
 - **R-A4 žiadne dočasné súbory v `<root>`** (S1): do `<root>` nikdy `JsonFileStore`, `*.tmp*`, `.bak`, zámky ani staging — tie žijú v `Materials.dir`.
 - **R-A5 manifest** `{ std:1, kind:"noxun_library_version", group, version, id, plugin (= packet['plugin_version']), created_at (UTC), by_pc, by_pc_id, note, reverted_from, base,
   documents:{ entry_key => {file:"d/<key>.json", size, sha256 (= fingerprint)} }, attachments:{ "a/…" => {of: entry_key, local: rel, size, sha256} }, group_fingerprint }`.
@@ -173,9 +164,8 @@ Roly `-Role writer` (Michal) / `-Role reader` (Lucia), spojené menom behu. Čas
   „Na Disku ešte nie je knižnica") · `ok` · `timeout` · `error`. `empty`/`no_root` pri skupine, ktorú toto PC už prevzalo, = **`missing_known`** („Disk neukazuje knižnicu, ktorú
   už máš — synchronizácia možno beží; nič sa nemení"). Prázdny koreň **nikdy** neznamená zmazanú knižnicu.
 - **R-E2 `core/timed_worker.rb`** (`Noxun::Engine::TimedWorker`, bez `UI`): `start(key) { blok }` → `{box, started_at, reused}`; **single-flight na kľúč** (živý beh sa zdieľa,
-  dobehnutý zahodí — sémantika S10); `state(entry, deadline:, now:)` → `:running | :done | :timeout`; vlákno sa nezabíja; výnimka → `box['error']`; injektovateľné `clock`, `spawn`.
-  Poll cez `UI.start_timer` robí volajúci (U5). D-52b updater sa nemení (D3).
-- **R-E3 [R0] limity:** sken 4 s, overenie + staging 120 s, odoslanie 180 s.
+  dobehnutý zahodí — S10); `state(entry, deadline:, now:)` → `:running | :done | :timeout`; vlákno sa nezabíja; injektovateľné `clock`, `spawn`; poll robí U5 (D3).
+- **R-E3 [R0] limity:** sken 4 s, distribúcia 60 s, staging 120 s, odoslanie 180 s.
 - **R-E4** vo vlákne len `Remote.*` a kopírovanie H: ↔ staging; `LibraryTransfer.*`, lokálny stav a zámky store-ov **na hlavnom vlákne** (A4 B6). Guard: telá
   `TimedWorker.start` v `library_sync*.rb` volajú len povolené metódy.
 
@@ -274,7 +264,7 @@ U3 vlastné zálohy nerobí. „Vrátiť zálohu" = `restore_backup!(id, plugins
 - **R-L1** `history(g)` = R-D5; Vrátiť len pri `admin_state == self`.
 - **R-L2 `revert!(g, version_id, note:)`:** `verify_version` + R-G1 (iný plugin → „verzia je z iného pluginu") → prevzatie verzie lokálne cestou R-J (záloha a návrat U2) →
   odoslanie **bajtov tej verzie bez nového exportu** ako `N+1` s `reverted_from` a poznámkou „Návrat na verziu K z <dátum>". Zlyhanie odoslania → lokálne K, stav `local_changes`.
-- **R-L3** stará verzia sa nemení ani nemaže.
+  Stará verzia sa nemení ani nemaže.
 
 ### R-M · Prílohy len pribúdajú (A4 B9, rozhranie pre U4)
 
@@ -312,12 +302,10 @@ U3b so skutočnou U2):
 |---|---|
 | mená | `head-…(1).json`, `HEAD-…`, `v000015-xyz`, `manifest (1).json` ignorované a hlásené, nikdy zmazané |
 | celistvosť | chýbajúci/skrátený/iný súbor, iný SHA manifestu, ukazovateľ pred priečinkom → `syncing`; `..`/absolútna cesta/strop → `broken`; `EACCES` → `syncing` |
-| stavy Disku | `no_drive`, `no_root`, `empty`, `missing_known`, `ok`, `timeout` (fake spawn), `error` |
-| timed worker | single-flight, dobehnutý zahodený, nezabíja sa, výnimka → `error` |
+| stavy Disku, worker, zámok | `no_drive`, `no_root`, `empty`, `missing_known`, `ok`, `timeout`, `error`; single-flight, vlákno sa nezabíja; druhá operácia → `:busy` |
 | správca | `none` → Odoslať vypnuté; `claiming` → Odoslať vypnuté; aktivácia pred lehotou T / pri druhom kandidátovi odmietnutá; dva kandidáti doručení oneskorene → `conflict`, Odoslať vypnuté na oboch, Aktualizovať len od `publisher_pc_id`; ukazovateľ cudzieho `pc_id` nikdy neprevzatý; konfliktná kópia `head-…` blokuje |
 | R14/R18 | Aktualizovať pri inom pluginu odmietnuté (dva dôvody); Odoslať pri novšom na Disku odmietnuté; distribúcia `newer`, `older`, `same` s iným manifestom, nečitateľná → odmietnuté; `same` + zhodný manifest → povolené; precheck nikdy na hlavnom vlákne (fake worker) |
 | odoslanie | ukazovateľ až po čítaní späť; zlyhanie kopírovania → bez ukazovateľa, stav nezmenený; súbežný ukazovateľ → `failed`; úprava po odoslaní A → B sa odošle (audit 1); po zmene VERSION sa odošlú všetky skupiny; zametanie necháva 5 publikácií, nemaže priečinok bez ukazovateľa mimo `failed.json` |
-| zámok | druhá operácia počas prvej → `:busy`; uvoľnený po chybe |
 | prevzatie | staging overený znova (súbor vymenený medzi kópiou a overením); prílohy pred `import_group!`; príloha sa nikdy nezmaže; lokálne zmeny bez `:overwrite` → `skipped`; zmena po `status` → `skipped_changed`; kódy U2 (`:failed_restored`, `:failed_restore_failed` → `pending` ostáva, `:other_instance` zastaví zvyšok) prenesené bez zmeny |
 | prerušenie (A1 S1, audit 8) | pád pred importom, počas importu, **po úspechu U2 a pred `update_sync_state!`** → po „štarte" (a)/(b)/(c) R-J5; zlyhaná obnova → `pending` |
 | zastaraný tiket (audit 3) | tikety N a N+1, commit N po N+1 → `stale_ticket` aj s `:overwrite`; lokálna zmena po rozhodnutí → `skipped_changed` aj s `:overwrite`; Disk nižší než prevzatý → `disk_behind` |
@@ -335,22 +323,21 @@ s poznámkou → B `newer` + poznámka → B zmení Materiály → `newer_and_lo
 
 ## 8 · In-SU
 
-Nie je brána (spúšťače sa nemenia — §5). Overenie na reálnom Disku a dvoch PC = smoke U5.
+Nie je brána; reálny Disk a dve PC = smoke U5 a akceptácia bloku (§7).
 
 ## 9 · Riziká
 
-1. **Disk doručí inak, než predpokladáme [R0]** → manifest + SHA256 nezávisí od poradia; najhorší dôsledok = dlhšie `syncing`.
-2. **Prepis mení čísla zákazky** (A4 D, R17) → diff s `used`, záloha a návrat U2, odmietnutie druhého okna; rozhodnutie a texty U5.
+1. **Disk doručí inak [R0]** → manifest + SHA256 nezávisí od poradia; najhorší dôsledok = dlhšie `syncing`.
+2. **Prepis mení čísla zákazky** (R17) → diff s `used`, záloha a návrat U2; texty U5.
 3. **Po aktualizácii pluginu varovanie R4 aj bez úprav** (R-F3 konzervatívne) → zmizne, keď správca odošle novou verziou a odtlačky sa zhodnú; cena = jedno zbytočné varovanie.
 4. **Zaseknuté vlákno nad H:** drží `library_sync.lock` do dobehu → `:busy` v tom okne do reštartu.
 5. **Dvaja správcovia** (oneskorená synchronizácia dlhšia než T) → `conflict`, Odoslať vypnuté, cudzie publikácie sa neprijímajú (R-C3, R-C4, R19).
-6. **API U2 sa pri implementácii zmení** → U3b štartuje až po mergi U2; zmena mien = zladenie package pred U3b.
-7. **Veľkosť príloh** (U4) → stropy na verziu, história 5 = až 5× na Disku; R0 T1 zmeria čas.
-8. **Cesta s diakritikou** (`Môj disk`) → R0 T8 + testy s UTF-8 cestou.
+6. **API U2 sa zmení** (vrátane D10, D11) → U3b až po mergi U2a–c; zladenie package pred U3b.
+7. **Veľkosť príloh a diakritika v ceste** → stropy, R0 T1/T8, testy s UTF-8 cestou.
 
 ## 10 · Smoke checklist pre Michala
 
-U3 nemá okno — uvidíš ju až v U5. Od teba treba **R0 sondu** (pred implementáciou) a krátku kontrolu po inštalácii:
+U3 nemá okno (uvidíš ju v U5). Od teba treba **R0 sondu** a krátku kontrolu po inštalácii:
 
 1. **Sonda (R0):** na svojom PC `scripts\sonda_disk_d48.ps1 -Role writer -Beh test1`, na Luciinom `… -Role reader -Beh test1` (do minúty po sebe); nechaj dobehnúť (≤ 20 min).
    CSV a `_summary.txt` z `%TEMP%\noxun_sonda_disk\` oboch PC pošli do okna (alebo nechaj v `_sonda\` na Disku).
@@ -361,9 +348,8 @@ U3 nemá okno — uvidíš ju až v U5. Od teba treba **R0 sondu** (pred impleme
 
 ## 11 · Checklist uzáveru (U3a aj U3b zvlášť)
 
-Bump patch (`noxun_engine.rb` + `main.rb`) + všetky `?v=` · testy zelené · **U3b export test P == K v PR** · odseky `kniznice.md` na mieste + rozcestník + tabuľka časti 3 ·
-STANDARD §13.1 · Grep tvrdení o zoznamoch (LOCKS, súbory koreňa, „SYNC-0..3" v komentároch registra) · STAV prepis · KRONIKA navrch · PLAN riadok U3a/U3b ✅ + PR ·
-D-48 v DOGFOODING ostáva otvorený (zatvorí U5) · PR popis: predrecenzia, odkaz na R0.
+Bump patch (2×) + `?v=` · testy zelené · **U3b export test P == K** · odseky `kniznice.md` + rozcestník + tabuľka časti 3 · STANDARD §13.1 · Grep zoznamov (LOCKS,
+súbory koreňa) · STAV · KRONIKA · PLAN ✅ + PR · D-48 ostáva otvorený (zatvorí U5) · PR: predrecenzia, odkaz na R0.
 
 ## 12 · Rozhodnutia autora na potvrdenie orchestrátorom
 
@@ -397,9 +383,8 @@ D-48 v DOGFOODING ostáva otvorený (zatvorí U5) · PR popis: predrecenzia, odk
 ## 14 · Nálezy mimo scope
 
 - **N1:** kontrola verzie pluginu v O plugine (`supplier_settings_dialog.rb:354-423`) môže neskôr použiť `TimedWorker` — jeden vzor namiesto dvoch (refaktor, guard D-52b).
-- **N2:** zavádzač zapisuje lease bez `exe` (`noxun_engine.rb:161-168`) na rozdiel od `Updater.write_lease!` (`updater.rb:628-639`) — zjednotenie pre D-52.
-- **N3:** F10 `Debug.report` po U3 môže pridať `LibrarySync.status` — porovnanie Michal vs. Lucia jedným príkazom.
-- **N4:** nápad do U5: v histórii ukazovať aj PC a verziu pluginu odoslania (údaje nesie ukazovateľ).
+- **N2:** loader píše lease bez `exe` (`noxun_engine.rb:161-168`) — zjednotenie s `Updater.write_lease!` pre D-52.
+- **N3:** `Debug.report` + `LibrarySync.status` (porovnanie Michal vs. Lucia); **N4:** história v U5 aj s PC a verziou pluginu.
 
 ## 15 · Audit návrhu — zapracovanie (Codex `gpt-6-astra`, 17.10.2026; [AUDIT_U3_raw.md](AUDIT_U3_raw.md))
 
