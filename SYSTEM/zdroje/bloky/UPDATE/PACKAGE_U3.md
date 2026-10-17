@@ -133,7 +133,8 @@ Roly `-Role writer` (Michal) / `-Role reader` (Lucia), spojené menom behu. Čas
 
 - **R-B1 lokálny stav = `LibraryTransfer.sync_state` / `update_sync_state!(group_key, entry)`** (U2 R4.5; súbor `library_sync.json` a jeho riadok registra pridáva **U2**). U3 definuje obsah:
   `entry = { version, id, fingerprint (group_fingerprint po prevzatí/odoslaní — pri prevzatí z `result['fingerprints']` po usadení), plugin, at, origin: take|publish|revert,
-  clean, clean_checked_plugin, pending: {target_id, started_at} | nil }`. PC údaje (`pc_id` UUID vzniknutý raz, `root`, `admin_claimed`) v pseudo-skupine — **U2 dnes overuje
+  clean, clean_checked_plugin, pending: {target_id, started_at} | nil, attachments_digest }` — pole `attachments_digest` je **rezervované pre U4** (význam, plnenie
+  a vplyv na `status`: [PACKAGE_U4.md](PACKAGE_U4.md) R5.1–R5.2); U3 ho len prenáša. PC údaje (`pc_id` UUID vzniknutý raz, `root`, `admin_claimed`) v pseudo-skupine — **U2 dnes overuje
   `group_key ∈ GROUPS`** → chýba miesto pre údaje mimo skupín (§12 D6a). Degradovaný stav (U2) = Odoslať aj Aktualizovať odmietnuté s dôvodom.
 - **R-B2 zámok operácie** `library_sync.lock` (`Materials.dir`, nový záznam `LibraryRegistry::LOCKS` — pridáva U3): `flock(LOCK_EX | LOCK_NB)`; obsadený → `:busy` „Iné okno práve odosiela
   alebo aktualizuje knižnicu". Drží sa počas celej operácie vrátane vlákna. **Vonkajší** voči zámkom U2 (`materials.lock` a ďalšie berie `LibraryTransfer` vnútri, postupne — F4).
@@ -247,11 +248,11 @@ U3 vlastné zálohy nerobí. „Vrátiť zálohu" = `restore_backup!(id, plugins
 
 ### R-M · Prílohy len pribúdajú (A4 B9, rozhranie pre U4)
 
-- **R-M1 `place_attachment(staged, local_rel, sha256, policy:)`** pod zámkom prílohového riadku (R-I chýba b): cieľ chýba → kópia do `<cieľ>.d48-<r8>` + `rename` (lokálne);
-  rovnaký obsah → nič; iný obsah → `policy` z U4 (`:keep_local` predvolené, `:replace` pre náhľady — pôvodný súbor sa vtedy nemaže, ale premenuje na `<cieľ>.d48old-<r8>`;
-  upratanie rieši U4). **Nikdy nič nemaže.**
+- **R-M1 uloženie prílohy** = `LibraryAttachments.place(staged, local_rel, sha256)` pod `LibraryTransfer.with_store_lock` — **politiku, overenie, žurnál náhrad
+  a upratanie definuje U4** ([PACKAGE_U4.md](PACKAGE_U4.md) R4.1, R1.6, D10). U3 len volá `place` pre každú prílohu manifestu pred `import_group!` a výsledok prenesie.
+  Do U4 platí len: chýbajúci cieľ sa doplní, existujúci sa nemení. **Nikdy nič nemaže.**
 - **R-M2** prílohy idú **pred** `import_group!` (U2 R4.2 krok 2 ich overuje — `:missing_attachments`).
-- **R-M3** dočasné mená `*.d48-*`, `*.d48old-*` do `transient` prílohových riadkov (guard S13).
+- **R-M3** dočasné mená príloh registruje **U4** ([PACKAGE_U4.md](PACKAGE_U4.md)); U3 žiadne nepridáva.
 
 ### R-N · Zoznam zmien pre varovanie R4 (A4 B5, R17) — nad výstupom `export_group`, bez nového API U2
 
@@ -264,7 +265,7 @@ U3 vlastné zálohy nerobí. „Vrátiť zálohu" = `restore_backup!(id, plugins
 
 ### R-O · Register, verzie a dokumentácia
 
-- **R-O1** U3 pridá do registra len: `LOCKS['library_sync.lock']`, riadky `library_staging/` a `library_outbox/` (lokálne, celé `transient`) a dočasné mená R-M3. Riadky
+- **R-O1** U3 pridá do registra len: `LOCKS['library_sync.lock']`, riadky `library_staging/` a `library_outbox/` (lokálne, celé `transient`); dočasné mená príloh registruje U4. Riadky
   `library_backups/` a `library_sync.json` pridáva **U2**; `SHARED` sa nemení. `WRITE_SITES` doplniť.
 - **R-O2** `LibrarySync::FORMAT_STD = 1` (manifest, ukazovateľ, správca) → STANDARD §13.1.
 - **R-O3** odseky `### library_sync.rb` (+ `_remote`, `_publish`, `_take`) a `### timed_worker.rb` v `kniznice.md` na mieste + riadky rozcestníka `docs/ARCHITEKTURA.md`.
