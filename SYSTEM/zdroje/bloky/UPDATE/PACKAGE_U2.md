@@ -250,7 +250,7 @@ Reentrancia: obal nesmie nastaviť `@lock_held`/`@lock_depth` modulu; `import_do
   bez zápisu; zlúči `attrs` do `meta` (chýbajúci kľúč ostane), ten istý zámok a brány ako `update_sync_state!`, `groups` nemení. Význam hodnôt (ako vzniká `pc_id`, kedy `admin`) **definuje U3**.
 
 **R4.8 API pre U3/U5 (súhrn):** `export_group` · `import_group!` · `create_backup!` · `backups` · `restore_backup!` · `sync_state` · `update_sync_state!` · `update_sync_meta!` ·
-`with_store_lock` · **`peek_group`** · **`import_done`** · **`ack_import_done!`** (15.9; `import_group!` s voliteľnými `tag:` a `replacements:`) · `import_allowed?` · `export_allowed?` · `compare_versions` · `recover_pending!` · `canonical_bytes` · `fingerprint`; z registra `groups` · `members` · `depends_on` · `dependents`. Nič iné U3/U5 z U2 nevolá.
+`with_store_lock` · **`peek_group`** · **`backup_peek`** · **`local_fingerprint`** (15.10; `restore_backup!` s `seen_fingerprint:`) · **`import_done`** · **`ack_import_done!`** (15.9; `import_group!` s voliteľnými `tag:` a `replacements:`) · `import_allowed?` · `export_allowed?` · `compare_versions` · `recover_pending!` · `canonical_bytes` · `fingerprint`; z registra `groups` · `members` · `depends_on` · `dependents`. Nič iné U3/U5 z U2 nevolá.
 
 **R4.6 Kanonické bajty a odtlačok**
 - `canonical_bytes(doc)` = `JSON.generate` nad kópiou s **rekurzívne zoradenými kľúčmi** Hash-ov (polia v pôvodnom poradí), UTF-8, bez medzier. `fingerprint(doc)` = SHA-256 hex.
@@ -468,3 +468,18 @@ na 15.0–15.6 pred U2b. Export test `P == K` platí pre všetky tri; in-SU pod�
   každými dvoma krokmi (žurnál, `cieľ→old`, `new→cieľ`, 1. dokument, archivácia) → po `recover_pending!` cieľ pôvodný (`importing`/`rolling_back`) alebo nový s `old` v zálohe
   (`committing`); stub zlyhania 2. náhrady → návrat aj 1.; zmazaný `old` → `failed`, žurnál a blok ostávajú; dvojitý `recover_pending!` = rovnaký výsledok.
 - **Rez:** (1)–(3) patria do **U2b** (+~90 riadkov → ~490; poistka U2b ~550). `LibraryAttachments` je modul U4 — U2b ho v testoch stubuje presnými menami a volá len ak `replacements` nie je prázdne.
+
+**15.10 Požiadavky U5 na U2 — okno dopadov pred „Vrátiť zálohu"** ([PACKAGE_U5.md](PACKAGE_U5.md) §12 D15, R-J1; mená záväzné).
+
+- **`backup_peek(backup_id)`** → `[:ok, {'group', 'documents' => {entry_key => doc}, 'fingerprints' => {entry_key => sha256}}]` | `[:broken | :missing, veta]`. Len čítanie zálohy
+  (`library_backups/<id>/`): `backup.json` + `files/` knižníc skupiny, **overené SHA** podľa `backup.json` (nesúlad alebo nečitateľný súbor → `:broken`; neznáme ID alebo `.partial` →
+  `:missing`); knižnica so stavom `absent` (15.2) v `documents` chýba. Bez zápisu, bez bariéry 15.0, bez zámku na čakanie, bez `Sketchup`. Odtlačky = `fingerprint` (R4.6).
+- **`local_fingerprint(group_key)`** → String (SHA-256 kanonických bajtov `{rel => sha256 surových bajtov primára | 'absent'}` knižníc skupiny) — čítanie bez zápisu, funguje aj nad
+  poškodeným primárom. **Jediná** definícia „lokálneho stavu, ktorý okno ukázalo"; `LibrarySync.diff_documents` (U3) vracia `seen_fingerprint` práve z nej.
+- **`restore_backup!(backup_id, plugins_dir:, seen_fingerprint: nil)`** — po podmienkach 15.0 a **pod zámkami** (pred novou zálohou) porovná `local_fingerprint(group)` so
+  `seen_fingerprint`; nesúlad → **`[:changed, „Knižnica sa od zobrazenia zmenila — otvor okno znova"]` bez akéhokoľvek zápisu** (ani záloha, ani žurnál). `nil` = bez kontroly
+  (interné volania; U5 ho posiela vždy). Kód `:changed` pribúda do R4.7.
+- **Testy** (`test_u2_transfer.rb`): `backup_peek` — zdravá záloha = dokumenty a odtlačky zhodné s pôvodnými súbormi; zmenený bajt v `files/` → `:broken`; neznáme ID a `.partial` →
+  `:missing`; po volaní SHA koreňa bez zmeny. `local_fingerprint` — zmena jedného primára ho zmení, `.bak` ani prílohy nie; chýbajúci primár = `absent`. `restore_backup!` —
+  zhodný `seen_fingerprint` → prebehne; zápis do knižnice medzi `local_fingerprint` a volaním → `:changed`, žiadna nová záloha ani žurnál (výpis `library_backups/` bez zmeny).
+- **Rez:** U2b (+~40 riadkov).

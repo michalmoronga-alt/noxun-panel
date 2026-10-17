@@ -145,6 +145,10 @@ Roly `-Role writer` (Michal) / `-Role reader` (Lucia); časy monotónne v rámci
 - **R-C4 prijímanie publikácií (audit 4):** ukazovateľ nesie `by_pc_id`; čitateľ berie do úvahy **len ukazovatele aktivovaného správcu**. Prvé prevzatie zapíše `entry.publisher_pc_id`.
   Pri `conflict` (R19): Odoslať vypnuté na oboch; **Aktualizovať pokračuje len z ukazovateľov `entry.publisher_pc_id`** (doterajší zdroj tohto PC); skupina bez neho (`never_taken`)
   čaká na ručné vyriešenie. Ukazovatele cudzieho `pc_id` = `foreign_publisher` (hlásené, nikdy prevzaté, nikdy mazané). PC, ktoré je samo kandidátom v konflikte, neprijíma nič od druhého.
+- **R-C5 `resolve_admin!(keep_pc_id)`** (U5 D13, R19 ručné riešenie v „⋯"): hlavné vlákno, zámok R-B2; len pri `conflict` a `keep_pc_id` ∈ kandidáti najvyššieho `seq`
+  (smie ktorékoľvek z dvoch PC) → nový kandidát `admin-<seq+1>-<r8>.json` s `resolves: [pc_id oboch]` → `update_sync_meta!('admin' => keep_pc_id == pc_id)` → `[:ok, admin_state]`
+  | `[:not_conflict | :unknown_pc | :disk, veta]`. Aktivácia ponechaného PC = R-C3 krok 2 (lehota T od `at` nového kandidáta); kandidát s `resolves` ruší konflikt nižšieho `seq`;
+  neponechané PC s `admin == true` si ho pri `status` zhodí. `status['admin']` nesie `candidates: [{pc_id, pc_name, seq}]` a `activate_after` (UTC).
 
 ### R-D · Sken Disku a celistvosť verzie (A3 FIX 1)
 
@@ -228,6 +232,9 @@ Roly `-Role writer` (Michal) / `-Role reader` (Lucia); časy monotónne v rámci
 | blok po prerušení | `pending_block(entry_key = nil)` (U2 §15.1) | R-F1 `blocked`, R-J2 |
 | čítanie stavu bez bariéry | **`peek_group(g)` — požiadavka §12 D10** | R-F1, R-N1 |
 | doklad dokončenia | **`import_group!(…, tag:)`, `import_done(tag)`, `ack_import_done!(tag)` — požiadavka §12 D11** | R-J5 |
+| lokálny stav pre rozhodnutie | `local_fingerprint(group_key)` (U2 15.10) | `seen_fingerprint` v R-J2, R-L2, R-N1, R-N3; `restore_backup!` |
+| náhľad zálohy | `backup_peek(backup_id)` → `[:ok, {group, documents, fingerprints}]` \| `[:broken \| :missing, veta]`; `restore_backup!(…, seen_fingerprint:)` (U5 D15) | R-K, R-N3 |
+| **U3 → U5 (požiadavky U5 §12)** | `resolve_admin!` (D13), `diff` s `attachment_conflicts` (D14), `diff_documents`, `revert_prepare`, `revert!(g, ticket, note:, seen_fingerprint:)` (D15) | R-C5, R-N1, R-N3, R-L2 |
 
 **Doplnené v U2** (§12 D6): (a) `update_sync_meta!` pre údaje PC (`pc_id`, `drive_root`, `admin`); (b) predpoklad R4.2 krok 2 „prílohy už ležia" — U3 ich uloží
 pred `import_group!` (R-M), ale riadky prílohy majú v registri `lock` (`materials.lock`, `appliances.json.lock`, `templates.json.lock` drží volajúci) → U3 potrebuje
@@ -239,8 +246,8 @@ pred `import_group!` (R-M), ale riadky prílohy majú v registri `lock` (`materi
   vymeniť) → tiket. Neúspešná skupina = `syncing`/`broken`, ostatné pokračujú.
 - **R-J2 `take_commit(ticket, decisions:, plugins_dir:)`** (hlavné vlákno, synchrónne — U2 §15.0): zámok R-B2 · R-G1 · `pending_block` → `blocked` · **zastaraný tiket (audit 3):**
   pod zámkom sa odmietne (`stale_ticket`, nezávisle od `:overwrite`), keď `ticket.version ≤ entry.version` alebo tiket nie je **posledný pripravený** v tomto procese (sekvencia
-  tiketov); cesta dozadu existuje len cez Vrátiť (R-L2). `decisions = { g => {action: :take | :overwrite | :skip, seen_fingerprint:} }`: lokálny odtlačok sa prepočíta
-  (`export_group`) a **≠ `seen_fingerprint`** (odtlačok, nad ktorým používateľ rozhodol) → `skipped_changed` **aj pri `:overwrite`**; lokálne zmeny bez `:overwrite` → `skipped` (R4). Vráti aj
+  tiketov); cesta dozadu existuje len cez Vrátiť (R-L2). `decisions = { g => {action: :take | :overwrite | :skip, seen_fingerprint:} }`: `LibraryTransfer.local_fingerprint(g)`
+  (U2 15.10 — jediná definícia lokálneho stavu) **≠ `seen_fingerprint`** (hodnota z `diff`, nad ktorou používateľ rozhodol) → `skipped_changed` **aj pri `:overwrite`**; lokálne zmeny bez `:overwrite` → `skipped` (R4). Vráti aj
   `dependents_skipped` z `LibraryRegistry.dependents` (text U5).
 - **R-J3 poradie per skupina** (v poradí `GROUPS`): (1) `pending = {target_id, target_version, before_fingerprint, started_at}` do stavu · (2) prílohy R-M · (3) packet = `{group, plugin_version: manifest.plugin, documents: JSON.parse(staged d/*),
   attachment_refs, fingerprints}` → `import_group!(g, packet, plugins_dir:, reason: 'prevzatie verzie N', tag: target_id)` · (4) `:ok` → `update_sync_state!` (`fingerprint` z `result['fingerprints']`
@@ -256,13 +263,16 @@ pred `import_group!` (R-M), ale riadky prílohy majú v registri `lock` (`materi
 
 ### R-K · Zálohy (O5) — len cez U2
 
-U3 vlastné zálohy nerobí. „Vrátiť zálohu" = `restore_backup!(id, plugins_dir:)` pod zámkom R-B2; `entry` sa **nemení** (východisko ostáva poslednou prevzatou verziou → správne
+U3 vlastné zálohy nerobí. „Vrátiť zálohu" = okno dopadov z `backup_peek(id)` + `diff_documents` (R-N3) → `restore_backup!(id, plugins_dir:, seen_fingerprint:)` pod zámkom R-B2
+(nesúlad → `:changed` bez zápisu, U2); `entry` sa **nemení** (východisko ostáva poslednou prevzatou verziou → správne
 `local_changes`). Zoznam = `backups(g)`. Riadok `library_backups/` pridáva U2 (R1.4).
 
 ### R-L · História a Vrátiť verziu (R5, O5)
 
 - **R-L1** `history(g)` = R-D5; Vrátiť len pri `admin_state == self`.
-- **R-L2 `revert!(g, version_id, note:)`:** `verify_version` + R-G1 (iný plugin → „verzia je z iného pluginu") → prevzatie verzie lokálne cestou R-J (záloha a návrat U2) →
+- **R-L2 dvojfázové Vrátiť (U5 D15):** `revert_prepare(g, version_id)` vo vlákne = `verify_version` + staging ako R-J1 → tiket (okno dopadov: `diff` nad tiketom, R-N1, `seen_fingerprint` z `local_fingerprint`);
+  `revert!(g, ticket, note:, seen_fingerprint:)` (hlavné vlákno): R-G1 (iný plugin → „verzia je z iného pluginu") · `local_fingerprint(g)` ≠ `seen_fingerprint` → `skipped_changed` ·
+  tiket nie je posledný pripravený → `stale_ticket` (výnimka z R-J2 „verzia ≤ entry.version" — návrat dozadu je tu zámerný) → prevzatie lokálne cestou R-J3 (záloha a návrat U2) →
   odoslanie **bajtov tej verzie bez nového exportu** ako `N+1` s `reverted_from` a poznámkou „Návrat na verziu K z <dátum>". Zlyhanie odoslania → lokálne K, stav `local_changes`.
   Stará verzia sa nemení ani nemaže.
 
@@ -277,12 +287,15 @@ U3 vlastné zálohy nerobí. „Vrátiť zálohu" = `restore_backup!(id, plugins
 ### R-N · Zoznam zmien pre varovanie R4 (A4 B5, R17) — nad `peek_group`, overené `export_group` pri commite
 
 - **R-N1 `diff(g, ticket, used_ids: {})`** (hlavné vlákno, pred rozhodnutím R4 pri otvorenom okne): lokálne dokumenty z `peek_group(g)` vs. dokumenty zo stagingu tiketu
-  (tie isté bajty, ktoré sa importujú); výsledok nesie `seen_fingerprint` pre R-J2. `peek_group` `:unknown` → `diff: :unknown` (U5 ukáže všeobecné varovanie R4).
+  (tie isté bajty, ktoré sa importujú); výsledok nesie `seen_fingerprint` = `LibraryTransfer.local_fingerprint(g)` v okamihu diffu (pre R-J2) a **`attachment_conflicts: [{rel, label}]`** (U5 D14, U4 §15.2: povinná príloha
+  tiketu, ktorej lokálny súbor pod rovnakým menom má iné SHA — len čítanie). `peek_group` `:unknown` → `diff: :unknown` (U5 ukáže všeobecné varovanie R4).
   Per knižnica `{ added:[{id,label}], changed:[{id,label,fields}], removed:[{id,label,used}] }`; `used = used_ids[entry_key].include?(id)` — množinu použitých ID otvorenej zákazky
   dodá U5 (potrebuje model; napr. `Materials.used_material_ids`), U3 ju len prenesie do výsledku.
 - **R-N2 tabuľka záznamov** v U3 (`LibrarySync::RECORDS`): per `entry_key` cesta k poľu záznamov, kľúč identity a popisu (napr. `materials` → pole položiek, `id`, `name`);
   `fields` = mená najvyššej úrovne s odlišným `canonical_bytes`. Pole cien (`price*`, sadzby) sa označí `price_changed: true` pre vetu R17. Tvary dokumentov overí implementátor
   sondou na kóde pred písaním tabuľky; store bez stabilného ID → len počet zmien (§12 D7).
+- **R-N3 `diff_documents(g, documents, used_ids:)`** (U5 D15): rovnaký výpočet a tvar ako `diff` (vrátane `seen_fingerprint` = `local_fingerprint(g)`, bez `attachment_conflicts`) nad ľubovoľnými cieľovými
+  dokumentmi — pre okno dopadov pred „Vrátiť zálohu" (dokumenty z U2 `backup_peek`).
 
 ### R-O · Register, verzie a dokumentácia
 
@@ -310,7 +323,8 @@ U3b so skutočnou U2):
 | prerušenie (A1 S1, audit 8) | pád pred importom, počas importu, **po úspechu U2 a pred `update_sync_state!`** → po „štarte" (a)/(b)/(c) R-J5; zlyhaná obnova → `pending` |
 | zastaraný tiket (audit 3) | tikety N a N+1, commit N po N+1 → `stale_ticket` aj s `:overwrite`; lokálna zmena po rozhodnutí → `skipped_changed` aj s `:overwrite`; Disk nižší než prevzatý → `disk_behind` |
 | bez bariéry (audit 5) | `status` nevolá `export_group`; `peek_group :unknown` → `unknown`, nikdy `current`; `:dialogs_open` z U2 prenesené |
-| Vrátiť | verzia K → lokálne K + Disk N+1 s `reverted_from`; K z iného pluginu odmietnuté |
+| Vrátiť | `revert_prepare` + `revert!` → lokálne K + Disk N+1 s `reverted_from`; K z iného pluginu odmietnuté; zmena po náhľade (`local_fingerprint`) → `skipped_changed`; starší tiket → `stale_ticket` |
+| U5 API | `resolve_admin!`: mimo konfliktu `:not_conflict`, cudzí `pc_id` `:unknown_pc`, ponechané PC prejde `claiming` → `self` po T, druhé si `admin` zhodí; `diff` s `attachment_conflicts` (rovnaké meno, iné SHA); `diff_documents` = tvar `diff` |
 | lokálne zmeny | po prevzatí `current`; po úprave `local_changes`; po zmene VERSION úprava pred aktualizáciou ostane `local_changes` (audit 2) |
 | diff | pridané/zmenené/zmiznuté, `used` z `used_ids`, `price_changed` |
 | guardy | čistota (R-O4); telá vlákien (R-E4); žiadny `JsonFileStore`/`.tmp` nad `<root>`; register (S13) |
@@ -400,6 +414,7 @@ súbory koreňa) · STAV · KRONIKA · PLAN ✅ + PR · D-48 ostáva otvorený (
 | 8 | FIX pád medzi U2 a zápisom U3 | platný | **R-J5** (a)/(b)/(c), **D11** doklad `tag` od U2, `before_fingerprint` v `pending` |
 | 9 | FIX zametanie maže priečinok bez ukazovateľa | platný | **R-H7** 5 skutočných publikácií, mazanie len s ukazovateľom alebo z `failed.json`, bez veku |
 | 10 | NOTE S1–S5 nie všetky uzavreté | platný ako stav | S1–S3 = návrh U2 §15 (dôkaz až implementáciou U2b); S4 čiastočne do smoke U5 (U2 §15.7); S5 v U3 opravené bodmi 1 a 6; R0 nedokazuje budúce poradie — návrh od poradia nezávisí (R-D3), mená konfliktov blokujú konzervatívne (R-D2) |
+| 11 | (U5 §12 D13–D15) API pre okno | doplnené | **R-C5** `resolve_admin!`, **R-N1** `attachment_conflicts`, **R-N3** `diff_documents`, **R-L2** `revert_prepare`/`revert!`, **R-K** `backup_peek` + `seen_fingerprint`; všetky `seen_fingerprint` z U2 `local_fingerprint` (15.10) |
 
 ## 16 · Výsledok sondy R0
 
