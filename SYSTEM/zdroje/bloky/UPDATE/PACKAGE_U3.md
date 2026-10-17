@@ -329,7 +329,7 @@ D-48 v DOGFOODING ostáva otvorený (zatvorí U5) · PR popis: predrecenzia, odk
 ## 12 · Rozhodnutia autora na potvrdenie orchestrátorom
 
 - **D1 trieda:** potvrdené orchestrátorom 17.10. — U3a nie výrobná/cenová, **U3b áno** + export test P == K.
-- **D2 R18 fail-closed:** keď sa distribúcia pluginu na Disku nedá prečítať, Odoslať sa odmietne (R18 „verzia nie je na Disku" sa nedá overiť). Alternatíva: povoliť s varovaním.
+- **D2 R18 fail-closed** — **potvrdené orchestrátorom 17.10.:** keď sa distribúcia pluginu na Disku nedá prečítať, Odoslať sa odmietne (R18 „verzia nie je na Disku" sa nedá overiť).
 - **D3 časový limit v core** — potvrdené: nový `TimedWorker`, updater D-52b ostáva (N1).
 - **D4 prebázovanie po aktualizácii pluginu** (R-F3) — jednoduchšia cesta so zostatkovým rizikom; presnejšia by potrebovala od U2 `canonicalize` bez zápisu (nové API — nenavrhujem).
 - **D5 súbežný ukazovateľ** na jednom PC nenastane (R-B2), dva PC zakazuje R3 → stačí `failed` + `head_conflict`.

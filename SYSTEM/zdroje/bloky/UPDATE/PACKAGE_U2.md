@@ -54,9 +54,8 @@ Používateľ v U2 **nič nové nevidí** — dávka postaví „motor" pod tla�
   v pamäti a knižnicu znova posúdi;
 - **nedovolí** zapísať do priečinka knižníc súbor, ktorý nie je v súpise — aby Odoslať nikdy neposlalo cudzí ani zabudnutý súbor.
 
-**Príklad:** Lucia klikne v U5 Aktualizovať → U3 overí verziu na Disku → zavolá `LibraryTransfer.import_group!('materials', …)`. Ak má Lucia
-v Materiáloch vzhľad dosky „Dub Halifax", ktorý Michal medzitým zmenil, po prevzatí má **Michalov** vzhľad (dnešný bežný zápis by jej nechal starý — B1),
-jej pôvodné Materiály ležia v zálohe „Materiály 17.10. 08:12" a UNI dosky, ktoré Michal vedome zmazal, sa pri ďalšom štarte **nevrátia** (B14).
+**Príklad:** Lucia klikne Aktualizovať → po prevzatí Materiálov má **Michalov** vzhľad „Dub Halifax" (bežný zápis by nechal jej starý — B1), jej
+pôvodné Materiály sú v zálohe a UNI dosky, ktoré Michal zmazal, sa **nevrátia** (B14).
 
 ## 2 · Rez a odhad
 
@@ -241,7 +240,7 @@ použije vlastný obal, ktorý **skontroluje návratovú hodnotu `flock`** a vý
 Reentrancia: obal nesmie nastaviť `@lock_held`/`@lock_depth` modulu; `import_document!` týchto dvoch store-ov preto beží **vo vnútri** obalu a sám zámok neberie (dokumentovať).
 - **Verejné `with_store_lock(entry_key) { … }`** (pre U3, PACKAGE_U3 §12 D6): zámok riadku registra (`lock`) pre knižnicu **aj prílohový riadok** (`appearances` → `materials.lock`,
   `appliance_files` → `appliances.json.lock`, `template_previews` → `templates.json.lock`); neznámy kľúč alebo riadok bez zámku → `ArgumentError`; nezískaný zámok → `IOError`
-  (nikdy `false`, nikdy blok bez zámku). U3 v ňom ukladá prílohy **pred** `import_group!`. Vnáranie dvoch rôznych zámkov je zakázané (F4) — obal to odmietne `IOError`.
+  (nikdy blok bez zámku). U3 v ňom ukladá prílohy **pred** `import_group!`. Vnorenie dvoch rôznych zámkov (F4) → `IOError`.
 
 **R4.5 Lokálny stav synchronizácie (B7, obálka pre U3)**
 - `sync_state` → `{'std' => SYNC_STD, 'meta' => Hash, 'groups' => {group_key => Hash}}` (chýbajúci súbor = prázdne `meta` aj `groups`; zlý tvar s dobrou `.bak` = čítanie zo zálohy, zápisy vypnuté — vzor R-37
@@ -368,4 +367,4 @@ U2 nemá viditeľnú funkciu — **plný smoke prevzatia je až v U5**. Po mergi
   bežné zápisy by na súborovom systéme bez zámkov bežali bez ochrany. U2 sa im vyhne (R4.4); oprava bežných ciest = samostatná fix dávka (mení správanie okien → vlastná predrecenzia).
 - **N2 · `reset_state!` HardwareCatalog/ApplianceCatalog** nulujú zámkový čítač (S11) — komentár „nikdy pod zámkom".
 - **N3 · `Materials.write` ignoruje `appearance` z payloadu** (B1, zámer pre okná) — povedať to v komentári `materials.rb:309`.
-- **N4 · F10 `Debug.report` inventár knižníc** — po U2 stačí `fingerprint` per skupina = porovnanie Michal vs. Lucia jedným príkazom; návrh do U3.
+- **N4 · F10 `Debug.report`** — `fingerprint` per skupina = porovnanie Michal vs. Lucia; návrh do U3.
