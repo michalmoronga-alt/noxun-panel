@@ -1,0 +1,23 @@
+# Audit návrhu U5 — Codex `gpt-6-astra` (17.10.2026, úzke zadanie)
+
+1. **BLOCKER — Návrat verzie a zálohy obchádza R4/R17.** [PACKAGE_U5.md:253](<C:/APP DEV/RUBY/ENGINE/.claude/worktrees/wonderful-wilson-10d11d/SYSTEM/zdroje/bloky/UPDATE/PACKAGE_U5.md:253>)  
+   R-J1 potvrdzuje iba skupinu a dátum; R-J3 pridáva poznámku. Obe cesty následne prepíšu lokálnu knižnicu bez zoznamu odstránených/používaných záznamov a upozornenia na zmenu cien. Napríklad obnovenie starých Materiálov zmení najbližší rozpočet bez vety R17. Pred oba zápisy zaradiť rovnaký prehľad dopadov ako pri Aktualizovať, naviazaný na konkrétnu obnovovanú verziu.
+
+2. **BLOCKER — Zatvorenie okien ešte nie je bariéra rozpracovaných akcií.** [PACKAGE_U5.md:142](<C:/APP DEV/RUBY/ENGINE/.claude/worktrees/wonderful-wilson-10d11d/SYSTEM/zdroje/bloky/UPDATE/PACKAGE_U5.md:142>)  
+   Prevzatý mechanizmus kontroluje zánik okien; napríklad [panel.rb:67](<C:/APP DEV/RUBY/ENGINE/.claude/worktrees/wonderful-wilson-10d11d/noxun_engine/ui/panel.rb:67>) iba `@dialog.nil?`. R-B4 blokuje otváranie, ale návrh neustanovuje dokončenie alebo zrušenie už rozbehnutých zápisov a zneplatnenie ich oneskorených odpovedí. Štúdio pritom má asynchrónny kanál [studio_dialog.rb:750](<C:/APP DEV/RUBY/ENGINE/.claude/worktrees/wonderful-wilson-10d11d/noxun_engine/ui/studio_dialog.rb:750>). Chýba záruka, že stará akcia po prevzatí neprepíše dáta alebo nenaplní nové okno starým obsahom. Pred zápisom zneplatniť starú reláciu a ukončiť rozpracované zápisy; overiť oneskorený callback aj po znovuotvorení. Samotný test zatvorených okien nestačí.
+
+3. **FIX — Potvrdený plán nie je viazaný na otvorenú zákazku.** [PACKAGE_U5.md:163](<C:/APP DEV/RUBY/ENGINE/.claude/worktrees/wonderful-wilson-10d11d/SYSTEM/zdroje/bloky/UPDATE/PACKAGE_U5.md:163>)  
+   Tiket uchováva `id`, obsah a `dlg`, ale nie identitu zákazky ani stav jej použitých záznamov. R4 môže vzniknúť nad zákazkou A; počas otvoreného modeless Štúdia používateľ prejde na B alebo zmení jej obsah. Potvrdenie z rovnakého okna stále prejde, hoci červené označenia už nezodpovedajú otvorenej zákazke. Pred zápisom overiť identitu dokumentu a relevantné použitia; pri zmene znovu zostaviť R4 a vyžiadať nové potvrdenie.
+
+4. **FIX — Spotrebiče môžu potichu stratiť označenie „používa zákazka“.** [PACKAGE_U5.md:188](<C:/APP DEV/RUBY/ENGINE/.claude/worktrees/wonderful-wilson-10d11d/SYSTEM/zdroje/bloky/UPDATE/PACKAGE_U5.md:188>)  
+   R-D2 výslovne povoľuje pri nenájdení čítacej funkcie pokračovať bez `used`, iba s poznámkou v PR. Používateľ tak nerozozná „nepoužíva sa“ od „neoverili sme“. Existenciu väzby potvrdzuje [budget_store.rb:506](<C:/APP DEV/RUBY/ENGINE/.claude/worktrees/wonderful-wilson-10d11d/noxun_engine/core/budget_store.rb:506>). Pred implementáciou určiť konkrétne čítanie rozpočtu a pridať test použitého odstráneného spotrebiča. Neúspešné zisťovanie musí byť viditeľné v R4 podľa R-D3; snapshot túto informačnú povinnosť nenahrádza.
+
+5. **FIX — Odporúčané opakovanie pri `pending` nemá vykonateľnú cestu.** [PACKAGE_U5.md:182](<C:/APP DEV/RUBY/ENGINE/.claude/worktrees/wonderful-wilson-10d11d/SYSTEM/zdroje/bloky/UPDATE/PACKAGE_U5.md:182>)  
+   Hlásenie odporúča „klikni Aktualizovať znova“, ale R-C1 vyberá iba `newer`, `newer_and_local`, `never_taken`. Skupinu `pending` teda ďalší pokus nepripraví. Zosúladiť hlásenie a dostupné akcie s obnovovacím rozhraním U2/U3: buď existuje explicitný bezpečný postup opakovania, alebo ponúknuť iba návrat zálohy. Otestovať stav, keď je `pending` jediná problémová skupina.
+
+6. **FIX — Pruh správcu nemá úplnú cestu dát pri priamom otvorení knižnice.** [PACKAGE_U5.md:268](<C:/APP DEV/RUBY/ENGINE/.claude/worktrees/wonderful-wilson-10d11d/SYSTEM/zdroje/bloky/UPDATE/PACKAGE_U5.md:268>)  
+   R-K2 potrebuje `admin` z `last_payload`/`UpdateNotice`, ale deklarovaný stav `UpdateNotice` obsahuje iba `libs`, `plugin`, `checked_at`. Sken napĺňajúci `last_payload` sa spúšťa cez O plugine. Chýba garantované naplnenie správcu, keď Lucia po štarte otvorí rovno Materiály. Výsledok štartovacieho skenu musí naplniť aj spoločný stav správcu a obnoviť pruh už otvorenej sekcie.
+
+7. **FIX — Konflikt správcov nemá schválené ručné riešenie v „⋯“.** [PACKAGE_U5.md:205](<C:/APP DEV/RUBY/ENGINE/.claude/worktrees/wonderful-wilson-10d11d/SYSTEM/zdroje/bloky/UPDATE/PACKAGE_U5.md:205>)  
+   Pri `conflict` sa založenie správcu nekreslí, odovzdanie je mimo scope a zostávajú iba história/zálohy. R-F3 odkazuje na Michala, ale záväzné rozhodnutie [R19:47](<C:/APP DEV/RUBY/ENGINE/.claude/worktrees/wonderful-wilson-10d11d/SYSTEM/zdroje/bloky/UPDATE/ROZHODNUTIA_MICHALA_2026-10-17.md:47>) požaduje ručné riešenie v „⋯“. Doplniť konkrétnu akciu a jej rozhranie; samotná oznamovacia veta konflikt neodstráni.
+
