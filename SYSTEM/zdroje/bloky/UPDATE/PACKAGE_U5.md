@@ -6,7 +6,7 @@
 > [MOCKUP_UPDATE_KNIZNICA.html](MOCKUP_UPDATE_KNIZNICA.html) (schválený bez úprav + rámik O9) · smer [RECONCILE_2026-10-17.md](RECONCILE_2026-10-17.md) §2 riadky „U5", §3 ·
 > API **presne podľa** [PACKAGE_U2.md](PACKAGE_U2.md) R4.8 a [PACKAGE_U3.md](PACKAGE_U3.md) R-C, R-E, R-F, R-H, R-J, R-K, R-L, R-N · dôkazy
 > [CROSS_AUDIT_A4_CLAUDE_KOD.md](CROSS_AUDIT_A4_CLAUDE_KOD.md) B4, B5, B6, B8, B11 · [CROSS_AUDIT_A2_GROK.md](CROSS_AUDIT_A2_GROK.md) B6 · A3 FIX 5 · [PACKAGE_U4.md](PACKAGE_U4.md) R3.2, R4.3 (len texty výsledkov — §6 R-N).
-> **§15 (audit návrhu + zladenie s U2/U3/U4 §15) MÁ PREDNOSŤ** pred textom vyššie, kde sa líšia. **Trieda Ť** (nové moduly + > 300 riadkov; výrobná/cenová — §5) · **rez U5a → U5b** (§2) · `codex-audit` · predrecenzia · export test P == K · ui_foto · smoke na oboch PC.
+> **§15 (audit návrhu + zladenie s U2/U3/U4 §15; delta audit 17.10. = §15.1) MÁ PREDNOSŤ** pred textom vyššie, kde sa líšia. **Trieda Ť** (nové moduly + > 300 riadkov; výrobná/cenová — §5) · **rez U5a → U5b** (§2) · `codex-audit` · predrecenzia · export test P == K · ui_foto · smoke na oboch PC.
 > **Stav kódu:** sonda nad `docs/update-start` `1468dfe2` (kód = `main` `a9e8c79d`, v0.18.1). U2–U4 v kóde ešte nie sú; riadky nižšie platia k tejto hlave.
 
 ---
@@ -170,14 +170,19 @@ zmena čítacej sekcie Pravidlá na editovateľnú (pruh áno, obsah bez zmeny �
 - **R-C1 klik** (len keď `can_take`): modal **„Aktualizovať knižnicu z Disku"** (D-15, `size: 'md'`, `busyLock: true`) otvorený hneď vo fáze „Pripravujem verziu z Disku…"
   (potvrdenie `aria-disabled`) → server `lib_take_prepare` → `LibrarySync.take_prepare(groups:)` vo vlákne (U3 R-J1; deadline 120 s, poll 0,25 s) — `groups` = skupiny
   so stavom `newer`, `newer_and_local`, `never_taken` (nie `pending`/`blocked` — R-C7) → na hlavnom vlákne per skupina `LibrarySync.diff(g, ticket, used_ids:)` (U3 R-N1; `used_ids` R-D;
-  `diff: :unknown` → veta „Nepodarilo sa porovnať s tvojou knižnicou — prepíše sa celá") → `SS.libTake(plan)`.
+  výsledok `'documents' => :unknown` → vetva R-C2 „neznámy diff") → `SS.libTake(plan)`.
 - **R-C2 plán** `{ 'ticket_id', 'groups' => [{'key','label','version','at','note','local_changed','state' (syncing/broken → len informácia, neprevezme sa),'diff' =>
-  {entry_key => {added:[{id,label}], changed:[{id,label,fields}], removed:[{id,label,used}]}}, 'price_changed' => bool, 'dependents' => [labels]}] }`. Tiket drží server
-  (`@lib_ticket = {id, ticket, dlg, model_guid, used_sha}`); klient posiela späť len `ticket_id` a per skupina `seen_fingerprint` z diffu (U3 R-J2). **Väzba na zákazku (audit 3):**
+  {entry_key => {added:[{id,label}], changed:[{id,label,fields}], removed:[{id,label,used,where}]}} | 'unknown', 'price_changed' => bool, 'attachment_conflicts' => [{rel,label}],
+  'used_unknown' => [entry_key], 'dependents' => [labels]}] }` (zladené s U3 R-N1, §15.1). `used` v JSON = `true` · `false` · `null` (zámerne neoverované) · `"unknown"` (R-D3).
+  **Vetva neznámeho diffu** (`'diff' => 'unknown'` z U3 `'documents' => :unknown`): v okne namiesto zoznamu jantárová veta „Nepodarilo sa porovnať s tvojou knižnicou — prevzatím sa prepíše
+  celá a zmiznuté záznamy sa nedajú vypísať", veta R17 sa ukáže (`price_changed` true) a skupina sa správa ako **s lokálnymi zmenami**: voľba R-C4, predvolené preskočiť (U3 R-J2 ju bez `:overwrite`
+  neprevezme). Tiket drží server
+  (`@lib_ticket = {id, ticket, dlg, model_guid, used_sha, seen}`, `seen = {g => seen_fingerprint z diffu}`); klient posiela späť len `ticket_id` a per skupina `{action}`; server zloží
+  **jediný tvar rozhodnutí U3 R-J2** `decisions = {g => {action: :take | :overwrite | :skip, seen_fingerprint: seen[g]}}` (klient `seen_fingerprint` neposiela ani nemení). **Väzba na zákazku (audit 3):**
   pri potvrdení server znova zistí `Panel.model_guid` aktívneho modelu (`ui/panel/sync.rb:325`) a SHA `used_ids` — nezhoda → nič sa nezapisuje, plán sa **zostaví znova** nad tým istým
   tiketom a okno povie „Otvorená zákazka sa medzitým zmenila — prehľad je obnovený, skontroluj a potvrď znova".
 - **R-C2b konflikt povinnej prílohy (U4 §15.2):** `diff` skupiny nesie `attachment_conflicts: [{rel, label}]` (§12 D14) → riadok „Vzhľad/list <label> sa líši od verzie správcu —
-  prevzatím sa nahradí, tvoj súbor ostane v zálohe" a skupina dostane voľbu R-C4 ako pri lokálnych zmenách (bez `:overwrite` U4 vráti `:attachment_conflict`).
+  prevzatím sa nahradí, tvoj súbor ostane v zálohe" a skupina dostane voľbu R-C4 ako pri lokálnych zmenách (bez `:overwrite` vráti U3 výsledok skupiny `attachment_conflict`).
 - **R-C3 telo okna** (`custom`, poradie podľa mockupu): veta „Na Disku sú novšie: Materiály (verzia 14 z 16.10. 18:42) a Kovanie (verzia 9)." + poznámka odoslania (O8)
   pod menom skupiny · pri skupine s lokálnymi zmenami jantárová veta (`--nx-modalwarn-fg`) „V Materiáloch máš vlastné zmeny, ktoré na Disku nie sú. Prevzatím sa prepíšu."
   · **„Čo sa zmení v <skupina>"**: „+ N nové (prvé 3 mená, …)" · „~ N zmenená cena" / „~ N zmenené" · **„− <meno> — zmizne"**; zmiznutý záznam s `used` = červený
@@ -188,11 +193,11 @@ zmena čítacej sekcie Pravidlá na editovateľnú (pruh áno, obsah bez zmeny �
   (dá sa vrátiť v História)"** (`:overwrite`) / **„<Skupina> zatiaľ preskočiť — pošli zmeny správcovi"** (`:skip`). **Predvolená = preskočiť** (vedomá odchýlka od mockupu — §12 D4).
   Skupina bez lokálnych zmien = `:take` bez voľby. Preskočenie skupiny, od ktorej iná prevzatá závisí (`LibraryRegistry.dependents`, U2 R1.3) → jantárová veta
   „Šablóny odkazujú na Materiály — kým Materiály preskočíš, niektoré šablóny môžu ukazovať na záznamy, ktoré u teba nie sú." (A4 B8; varovanie, nie blokovanie — U2 R4.2).
-- **R-C5 potvrdenie** „Aktualizovať" (`primary`; pri všetkých `:skip` `aria-disabled` „Nie je čo prevziať") → `lib_take_commit {ticket_id, decisions}` → bariéra R-B3 →
+- **R-C5 potvrdenie** „Aktualizovať" (`primary`; pri všetkých `:skip` `aria-disabled` „Nie je čo prevziať") → `lib_take_commit {ticket_id, actions: {g => 'take'|'overwrite'|'skip'}}` → server zloží `decisions` (R-C2, tvar U3 R-J2) → bariéra R-B3 →
   `LibrarySync.take_commit(ticket, decisions:, plugins_dir: Engine.plugin_dir)` (U3 R-J2) → natívna hláška: riadok per skupina z R-J4 (`taken` „prevzaté (verzia N)",
   `skipped` „preskočené", `skipped_changed` „preskočené — medzitým si ich zmenila", `syncing`, `broken`, `plugin_mismatch`, kódy U2 vetou U2) + pri
   `:failed_restore_failed` veta „Otvor O plugine → ⋯ → Zálohy a vráť zálohu <dátum>." + pri `:other_instance*` „Zavri ostatné okná SketchUpu a skús znova." + `stale_ticket`
-  „Na Disku je medzitým novšia verzia — klikni Aktualizovať znova" + `:attachment_conflict` (U4) + `:dialogs_open`/`:busy_snapshot` (U2) vetou U2. Výsledok s `'refresh'` → Štúdio sa
+  „Na Disku je medzitým novšia verzia — klikni Aktualizovať znova" + `attachment_conflict` (U3 R-J4, veta R-N) + `:dialogs_open`/`:busy_snapshot` (U2) vetou U2. Výsledok s `'refresh'` → Štúdio sa
   otvára z čerstvého `push_state` (R-B3).
 - **R-C6 zrušenie** (Zrušiť, Esc, krížik vo fáze plánu) → `lib_take_cancel` → U3 staging sa zahodí (`take_prepare` tiket; upratanie U3 R-J4). Vo fáze prípravy je okno
   zamknuté (`busyLock`) do odpovede servera v **každej** vetve vrátane výnimky (§5.12).
@@ -209,7 +214,8 @@ zmena čítacej sekcie Pravidlá na editovateľnú (pruh áno, obsah bez zmeny �
   `{catalog_id => ["rozpočet: <nazov>"]}` pre každú položku s neprázdnym `catalog_id`. Len čítanie modelu (`read_json`), žiadna operácia. Kovanie, šablóny, dodávateľ: bez `used`
   (kovanie chráni snapshot — A4 D; šablóny a sadzby zákazka neodkazuje ID) — okno to povie vetou „Pri Kovaní sa použitie v zákazke neoveruje (zákazka má vlastnú kópiu)".
   Žiadny model → `{}`. **Test:** odstránený spotrebič, ktorý má rozpočet zákazky → `used` a červený riadok v R4.
-- **R-D3** zlyhanie `used_ids` (celé aj jednej knižnice) → `{entry_key => :unknown}` + log; okno pri tej skupine **viditeľne** povie „Nepodarilo sa zistiť, čo z <skupina> používa
+- **R-D3** zlyhanie `used_ids` (celé aj jednej knižnice) → `{entry_key => :unknown}` + log (tvar zladený s U3 R-N1: hodnota je `Hash{id => [kde]}` alebo `:unknown`; U3 vráti zmiznutým záznamom
+  `used: :unknown`; zoznam `used_unknown` v pláne R-C2 skladá U5 server zo svojho `used_ids`); okno pri tej skupine **viditeľne** povie „Nepodarilo sa zistiť, čo z <skupina> používa
   otvorená zákazka — skontroluj zmiznuté záznamy" (jantár; nikdy tichá prázdna množina). Test pre materiály aj spotrebiče.
 
 ### R-E · Odoslať s poznámkou (O8, R3, R18)
@@ -282,16 +288,18 @@ zmena čítacej sekcie Pravidlá na editovateľnú (pruh áno, obsah bez zmeny �
 
 - **R-J1 (U5a) modal „Zálohy pred prepisom"** (D-15, `custom`): zoznam `LibraryTransfer.backups` (najnovšia navrchu, max 5 na skupinu — U2 §12 D4): skupina · dátum · dôvod ·
   verzia pluginu · **„Vrátiť zálohu"** (`rotate-ccw`). Záloha z inej verzie pluginu alebo `:broken` → `aria-disabled` s dôvodom. Klik → `lib_backup_preview {backup_id}`
-  → `LibraryTransfer.backup_peek(id)` + `LibrarySync.diff_documents(g, documents, used_ids:)` (**API — §12 D15**) → **to isté okno dopadov ako R-C3** (zoznam pridaných/zmenených/
-  zmiznutých, `used` červeno, veta R17 pri `price_changed`, R-D3) s nadpisom „Vrátiť <skupina> na stav z <dátum>?" a vetou „Súčasný stav sa najprv uloží ako ďalšia záloha."
-  (audit 1) → potvrdenie (s väzbou na zákazku R-C2) → `lib_backup_restore {backup_id, seen_fingerprint}` → bariéra R-B3 →
-  `LibraryTransfer.restore_backup!(id, plugins_dir:)` pod zámkom U3 (R-K) → natívna veta U2 → `lib_scan`. `entry` U3 sa nemení (U3 R-K) → skupina ukáže „vlastné zmeny".
+  → `peek = LibraryTransfer.backup_peek(id)` + `LibrarySync.diff_documents(g, peek['documents'], used_ids:, attachment_rels: peek['attachment_rels'])` (**API — §12 D15**, U2 R4.8) → **to isté okno
+  dopadov ako R-C3** (zoznam pridaných/zmenených/zmiznutých, `used` červeno, veta R17 pri `price_changed`, R-D3) s nadpisom „Vrátiť <skupina> na stav z <dátum>?" a vetou „Súčasný stav sa najprv
+  uloží ako ďalšia záloha." (audit 1); server si odloží `seen_fingerprint` z `diff_documents` k `backup_id` (ako pri tikete R-C2) → potvrdenie (s väzbou na zákazku R-C2) →
+  `lib_backup_restore {backup_id}` → bariéra R-B3 → **`LibraryTransfer.restore_backup!(id, plugins_dir: Engine.plugin_dir, seen_fingerprint: <odložený>)`** (jediná signatúra U2 R4.8; zladené
+  17.10. — bez `seen_fingerprint:` sa nevolá nikdy) pod zámkom U3 (R-K) → `:changed` = veta U2 „Knižnica sa od zobrazenia zmenila — otvor okno znova" bez zápisu; inak natívna veta U2 → `lib_scan`.
+  Návrat vráti aj prílohy archivované pri prevzatí (U2 15.11 C1). `entry` U3 sa nemení (U3 R-K) → skupina ukáže „vlastné zmeny".
 - **R-J2 (U5b) modal „História knižnice — <skupina>"**: výber skupiny segmentom (5), tabuľka **Verzia · Kedy · Poznámka · PC · Plugin** (U3 R-L1/R-D5; PC a plugin = U3 N4)
   · aktuálna verzia označená „aktuálna" · pri ostatných **„Vrátiť"** (`rotate-ccw`) **len pri `admin.self`**; inde sa nekreslí. Veta pod tabuľkou: „Vrátenie odošle obsah
   zvolenej verzie ako novú verziu N+1 — Lucia ju dostane bežným Aktualizovať." Pod ňou „Tvoje zálohy pred prepisom" = R-J1 (jeden zoznam, nie dva).
 - **R-J3 Vrátiť verziu (audit 1)** → `lib_revert_prepare {group, version_id}` → `LibrarySync.revert_prepare(g, version_id)` vo vlákne (overenie + staging ako R-C1; **API — §12 D15**)
   → `diff(g, ticket, used_ids:)` → **okno dopadov R-C3** pre verziu K (nadpis „Vrátiť <skupina> na verziu K z <dátum>?") + pole poznámky (predvyplnené „Návrat na verziu K z <dátum>",
-  U3 R-L2) → potvrdenie (väzba na zákazku R-C2) → `lib_revert {ticket_id, note, seen_fingerprint}` → R-B7 + bariéra R-B3 → `LibrarySync.revert!(g, ticket, note:, seen_fingerprint:)`
+  U3 R-L2) → potvrdenie (väzba na zákazku R-C2) → `lib_revert {ticket_id, note}` (server doplní `seen_fingerprint` z diffu odloženého pri tikete — R-C2) → R-B7 + bariéra R-B3 → `LibrarySync.revert!(g, ticket, note:, seen_fingerprint:)`
   → natívna veta → `lib_scan`.
 
 ### R-K · Pruh v sekciách knižníc (O6, R13) — U5b
@@ -320,9 +328,10 @@ zmena čítacej sekcie Pravidlá na editovateľnú (pruh áno, obsah bez zmeny �
 
 - **Odoslať:** `attachments_skipped` z packetu skupiny (U4 R3.2) → dovetok riadku výsledku „odoslané bez N fotiek (u teba chýbajú)". Packet vzniká v U3 `publish_prepare` —
   výsledok per skupina ho nesie podľa U3 R-H3 (§12 D12).
-- **Aktualizovať:** `attachments.conflict > 0` vo výsledku skupiny (U4 R4.3) → dovetok „N vzhľadov sa líši od Michalových — ponechané tvoje". Ostatné počty sa neukazujú.
-- `:missing_attachments` (U2 R4.7, U4 R3.2) → veta U2 bez úprav. `:attachment_conflict` (U4 §15.2) → „<Skupina> sa neprevzala: vzhľad/list <label> sa líši od verzie správcu.
-  Aktualizuj znova a zvoľ Prepísať (tvoj súbor ostane v zálohe)."
+- **Aktualizovať (zladené s U4 §15.2/§15.7):** prevzatá skupina (`taken`) konflikt príloh **nehlási** — ponechanie rozdielneho vzhľadu či listu neexistuje (buď skupina neprejde, alebo sa pri
+  Prepísať nahradí a pôvodný ide do zálohy, čo okno R4 už povedalo). Počty príloh sa neukazujú; dovetok „ponechané tvoje" **zaniká**.
+- `:missing_attachments` (U2 R4.7, U4 R3.2) → veta U2 bez úprav. Výsledok skupiny `attachment_conflict` (U3 R-J4, U4 §15.2; skupina sa **neprevzala**, `entry` sa neposunul) → „<Skupina> sa neprevzala:
+  vzhľad/list <label> sa líši od verzie správcu. Aktualizuj znova a zvoľ Prepísať (tvoj súbor ostane v zálohe)."
 - **Test (audit 1, U4 §15.2):** konflikt prílohy v pláne → skupina má voľbu R-C4; bez `:overwrite` veta vyššie.
 
 ### R-M · Dokumentácia (na mieste)
@@ -349,6 +358,7 @@ zmena čítacej sekcie Pravidlá na editovateľnú (pruh áno, obsah bez zmeny �
 | správca | claim len pri `none` + `ok/empty`; Odoslať nekreslené/odmietnuté pri `other`, `mismatch`, `conflict`, `none` |
 | vlákna | guard nad zdrojom: telá `TimedWorker.start`/`Thread` v `library_sync_dialog.rb` a `update_notice.rb` bez `Sketchup.`, `UI.`, `LibraryTransfer.` |
 | štart | `start!` raz na proces; timeout/chyba → bez oznámenia; `on_accept` volá len `StudioDialog.show(open_section: 'about', anchor: 'library')` |
+| **delta 17.10.** | pomenované regresné testy so scenárom a očakávaním v **§15.1** (U5/1, U5/3, U5/4, U5/7, B: `seen_fingerprint`, `diff` `'unknown'`, `used` trojstav, výsledok konfliktu prílohy) |
 | §15 | R-B7 utíšenie (odložený emit/zápis so starou epochou nič nezapíše); väzba plánu na zákazku (iný `model_guid`/`used_ids` → nový plán, žiadny zápis); `pending`/`blocked` len „Vrátiť zálohu"; dopady pred Vrátiť zálohu a Vrátiť verziu (R17, `used`); spotrebič z rozpočtu `used`; `used` `:unknown` viditeľné; pruh po priamom otvorení sekcie; `claiming` → aktivácia po `activate_after`; `resolve_admin!` z „⋯" |
 
 **JS** (`tests/js/test_u5_about.js`, `test_u5_rail_nav.js`): R0.1 snapshot · chip pre každý `state` · `aria-disabled` (nikdy `disabled`) s dôvodom · Odoslať sa nekreslí mimo správcu ·
@@ -427,7 +437,7 @@ druhy `badge` v hlavičke `studio_sections.js`, rail §5.1 · `SYSTEM/STAV.md` p
   ponechaného PC ide bežným R-C3 krok 2 (lehota T od `at` nového kandidáta); kandidát s `resolves` ruší konflikt nižšieho `seq`; PC, ktoré nie je ponechané a má lokálne `admin == true`,
   si ho pri najbližšom `status` zhodí (`update_sync_meta!('admin' => false)`). `status['admin']` nesie `candidates: [{pc_id, pc_name, seq}]` a `activate_after` (UTC) pre R-F1b/R-F3.
 - **D14 ✅ požiadavka na U3/U4 — `diff` nesie `attachment_conflicts: [{rel, label}]`** (povinné prílohy s iným obsahom pod rovnakým menom; porovnanie SHA stagingu a lokálneho
-  súboru, len čítanie) — R-C2b; inak sa konflikt prejaví až výsledkom `:attachment_conflict`.
+  súboru, len čítanie) — R-C2b; inak sa konflikt prejaví až výsledkom `attachment_conflict`.
 - **D15 ✅ požiadavky pre okno dopadov pred Vrátiť (audit 1):** U2 `LibraryTransfer.backup_peek(backup_id)` → `[:ok, {'group','documents' => {entry_key => doc},'fingerprints'}]` |
   `[:broken | :missing, veta]` (len čítanie zálohy, overené SHA, bez zápisu) · U3 `LibrarySync.diff_documents(g, documents, used_ids:)` (tvar ako `diff`, vrátane `seen_fingerprint`)
   · U3 `LibrarySync.revert_prepare(g, version_id)` (vlákno; overenie + staging ako `take_prepare`) a `revert!(g, ticket, note:, seen_fingerprint:)` namiesto `revert!(g, version_id, note:)`.
@@ -460,6 +470,32 @@ druhy `badge` v hlavičke `studio_sections.js`, rail §5.1 · `SYSTEM/STAV.md` p
 **Zladenie s §15 U2/U3/U4 (Z):** Z1 nové stavy riadkov `blocked`, `disk_behind`, `unknown`, `foreign_publisher` (R-A3) · Z2 sken cez `peek_group` bez bariéry (R-B2) · Z3 Odoslať
 cez precheck a bariéru, lebo `export_group` vyžaduje zatvorené okná (R-E3, R-B3, R-B4) · Z4 správca v dvoch krokoch — `claiming` a automatická aktivácia po lehote (R-F1, R-F1b) ·
 Z5 `stale_ticket`, `:dialogs_open`, `:busy_snapshot`, `'refresh'` vo výsledkoch (R-C5) · Z6 `decisions` s `seen_fingerprint` (R-C2) · Z7 `pending`/`blocked` a červený pruh sekcie
-(R-C7, R-K4) · Z8 `:attachment_conflict` a voľba prepísať (R-C2b, R-N, D14) · Z9 `import_allowed?`/`export_allowed?` namiesto `compatible?` (R-A6, R-L1) · Z10 smoke hrúbky U2 §15.7 (§10 bod 13).
+(R-C7, R-K4) · Z8 `attachment_conflict` a voľba prepísať (R-C2b, R-N, D14) · Z9 `import_allowed?`/`export_allowed?` namiesto `compatible?` (R-A6, R-L1) · Z10 smoke hrúbky U2 §15.7 (§10 bod 13).
 **Rozsah:** +~120 riadkov kódu (R-B7, okno dopadov pred Vrátiť, `claiming`, `resolve_admin`, R-K2/R-K4) → U5a ~720, U5b ~470; poistka U5a sa zdvíha na ~780, nad ňu presun
 Zálohy (R-J1) do U5b. Delta audit na R-B7 a D13/D15 pred U5a odporúčam (rozhodne orchestrátor).
+
+**15.1 Integračné zladenie (delta 17.10.)** — [AUDIT_DELTA_raw.md](AUDIT_DELTA_raw.md) A (U5/1, U5/3, U5/4, U5/7 CIASTOCNE), B (obnova bez odtlačku, `:unknown`, neznámy diff, výsledok konfliktu prílohy),
+C1/C2 (dopad na okno); mapa [INTEGRACIA_2026-10-17.md](INTEGRACIA_2026-10-17.md). R1–R21 a O1–O9 bez zmeny (D4 „predvolené preskočiť" platí), nová funkcia nepribúda. **Má prednosť pred §6 a §15 tabuľkou.**
+Mená a signatúry U2 = PACKAGE_U2 **R4.8**, U3 = PACKAGE_U3 R-I/R-J/R-N po §15.1.
+
+- **B (úpravy priamo v §6):** **R-J1** volá `restore_backup!(id, plugins_dir:, seen_fingerprint:)` vždy s odtlačkom z `diff_documents(…, attachment_rels: peek['attachment_rels'])`, ktorý drží server; **R-C2**
+  jediný tvar plánu vrátane vetvy `'diff' => 'unknown'` (skupina ako s lokálnymi zmenami, veta R17, voľba R-C4) a `used` ∈ `true/false/null/"unknown"`; **R-C2/R-C5/R-J3** — `seen_fingerprint`
+  drží server pri tikete, klient posiela len akciu; server zloží jediný tvar `decisions = {g => {action:, seen_fingerprint:}}` (U3 R-J2); **R-D3** `{entry_key => :unknown}` v tvare U3 R-N1;
+  **R-N** prevzatá skupina konflikt príloh nehlási, `attachment_conflict` = skupina sa neprevzala (U4 §15.2/§15.7).
+- **C1/C2 v okne:** okno dopadov pred „Vrátiť zálohu" chráni aj prílohy archivované v zálohe (zmena po zobrazení → `:changed`, veta „otvor okno znova"); návrat ich vráti (U2 15.11 C1) —
+  v okne bez novej vety (veta „Súčasný stav sa najprv uloží ako ďalšia záloha" platí aj pre prílohy).
+- **Regresné testy** (`tests/pure/test_u5a_library_ui.rb`, JS `tests/js/test_u5_about.js`; stuby U2/U3 s presnými menami R4.8; každý s mutáciou):
+
+| Nález | Test | Scenár | Očakávanie |
+|---|---|---|---|
+| U5/1 | `test_restore_backup_passes_seen_fingerprint` | `lib_backup_preview` (stub `backup_peek` s `attachment_rels: ['template_previews/x.png']`, `diff_documents` vráti seen F) → `lib_backup_restore {backup_id}` | stub `restore_backup!` dostal `seen_fingerprint: F` a `plugins_dir:`; **mutácia** (volanie bez `seen_fingerprint:`) → test padne |
+| U5/1 | `test_restore_backup_changed_after_preview` | po náhľade stub `restore_backup!` vráti `[:changed, veta]` | natívna veta U2 bez úprav, žiadny ďalší zápis, okná sa znova otvoria, `lib_scan` |
+| U5/1 | `test_restore_backup_impact_window` | záloha, v ktorej chýba materiál „Lucia biela 18" použitý v modeli, `price_changed` true | okno dopadov: červený riadok „používa ho otvorená zákazka", veta R17, nadpis „Vrátiť Materiály na stav z …?" |
+| U5/3 | `test_plan_rebuilt_when_model_switched` | plán nad modelom A (`Panel.model_guid` GA, `used_sha` S1) → stub prepne na model B (GB) → `lib_take_commit` | `take_commit` sa **nezavolá**, nový plán (`SS.libTake`) s vetou „Otvorená zákazka sa medzitým zmenila…", tiket ten istý |
+| U5/3 | `test_plan_rebuilt_when_usage_changed` | ten istý model, `used_ids` po pláne pribudne použitie zmiznutého materiálu (SHA S2) | ako vyššie; nový plán ukáže riadok „používa ho otvorená zákazka" |
+| U5/4 | `test_used_unknown_visible_materials_and_appliances` | `Materials.used_material_ids` a `BudgetStore.appliances` vyhodia výnimku | `used_ids` = `{'materials' => :unknown, 'appliances' => :unknown}` + log; plán: zmiznuté záznamy `used: "unknown"`, jantárová veta R-D3 pri oboch skupinách; nikdy prázdna množina |
+| U5/4 | `test_diff_unknown_branch` (JS + Ruby) | stub `diff` vráti `'documents' => :unknown` pre Materiály bez lokálnych zmien | plán `'diff' => 'unknown'`, veta „Nepodarilo sa porovnať…", veta R17, voľba R-C4 s predvoleným preskočiť; potvrdenie bez zmeny voľby → `decisions['materials'][:action] == :skip` |
+| U5/7 | `test_resolve_admin_from_menu` | `status['admin']` = `conflict`, kandidáti A, B (rovnaké `seq`) | „⋯" na oboch PC má „Ponechať správcu: A…" a „Ponechať správcu: B…"; klik A na PC B → potvrdenie → `lib_resolve_admin {pc_id: A}` → stub `resolve_admin!('A')` zavolaný **raz** → `lib_scan`; Odoslať na B sa nekreslí; mimo `conflict` položky nie sú |
+| B | `test_attachment_conflict_result_text` | výsledok skupiny `attachment_conflict` `[{rel, label: 'Dub Halifax'}]`; iná skupina `taken` s `attachments.replaced: 2` | veta „Materiály sa neprevzali: vzhľad/list Dub Halifax sa líši…"; pri `taken` žiadny dovetok o prílohách |
+
+- **Rez:** U5a +~15 riadkov (server drží `seen`, vetva `'unknown'`, `used` trojstav) → **~735**; poistka U5a ~780 platí. U5b bez zmeny (~470).

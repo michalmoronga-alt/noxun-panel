@@ -8,7 +8,7 @@
 > ([SYNC_KNIZNICE_NAVRH_2026-09-06.md](../../next_sessions/SYNC_KNIZNICE_NAVRH_2026-09-06.md)) platí len §3 „Čo ostáva".
 > **Trieda Ť · audit-povinná (nový modul) · predrecenzia · U3b výrobná/cenová (export test P == K) · R0 sonda Disku pred zmrazením.** Rez **U3a → U3b** (§2), jeden audit.
 > **Stav kódu:** sonda nad `main` `a9e8c79d` (v0.18.1, po #474). U2 ešte nie je v kóde — U3 používa jej API **presne podľa PACKAGE_U2 vrátane jeho §15** (§6 R-I).
-> **Audit návrhu (Codex astra, 17.10.): 3 BLOCKER · 6 FIX · 1 NOTE — zapracované priamo do §6; mapa nález → požiadavka v §15.**
+> **Audit návrhu (Codex astra, 17.10.): 3 BLOCKER · 6 FIX · 1 NOTE — zapracované priamo do §6; mapa nález → požiadavka v §15. Delta audit 17.10. — integračné zladenie §15.1 (prednosť pred §6).**
 
 ---
 
@@ -125,8 +125,9 @@ Roly `-Role writer` (Michal) / `-Role reader` (Lucia); časy monotónne v rámci
 
 - **R-B1 lokálny stav = `LibraryTransfer.sync_state` / `update_sync_state!(group_key, entry)`** (U2 R4.5; súbor `library_sync.json` a jeho riadok registra pridáva **U2**). U3 definuje obsah:
   `entry = { version, id, fingerprint (group_fingerprint po prevzatí/odoslaní — pri prevzatí z `result['fingerprints']` po usadení), plugin, at, origin: take|publish|revert,
-  publisher_pc_id (R-C4), pending: {target_id, target_version, before_fingerprint, started_at} | nil, attachments_digest }` — pole `attachments_digest` je **rezervované pre U4** (význam, plnenie
-  a vplyv na `status`: [PACKAGE_U4.md](PACKAGE_U4.md) R5.1–R5.2); U3 ho len prenáša. Údaje PC cez `LibraryTransfer.update_sync_meta!` (U2 R4.5): `pc_id` (UUID vzniknutý raz),
+  publisher_pc_id (R-C4), pending: {target_id, target_version, before_fingerprint, started_at} | nil, attachments_digest, local_replace_digest }` — polia `attachments_digest`
+  a `local_replace_digest` sú **rezervované pre U4** (význam, plnenie a vplyv na `status`: [PACKAGE_U4.md](PACKAGE_U4.md) R5.1–R5.2, §15.4, §15.7 C3); U3 ich len prenáša a pri zarovnaní
+  `entry` (R-F3) ich **nedopĺňa** — chýbajúci `local_replace_digest` rieši výhradne pravidlo U4 §15.7. Údaje PC cez `LibraryTransfer.update_sync_meta!` (U2 R4.5): `pc_id` (UUID vzniknutý raz),
   `drive_root` (R-A1), `admin` (true = toto PC sa vyhlásilo za správcu, R-C3). Degradovaný stav (U2) = Odoslať aj Aktualizovať odmietnuté s dôvodom.
 - **R-B2 zámok operácie** `library_sync.lock` (`Materials.dir`, nový záznam `LibraryRegistry::LOCKS` — pridáva U3): `flock(LOCK_EX | LOCK_NB)`; obsadený → `:busy` „Iné okno práve odosiela
   alebo aktualizuje knižnicu". Drží sa počas celej operácie vrátane vlákna. **Vonkajší** voči zámkom U2 (`materials.lock` a ďalšie berie `LibraryTransfer` vnútri, postupne — F4).
@@ -217,28 +218,31 @@ Roly `-Role writer` (Michal) / `-Role reader` (Lucia); časy monotónne v rámci
 
 ### R-I · API U2, ktoré U3 používa (presne podľa PACKAGE_U2)
 
+> **Autorita mien a signatúr = PACKAGE_U2 R4.8** (tabuľka zladená 17.10., U2 §15.11). Táto tabuľka ju len mapuje na požiadavky U3; pri rozdiele platí U2 R4.8.
+
 | U3 potrebuje | API U2 | Pozn. |
 |---|---|---|
 | skupiny, poradie, závislosti | `LibraryRegistry.groups`, `members(g)`, `library_members(g)`, `depends_on`, `dependents` (R1.2–R1.3) | `members` = poradie prevzatia, prílohy pred dokumentom |
 | obsah na odoslanie a lokálny odtlačok | `LibraryTransfer.export_group(g)` → `[:ok, packet]` (R4.1) | `packet['documents']`, `['attachment_refs']`, `['fingerprints']`, `['plugin_version']` |
 | bajty na Disk, odtlačok | `canonical_bytes(doc)`, `fingerprint(doc)` (R4.6) | `group_fingerprint` skladá U3 (R-A5) |
-| prevzatie celej skupiny | `import_group!(g, packet, plugins_dir:, reason:)` (R4.2) | brány, záloha, návrat, druhé okno, UNI, `after_import!`; kódy R4.7 |
-| zálohy | `create_backup!`, `backups(g)`, `restore_backup!(id, plugins_dir:)` (R4.3) | U3 vlastné zálohy **nerobí** |
+| prevzatie celej skupiny | `import_group!(g, packet, plugins_dir:, reason:, tag: nil, replacements: [])` (R4.2, U2 15.9, 15.11) | brány, záloha, návrat, druhé okno, UNI, `after_import!`, náhrady príloh U4; kódy R4.7 |
+| zálohy | `create_backup!`, `backups(g)`, `restore_backup!(backup_id, plugins_dir:, seen_fingerprint: nil)` (R4.3, U2 15.10, 15.11) | U3 vlastné zálohy **nerobí** |
 | lokálny stav | `sync_state`, `update_sync_state!(g, entry)` (R4.5) | obsah `entry` R-B1 |
 | verzia | `import_allowed?(v)`, `export_allowed?(disk_v)`, `compare_versions(a, b)` (R5) | R-G1, R-G2 |
-| obnova po páde | `recover_pending!(plugins_dir)` (R4.9; volá `main.rb` pri boote pred `Materials.boot_cutover!`; žurnál `library_import.pending.json`, `last_recovery`, `pending_issue`) | R-J5 |
+| obnova po páde | `recover_pending!(plugins_dir)` (R4.9; volá `main.rb` pri boote pred `Materials.boot_cutover!`; žurnál `library_import.pending.json`) · čítače `last_recovery`, `pending_issue` (U2 R4.8, 15.11) | R-J5 |
 | zneplatnenie zobrazenia | výsledok `import_group!`/`restore_backup!` s `'refresh' => true` (R4.10) | R-J4 (U3 prenesie, `push_state` robí U5) |
 | podmienky operácií | U2 §15.0: bez inej inštancie, okná knižníc zatvorené (`:dialogs_open`), synchrónne na hlavnom vlákne | U3 volá `export_group`/`import_group!`/`restore_backup!` len synchrónne; bariéru okien robí U5 |
 | blok po prerušení | `pending_block(entry_key = nil)` (U2 §15.1) | R-F1 `blocked`, R-J2 |
 | čítanie stavu bez bariéry | **`peek_group(g)` — požiadavka §12 D10** | R-F1, R-N1 |
 | doklad dokončenia | **`import_group!(…, tag:)`, `import_done(tag)`, `ack_import_done!(tag)` — požiadavka §12 D11** | R-J5 |
-| lokálny stav pre rozhodnutie | `local_fingerprint(group_key)` (U2 15.10) | `seen_fingerprint` v R-J2, R-L2, R-N1, R-N3; `restore_backup!` |
-| náhľad zálohy | `backup_peek(backup_id)` → `[:ok, {group, documents, fingerprints}]` \| `[:broken \| :missing, veta]`; `restore_backup!(…, seen_fingerprint:)` (U5 D15) | R-K, R-N3 |
+| lokálny stav pre rozhodnutie | `local_fingerprint(g, attachment_rels: [])` (U2 15.10, 15.11 C2) | `seen_fingerprint` v R-J2, R-L2, R-N1, R-N3; `attachment_rels` = `local` cesty príloh skupiny z manifestu tiketu (R-N1) |
+| náhľad zálohy | `backup_peek(backup_id)` → `[:ok, {'group','documents','fingerprints','attachment_rels'}]` \| `[:broken \| :missing, veta]` (U2 15.10, 15.11) | R-K, R-N3 |
+| zámok prílohy | `with_store_lock(entry_key)`, `entry_key = LibraryAttachments.row_for(local_rel)` (U2 R4.4, U4) | R-M1 |
 | **U3 → U5 (požiadavky U5 §12)** | `resolve_admin!` (D13), `diff` s `attachment_conflicts` (D14), `diff_documents`, `revert_prepare`, `revert!(g, ticket, note:, seen_fingerprint:)` (D15) | R-C5, R-N1, R-N3, R-L2 |
 
 **Doplnené v U2** (§12 D6): (a) `update_sync_meta!` pre údaje PC (`pc_id`, `drive_root`, `admin`); (b) predpoklad R4.2 krok 2 „prílohy už ležia" — U3 ich uloží
 pred `import_group!` (R-M), ale riadky prílohy majú v registri `lock` (`materials.lock`, `appliances.json.lock`, `templates.json.lock` drží volajúci) → U3 potrebuje
-**verejný obal zámku** `LibraryTransfer.with_store_lock(entry_key)` (dnes R4.4 interný) alebo `place_attachments!` v U2.
+**verejný obal zámku** `LibraryTransfer.with_store_lock(entry_key)` — **vyriešené** v U2 R4.4 (verejný, parameter vždy `entry_key`; `place_attachments!` v U2 nevzniká).
 
 ### R-J · Prevzatie (U3b; R4, R6)
 
@@ -246,14 +250,20 @@ pred `import_group!` (R-M), ale riadky prílohy majú v registri `lock` (`materi
   vymeniť) → tiket. Neúspešná skupina = `syncing`/`broken`, ostatné pokračujú.
 - **R-J2 `take_commit(ticket, decisions:, plugins_dir:)`** (hlavné vlákno, synchrónne — U2 §15.0): zámok R-B2 · R-G1 · `pending_block` → `blocked` · **zastaraný tiket (audit 3):**
   pod zámkom sa odmietne (`stale_ticket`, nezávisle od `:overwrite`), keď `ticket.version ≤ entry.version` alebo tiket nie je **posledný pripravený** v tomto procese (sekvencia
-  tiketov); cesta dozadu existuje len cez Vrátiť (R-L2). `decisions = { g => {action: :take | :overwrite | :skip, seen_fingerprint:} }`: `LibraryTransfer.local_fingerprint(g)`
-  (U2 15.10 — jediná definícia lokálneho stavu) **≠ `seen_fingerprint`** (hodnota z `diff`, nad ktorou používateľ rozhodol) → `skipped_changed` **aj pri `:overwrite`**; lokálne zmeny bez `:overwrite` → `skipped` (R4). Vráti aj
-  `dependents_skipped` z `LibraryRegistry.dependents` (text U5).
-- **R-J3 poradie per skupina** (v poradí `GROUPS`): (1) `pending = {target_id, target_version, before_fingerprint, started_at}` do stavu · (2) prílohy R-M · (3) packet = `{group, plugin_version: manifest.plugin, documents: JSON.parse(staged d/*),
-  attachment_refs, fingerprints}` → `import_group!(g, packet, plugins_dir:, reason: 'prevzatie verzie N', tag: target_id)` · (4) `:ok` → `update_sync_state!` (`fingerprint` z `result['fingerprints']`
+  tiketov); cesta dozadu existuje len cez Vrátiť (R-L2). **Jediný tvar rozhodnutí (zladené 17.10., §15.1):** `decisions = { g => {action: :take | :overwrite | :skip, seen_fingerprint: String} }`
+  (Ruby Symboly; U5 server prevedie JSON klienta na tento tvar; iný tvar alebo chýbajúci `seen_fingerprint` = skupina `:skip`). `LibraryTransfer.local_fingerprint(g, attachment_rels: ticket_rels(g))`
+  (U2 15.10/15.11 — jediná definícia lokálneho stavu; `ticket_rels(g)` = `local` cesty príloh skupiny z manifestu tiketu, rovnaké ako pri `diff`) **≠ `seen_fingerprint`** → `skipped_changed`
+  **aj pri `:overwrite`**; lokálne zmeny bez `:overwrite` → `skipped` (R4). **Lokálne zmeny** pri commite = stav `local_changes`/`newer_and_local` **alebo** `peek_group` `:unknown`
+  (konzervatívne — bez overenia sa nikdy neprepíše bez `:overwrite`). Vráti aj `dependents_skipped` z `LibraryRegistry.dependents` (text U5).
+- **R-J3 poradie per skupina** (v poradí `GROUPS`): (1) `pending = {target_id, target_version, before_fingerprint, started_at}` do stavu · (2) prílohy R-M: pre každú prílohu manifestu
+  `LibraryAttachments.place(staged_abs, local_rel, sha256, resolve: decisions[g][:action] == :overwrite ? :overwrite : :policy)` pod `with_store_lock(row_for(local_rel))`; ktorákoľvek
+  `action == 'conflict'` → skupina `attachment_conflict` so zoznamom `[{rel, label}]`, `import_group!` sa **nevolá**, `entry` sa neposúva, `pending: nil` (U4 §15.2); položky `'replacement'`
+  sa zozbierajú do `replacements` · (3) packet = `{group, plugin_version: manifest.plugin, documents: JSON.parse(staged d/*),
+  attachment_refs, fingerprints}` → `import_group!(g, packet, plugins_dir:, reason: 'prevzatie verzie N', tag: target_id, replacements: replacements)` (U2 R4.8; U4 §15.1 — bez tohto parametra
+  sa náhrada nevykoná ani nezažurnáluje) · (4) `:ok` → `update_sync_state!` (`fingerprint` z `result['fingerprints']`
   po usadení, `publisher_pc_id`, `pending: nil`) → `ack_import_done!(target_id)`; iný kód → výsledok so slovenskou vetou U2, `pending: nil` okrem `:failed_restore_failed` (ostáva, U5 ponúkne „Vrátiť zálohu").
   `:other_instance` / `:other_instance_unknown` na prvej skupine → zvyšok sa nespúšťa („Zavri ostatné okná SketchUpu").
-- **R-J4 výsledok per skupina:** `taken` · `skipped` · `skipped_changed` · `syncing` · `broken` · `plugin_mismatch` · + kódy U2 R4.7 bez prekladu; `'refresh'` z U2 sa prenesie (U5). Staging sa zmaže po dobehu;
+- **R-J4 výsledok per skupina:** `taken` · `skipped` · `skipped_changed` · `stale_ticket` · `blocked` · `attachment_conflict` (U4 §15.2, nesie `[{rel, label}]`) · `syncing` · `broken` · `plugin_mismatch` · + kódy U2 R4.7 bez prekladu; `'refresh'` z U2 sa prenesie (U5). Staging sa zmaže po dobehu;
   zvyšky staršie ako 24 h zmaže najbližšie `take_prepare`.
 - **R-J5 (A1 S1) prerušené prevzatie:** `version`/`id`/`fingerprint` prevzatej verzie sa do `entry` zapíšu **až po `:ok` celej skupiny** (R-J3 krok 4), nikdy po jednom store-e.
   Pád počas `import_group!` rieši pri štarte **`LibraryTransfer.recover_pending!`** (U2 R4.9, žurnál `library_import.pending.json`, volá ho `main.rb` pred `Materials.boot_cutover!`,
@@ -263,22 +273,23 @@ pred `import_group!` (R-M), ale riadky prílohy majú v registri `lock` (`materi
 
 ### R-K · Zálohy (O5) — len cez U2
 
-U3 vlastné zálohy nerobí. „Vrátiť zálohu" = okno dopadov z `backup_peek(id)` + `diff_documents` (R-N3) → `restore_backup!(id, plugins_dir:, seen_fingerprint:)` pod zámkom R-B2
-(nesúlad → `:changed` bez zápisu, U2); `entry` sa **nemení** (východisko ostáva poslednou prevzatou verziou → správne
+U3 vlastné zálohy nerobí. „Vrátiť zálohu" = okno dopadov z `backup_peek(id)` + `diff_documents(g, peek['documents'], used_ids:, attachment_rels: peek['attachment_rels'])` (R-N3)
+→ `restore_backup!(id, plugins_dir:, seen_fingerprint:)` pod zámkom R-B2 (nesúlad vrátane archivovaných príloh → `:changed` bez zápisu; návrat vráti aj archivované prílohy — U2 15.11 C1); `entry` sa **nemení** (východisko ostáva poslednou prevzatou verziou → správne
 `local_changes`). Zoznam = `backups(g)`. Riadok `library_backups/` pridáva U2 (R1.4).
 
 ### R-L · História a Vrátiť verziu (R5, O5)
 
 - **R-L1** `history(g)` = R-D5; Vrátiť len pri `admin_state == self`.
 - **R-L2 dvojfázové Vrátiť (U5 D15):** `revert_prepare(g, version_id)` vo vlákne = `verify_version` + staging ako R-J1 → tiket (okno dopadov: `diff` nad tiketom, R-N1, `seen_fingerprint` z `local_fingerprint`);
-  `revert!(g, ticket, note:, seen_fingerprint:)` (hlavné vlákno): R-G1 (iný plugin → „verzia je z iného pluginu") · `local_fingerprint(g)` ≠ `seen_fingerprint` → `skipped_changed` ·
-  tiket nie je posledný pripravený → `stale_ticket` (výnimka z R-J2 „verzia ≤ entry.version" — návrat dozadu je tu zámerný) → prevzatie lokálne cestou R-J3 (záloha a návrat U2) →
+  `revert!(g, ticket, note:, seen_fingerprint:)` (hlavné vlákno): R-G1 (iný plugin → „verzia je z iného pluginu") · `local_fingerprint(g, attachment_rels: ticket_rels(g))` ≠ `seen_fingerprint` → `skipped_changed` ·
+  tiket nie je posledný pripravený → `stale_ticket` (výnimka z R-J2 „verzia ≤ entry.version" — návrat dozadu je tu zámerný) → prevzatie lokálne cestou R-J3 s `action: :overwrite`
+  (správca potvrdil okno dopadov; `replacements:` ako pri prevzatí; záloha a návrat U2) →
   odoslanie **bajtov tej verzie bez nového exportu** ako `N+1` s `reverted_from` a poznámkou „Návrat na verziu K z <dátum>". Zlyhanie odoslania → lokálne K, stav `local_changes`.
   Stará verzia sa nemení ani nemaže.
 
 ### R-M · Prílohy len pribúdajú (A4 B9, rozhranie pre U4)
 
-- **R-M1 uloženie prílohy** = `LibraryAttachments.place(staged, local_rel, sha256)` pod `LibraryTransfer.with_store_lock` — **politiku, overenie, žurnál náhrad
+- **R-M1 uloženie prílohy** = `LibraryAttachments.place(staged_abs, local_rel, sha256, resolve:)` (signatúra U4 §15.7) pod `LibraryTransfer.with_store_lock(LibraryAttachments.row_for(local_rel))` — **politiku, overenie, žurnál náhrad
   a upratanie definuje U4** ([PACKAGE_U4.md](PACKAGE_U4.md) R4.1, R1.6, D10). U3 len volá `place` pre každú prílohu manifestu pred `import_group!` a výsledok prenesie.
   Do U4 platí len: chýbajúci cieľ sa doplní, existujúci sa nemení. **Nikdy nič nemaže.**
 - **R-M2** prílohy idú **pred** `import_group!` (U2 R4.2 krok 2 ich overuje — `:missing_attachments`).
@@ -287,15 +298,20 @@ U3 vlastné zálohy nerobí. „Vrátiť zálohu" = okno dopadov z `backup_peek(
 ### R-N · Zoznam zmien pre varovanie R4 (A4 B5, R17) — nad `peek_group`, overené `export_group` pri commite
 
 - **R-N1 `diff(g, ticket, used_ids: {})`** (hlavné vlákno, pred rozhodnutím R4 pri otvorenom okne): lokálne dokumenty z `peek_group(g)` vs. dokumenty zo stagingu tiketu
-  (tie isté bajty, ktoré sa importujú); výsledok nesie `seen_fingerprint` = `LibraryTransfer.local_fingerprint(g)` v okamihu diffu (pre R-J2) a **`attachment_conflicts: [{rel, label}]`** (U5 D14, U4 §15.2: povinná príloha
-  tiketu, ktorej lokálny súbor pod rovnakým menom má iné SHA — len čítanie). `peek_group` `:unknown` → `diff: :unknown` (U5 ukáže všeobecné varovanie R4).
-  Per knižnica `{ added:[{id,label}], changed:[{id,label,fields}], removed:[{id,label,used}] }`; `used = used_ids[entry_key].include?(id)` — množinu použitých ID otvorenej zákazky
-  dodá U5 (potrebuje model; napr. `Materials.used_material_ids`), U3 ju len prenesie do výsledku.
+  (tie isté bajty, ktoré sa importujú). **Jediný tvar výsledku (zladené 17.10., §15.1):**
+  `{ 'documents' => {entry_key => {added:[{id,label}], changed:[{id,label,fields}], removed:[{id,label,used,where}]}} | :unknown, 'price_changed' => bool, 'seen_fingerprint' => String,
+  'attachment_conflicts' => [{rel, label}] }`. `seen_fingerprint` = `LibraryTransfer.local_fingerprint(g, attachment_rels: ticket_rels(g))` v okamihu diffu (pre R-J2; zahŕňa prílohy, ktoré môže
+  rozhodnutie prepísať — U2 15.11 C2); `attachment_conflicts` (U5 D14, U4 §15.2): povinná príloha tiketu, ktorej lokálny súbor pod rovnakým menom má iné SHA — len čítanie. **`peek_group`
+  `:unknown` → `'documents' => :unknown`, `'price_changed' => true`** (konzervatívne — veta R17 sa ukáže); `seen_fingerprint` a `attachment_conflicts` sa vrátia aj vtedy (`local_fingerprint`
+  funguje nad poškodeným primárom).
+  **`used_ids`** (dodá U5 R-D, potrebuje model): `{ entry_key => {id => [kde]} | :unknown }`. Pre zmiznutý záznam: hodnota je Hash → `used = hash.key?(id)`, `where = hash[id] || []`;
+  hodnota je `:unknown` → `used: :unknown` (U5 R-D3 — „nepodarilo sa zistiť"); kľúč chýba (knižnica, kde sa použitie zámerne neoveruje — kovanie, šablóny, sadzby) → `used: nil`.
+  Na hodnote sa **nikdy** nevolá `.include?` ani iná metóda bez kontroly typu (`case`).
 - **R-N2 tabuľka záznamov** v U3 (`LibrarySync::RECORDS`): per `entry_key` cesta k poľu záznamov, kľúč identity a popisu (napr. `materials` → pole položiek, `id`, `name`);
   `fields` = mená najvyššej úrovne s odlišným `canonical_bytes`. Pole cien (`price*`, sadzby) sa označí `price_changed: true` pre vetu R17. Tvary dokumentov overí implementátor
   sondou na kóde pred písaním tabuľky; store bez stabilného ID → len počet zmien (§12 D7).
-- **R-N3 `diff_documents(g, documents, used_ids:)`** (U5 D15): rovnaký výpočet a tvar ako `diff` (vrátane `seen_fingerprint` = `local_fingerprint(g)`, bez `attachment_conflicts`) nad ľubovoľnými cieľovými
-  dokumentmi — pre okno dopadov pred „Vrátiť zálohu" (dokumenty z U2 `backup_peek`).
+- **R-N3 `diff_documents(g, documents, used_ids:, attachment_rels: [])`** (U5 D15): rovnaký výpočet a tvar ako `diff` (vrátane `seen_fingerprint` = `local_fingerprint(g, attachment_rels:)`;
+  `attachment_conflicts` = `[]`) nad ľubovoľnými cieľovými dokumentmi — pre okno dopadov pred „Vrátiť zálohu" (dokumenty a `attachment_rels` z U2 `backup_peek`).
 
 ### R-O · Register, verzie a dokumentácia
 
@@ -328,6 +344,7 @@ U3b so skutočnou U2):
 | lokálne zmeny | po prevzatí `current`; po úprave `local_changes`; po zmene VERSION úprava pred aktualizáciou ostane `local_changes` (audit 2) |
 | diff | pridané/zmenené/zmiznuté, `used` z `used_ids`, `price_changed` |
 | guardy | čistota (R-O4); telá vlákien (R-E4); žiadny `JsonFileStore`/`.tmp` nad `<root>`; register (S13) |
+| **regresia delty 17.10.** | pomenované testy s presným scenárom a očakávaním v **§15.1** (audit 1–9, U4/1 `replacements:`, C2, `used` `:unknown`, `diff` `:unknown`) — povinné, každý s mutáciou |
 
 **Koncový scenár („dve PC" = dva sandboxy `Materials.dir` + jeden „Disk"):** A claim → odošle všetko (v1) → B `never_taken` → prevezme → `current` → A zmení Materiály, odošle (v2)
 s poznámkou → B `newer` + poznámka → B zmení Materiály → `newer_and_local` → `:skip` (Kovanie prevzaté) → `:overwrite` → záloha U2 + prevzatie → A Vrátiť v1 → B dostane v3 = v1.
@@ -415,6 +432,37 @@ súbory koreňa) · STAV · KRONIKA · PLAN ✅ + PR · D-48 ostáva otvorený (
 | 9 | FIX zametanie maže priečinok bez ukazovateľa | platný | **R-H7** 5 skutočných publikácií, mazanie len s ukazovateľom alebo z `failed.json`, bez veku |
 | 10 | NOTE S1–S5 nie všetky uzavreté | platný ako stav | S1–S3 = návrh U2 §15 (dôkaz až implementáciou U2b); S4 čiastočne do smoke U5 (U2 §15.7); S5 v U3 opravené bodmi 1 a 6; R0 nedokazuje budúce poradie — návrh od poradia nezávisí (R-D3), mená konfliktov blokujú konzervatívne (R-D2) |
 | 11 | (U5 §12 D13–D15) API pre okno | doplnené | **R-C5** `resolve_admin!`, **R-N1** `attachment_conflicts`, **R-N3** `diff_documents`, **R-L2** `revert_prepare`/`revert!`, **R-K** `backup_peek` + `seen_fingerprint`; všetky `seen_fingerprint` z U2 `local_fingerprint` (15.10) |
+
+**15.1 Integračné zladenie (delta 17.10.)** — [AUDIT_DELTA_raw.md](AUDIT_DELTA_raw.md) A (U3/1–9 CIASTOCNE, U4/1), B, C2; mapa [INTEGRACIA_2026-10-17.md](INTEGRACIA_2026-10-17.md). R1–R21 a O1–O9 bez zmeny,
+nová funkcia nepribúda. **Má prednosť pred §6 tam, kde sa líši.**
+
+- **B · rozhrania (úpravy priamo v §6):** R-I cituje autoritu **U2 R4.8** (`library_members`, `pending_block`, `last_recovery`, `pending_issue`, `with_store_lock(entry_key)`); **R-J3** posiela
+  `replacements:` a `tag:` do `import_group!` a zastaví skupinu pri `conflict` prílohy (`attachment_conflict`); **R-J2** jediný tvar `decisions[g] = {action:, seen_fingerprint:}` a `peek_group :unknown`
+  pri commite = lokálne zmeny; **R-N1** jediný tvar výsledku `diff` vrátane vetvy `'documents' => :unknown` a trojstavového `used` (`true/false` · `:unknown` · `nil`) bez `.include?`;
+  **R-N3** `diff_documents(…, attachment_rels:)`; **R-K** návrat zálohy s `seen_fingerprint` nad archivovanými prílohami; **R-L2** Vrátiť verziu cez `:overwrite` s `replacements:`.
+- **C2 · `seen_fingerprint` chráni prílohy:** všade `local_fingerprint(g, attachment_rels: ticket_rels(g))`, `ticket_rels(g)` = `local` cesty príloh skupiny z manifestu tiketu (odvodené na serveri,
+  klient ich neposiela).
+- **Regresné testy** (`tests/pure/test_u3a_library_sync.rb` = U3a, `test_u3b_library_sync.rb` = U3b; každý s mutáciou):
+
+| Nález | Test | Scenár | Očakávanie |
+|---|---|---|---|
+| U3/1 | `test_publish_selects_edited_group_despite_entry` (U3b) | A odošle Materiály v1 (`entry.fingerprint` = Disk = F1) → zmena ceny dosky (čerstvý export F2) → `publish_prepare` | Materiály vybrané a odoslané ako v2; **mutácia** (výber cez `entry.fingerprint`) → test padne |
+| U3/1 | `test_publish_after_plugin_bump_selects_all` (U3b) | obsah nezmenený, Disk `head.plugin` = `0.18.1`, stub `Engine::VERSION` = `0.18.2` | všetky skupiny na Disku vybrané, nové ukazovatele nesú `plugin 0.18.2` |
+| U3/2 | `test_edit_before_plugin_update_stays_local_changes` (U3a) | B prevezme v1 (`current`, `entry.plugin 0.18.1`) → B zmení cenu **bez** ďalšieho `status` → stub VERSION `0.18.2` → `status` | `local_changes` s dôvodom „po aktualizácii pluginu…"; `take_commit` s `:take` → `skipped`, súbor bajtovo bez zmeny; kontrola: bez úpravy a s Diskom v2 od nového pluginu s rovnakým odtlačkom → `current` |
+| U3/3 | `test_stale_ticket_reverse_commit_order` (U3b) | `take_prepare` v5 (T5) a v6 (T6) → commit T6 → commit T5 s `:overwrite` | T5 → `stale_ticket`; knižnica = bajty v6, `entry.version` 6; žiadna nová záloha |
+| U3/3 | `test_disk_behind_no_take` (U3a) | `entry.version` 6, Disk ukazuje najvyššie v5 | stav `disk_behind`, `can_take` false, nič sa nepreberá |
+| U3/4 | `test_late_admin_conflict_after_T` (U3b) | A: kandidát `seq 1` → po lehote T aktivácia (vidí len seba) → odošle v1; B: kandidát `seq 1` doručený **po** T + 5 min | na A aj B `conflict`, `can_send` false; PC C s `publisher_pc_id = A` ďalej preberá od A; ukazovateľ od B = `foreign_publisher`, nikdy prevzatý ani zmazaný; v1 od A ostáva platná |
+| U3/5 | `test_status_and_diff_with_peek_unknown` (U3a) | stub `peek_group` → `[:unknown, …]` | `status` = `unknown` (nikdy `current`); `diff['documents'] == :unknown`, `price_changed` true, `seen_fingerprint` prítomný; `take_commit` s `:take` → `skipped` (konzervatívne lokálne zmeny), s `:overwrite` prejde |
+| U3/5 | `test_diff_used_tristate` (U3a) | `used_ids = {'materials' => :unknown, 'appliances' => {'sp1' => ['rozpočet: X']}}`, zmiznutý materiál a spotrebič `sp1` | materiál `used: :unknown`, spotrebič `used: true, where: ['rozpočet: X']`, kovanie `used: nil`; **mutácia** `.include?` → `NoMethodError` → test padne |
+| U3/6 | `test_r18_distribution_gate` (U3a) | precheck: `same` + iný manifest · `newer` · `older` · výnimka čítania · `same` + zhodný manifest | prvé štyri → `can_send` false so `send_reason`; posledný → povolené |
+| U3/7 | `test_precheck_hang_does_not_block` (U3b) | fake `spawn` s blokom, ktorý nikdy neskončí; `clock` + 61 s | výsledok `timeout` s vetou, `publish_prepare` sa nezavolá, `library_sync.lock` voľný, test sa vráti (hlavné vlákno nečaká); druhé volanie → single-flight `running` |
+| U3/8 | `test_recover_done_before_state_write` (U3b) | `import_group!` s `tag` dobehne, „pád" pred `update_sync_state!` (`entry.pending` nastavené, `import_done(tag)` existuje) → štart | (a): `entry` = verzia a odtlačky z dokladu, `pending: nil`, `ack_import_done!` → doklad zmizol, stav `current`; varianty (b) `last_recovery` → `pending: nil`; (c) `pending_issue` → `pending`, Aktualizovať vypnuté |
+| U3/9 | `test_sweep_keeps_folder_awaiting_pointer` (U3b) | Disk: v1–v7 s ukazovateľmi aktivovaného správcu + priečinok v8 bez ukazovateľa, nie vo `failed.json` | zmazané len v1, v2 (ukazovateľ + priečinok spolu); v8 ostáva; po doručení ukazovateľa v8 `verify_version` ok a v8 = aktuálna |
+| U4/1 | `test_take_passes_replacements_to_u2` (U3b) | B má náhľad šablóny s iným obsahom než verzia (politika `:replace`) | `place` vráti položku `replacement` → `import_group!` dostane `replacements: [{rel,new,old,old_sha256,new_sha256}]` (presné kľúče); žurnál nesie `attachments` v tom istom zápise ako `backup_id`; **mutácia** (bez `replacements:`) → náhľad sa nevymení a test padne |
+| U4/1 | `test_attachment_conflict_stops_group` (U3b) | povinná príloha (`appearances/U.skm`) s iným SHA, rozhodnutie `:take` | `attachment_conflict` so zoznamom, `import_group!` sa nevolá, `entry` bez zmeny, súbor bajtovo pôvodný; s `:overwrite` → náhrada cez `replacements` |
+| C2 | `test_seen_fingerprint_includes_ticket_attachments` (U3b) | `diff` (seen F) → zmena bajtov lokálneho náhľadu z manifestu tiketu → `take_commit` s `:overwrite` | `skipped_changed`, náhľad aj dokumenty bajtovo bez zmeny |
+
+- **Rez:** U3a +~15 riadkov (tvar `diff`, `used`, `:unknown`) → **~555**; U3b +~30 (`resolve:`, `replacements:`, `attachment_conflict`, `ticket_rels`) → **~550**; poistka ~650 platí.
 
 ## 16 · Výsledok sondy R0
 

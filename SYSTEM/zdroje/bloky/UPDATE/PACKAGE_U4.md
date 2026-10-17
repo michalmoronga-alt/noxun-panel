@@ -9,7 +9,7 @@
 > rozhrania [PACKAGE_U2.md](PACKAGE_U2.md) (R1.2 `GROUPS`, R3.2 krok 4, R4.1 `export_group`, R4.2 `import_group!`, R4.4 `with_store_lock`, R4.5 `update_sync_state!`, R4.8) ·
 > [PACKAGE_U3.md](PACKAGE_U3.md) (R-A2/R-A5 manifest a mená na Disku, R-B1 `entry`, R-F1 `status`, R-H1 odoslanie, R-J3 prevzatie, **R-M** `place_attachment`) ·
 > súpis [../../../../docs/architecture/kniznice.md](../../../../docs/architecture/kniznice.md) **F2**.
-> **Audit návrhu (Codex `gpt-6-astra`, 17.10.) zapracovaný v §15 — §15 MÁ PREDNOSŤ pred §1–§14** ([AUDIT_U4_raw.md](AUDIT_U4_raw.md)).
+> **Audit návrhu (Codex `gpt-6-astra`, 17.10.) zapracovaný v §15 — §15 MÁ PREDNOSŤ pred §1–§14** ([AUDIT_U4_raw.md](AUDIT_U4_raw.md)); **delta audit 17.10. — integračné zladenie §15.7**.
 > **Trieda Ť** · audit-povinná (zmena dátového kontraktu zdieľania — pripnutá zdieľaná množina a riadok registra; nový modul) · predrecenzia · **nie výrobná/cenová** (§12 D1) ·
 > in-SU nie je brána · bez rezu (odhad ~300 riadkov kódu pluginu).
 > **Stav kódu:** sonda nad `docs/update-start` `1468dfe2` (kód = `main` `a9e8c79d`, plugin **v0.18.1**). U2/U3 v kóde ešte nie sú — U4 ich API používa **presne podľa ich packages**;
@@ -175,8 +175,8 @@ Načítanie v `main.rb` za `core/library_transfer` (U2) a pred `core/library_syn
 
 ### R4 · Zapojenie do U3 (prevzatie a odoslanie)
 
-- **R4.1 uloženie prílohy** *(náhrada a konflikt → §15.1, §15.2)* (U3 R-M1): `place_attachment(staged, local_rel, sha256, policy:)` sa nahradí volaním `LibraryAttachments.place(staged, local_rel, sha256)` **pod**
-  `LibraryTransfer.with_store_lock(row_for(local_rel))` (U2 R4.4; pre `textures` to po R2.1 vráti `materials.lock`). Postup `place`:
+- **R4.1 uloženie prílohy** *(náhrada a konflikt → §15.1, §15.2; signatúra a výsledok → §15.7)* (U3 R-M1): `place_attachment(staged, local_rel, sha256, policy:)` sa nahradí volaním
+  `LibraryAttachments.place(staged_abs, local_rel, sha256, resolve:)` **pod** `LibraryTransfer.with_store_lock(entry_key)`, `entry_key = row_for(local_rel)` (U2 R4.4/R4.8; pre `textures` to po R2.1 vráti `materials.lock`). Postup `place`:
   1. `safe_local?` a `row_for` — neprejde → výnimka `ArgumentError` (U3 manifest to mal odmietnuť skôr ako `broken`; tu je to poistka).
   2. Cieľ chýba → kópia do `<cieľ>.d48-<r8>` → **SHA-256 kópie = `sha256` manifestu** (inak zmazať kópiu, `IOError`) → `File.rename` → `placed`.
   3. Cieľ existuje, SHA rovnaké → `same`.
@@ -186,8 +186,8 @@ Načítanie v `main.rb` za `core/library_transfer` (U2) a pred `core/library_syn
 - **R4.2 poradie v U3 R-J3** *(NAHRADENÉ §15.1)* (per skupina): (2) prílohy cez R4.1 → žurnál skupiny · (3) `import_group!` · (4) `:ok` → `commit_replaced!(žurnál)`; **iný kód** (vrátane `:failed_restored`,
   `:unhealthy_restored`, `:missing_attachments`) → `rollback_replaced!(žurnál)` — náhľady sa vrátia k JSON, ktorý U2 obnovil zo zálohy; `:failed_restore_failed` → žurnál sa **nechá**
   (súbory `.d48old-*` ostanú, `pending` ostáva — U3 R-J3) a `sweep!` ich nezmaže, kým je `pending`.
-- **R4.3 výsledok skupiny** (U3 R-J4) dostane `attachments: {placed, same, kept, replaced, conflict}` (počty) — U5 ich ukáže len pri `conflict > 0` („N vzhľadov sa líši od Michalových —
-  ponechané tvoje").
+- **R4.3 výsledok skupiny** *(zladené §15.7)* (U3 R-J4) `taken` dostane `attachments: {placed, same, kept, replaced}` (počty; **`conflict` v prevzatej skupine nenastáva** — povinná príloha s iným
+  obsahom buď zastaví skupinu výsledkom `attachment_conflict`, alebo sa pri `:overwrite` nahradí, U4 §15.2). U5 počty neukazuje; vetu skladá len z `attachment_conflict` (U5 R-N).
 - **R4.4** `take_prepare` (U3 R-J1) volá na začiatku `LibraryAttachments.sweep!(now:)`.
 - **R4.5 odoslanie** (U3 R-H1): do outboxu ide `required + optional` z packetu (tvar U2 sa nemení); `attachments_skipped` a `attachments_digest` z packetu prejdú do tiketu. Manifest U3 R-A5
   sa **nemení** (prílohy už nesie s `of`, `local`, `size`, `sha256`).
@@ -233,6 +233,8 @@ Načítanie v `main.rb` za `core/library_transfer` (U2) a pred `core/library_syn
 - Rozšírenie `test_u3b_library_sync.rb` (koncový scenár „dve PC"): A má fotku a náhľad → odošle → B prevezme → B má fotku (SHA) a náhľad → A prefotí náhľad bez zmeny šablóny → A `local_changes`
   „zmenené prílohy", B `current` (nie `local_changes`) → A odošle → B prevezme → náhľad nahradený, `old` zmazaný → simulované zlyhanie `import_group!` (stub `:failed_restored`) → náhľad B
   vrátený na pôvodný (SHA) → B má vlastnú platnú fotku s iným obsahom → `kept`, súbor bez zmeny → list spotrebiča, na ktorý odkazuje snapshot, ostane aj keď ho A z katalógu zmazal.
+- **Integračné testy delty (§15.7):** `test_place_resolve_modes`, `test_u4_1_replacements_reach_journal`, `test_c1_restore_backup_returns_attachment`, `test_c3_first_digest_fill_is_conservative`
+  — scenáre a očakávania v §15.7 (U3 strana: PACKAGE_U3 §15.1 `test_take_passes_replacements_to_u2`, `test_attachment_conflict_stops_group`).
 - H16 sada (SHARED, WRITE_SITES, triedenie, tvar `mixed` prílohy), `test_h13_rozsirovacie_body.rb`, rozcestník ARCHITEKTURA (guard).
 
 **DoD:** `ruby tests/run_all.rb` zelené · JS sady každá zvlášť (nemenia sa) · `ruby scripts/encoding_guard.rb --repo` · R0 na oboch PC v §16 · PR uvedie počty testov, výsledok R0
@@ -323,7 +325,7 @@ mechanizmus obnovy U4 nezavádza** — náhrada prílohy je súčasť transakcie
 `import_group!(…, replacements: [...])` — **nový voliteľný parameter U2 R4.2** (predvolene `[]`; bez neho sa správanie U2 nemení):
 - **Žurnál:** položky sa zapíšu do `library_import.pending.json` pod kľúč `'attachments'` **v tom istom zápise** ako `backup_id` (U2 R4.9), teda **pred prvým premenovaním** aj pred prvým
   zápisom knižnice. Podmienky U2 15.0 (iná inštancia, otvorené okná, hlavné vlákno) platia aj pre prílohy.
-- **Vykonanie** (U2 R4.2 medzi krokmi 3 a 4, pod `with_store_lock(row)` každej položky, postupne): `rename(cieľ → old)` → `rename(new → cieľ)` → SHA cieľa = `new_sha256`, inak zlyhanie
+- **Vykonanie** (U2 R4.2 medzi krokmi 3 a 4, pod `with_store_lock(entry_key)`, `entry_key = row_for(item['rel'])`, každej položky, postupne): `rename(cieľ → old)` → `rename(new → cieľ)` → SHA cieľa = `new_sha256`, inak zlyhanie
   transakcie → návrat.
 - **Návrat `rollback!(backup_id)`** (U2 15.4) sa rozšíri o prílohy žurnálu, **idempotentne podľa stavu súborov** (pád medzi ľubovoľnými dvoma premenovaniami): cieľ má `old_sha256` → hotovo
   (zvyšky `new`/`old` zmazať) · `old` existuje s `old_sha256` → cieľ (ak je) premenovať na `new`, `old` → cieľ · inak → položka `failed`. **`failed > 0` = návrat zlyhal** → žurnál ostáva,
@@ -340,8 +342,8 @@ mechanizmus obnovy U4 nezavádza** — náhrada prílohy je súčasť transakcie
   žurnál ostáva, `pending_block` hlási skupinu; dvojitý `recover_pending!` = rovnaký výsledok.
 
 **15.2 Konflikt povinnej prílohy zastaví skupinu (nález 2).** `appearances` a `appliance_files` s **iným obsahom** pod rovnakým menom: bez rozhodnutia → skupina sa **neimportuje**
-(`import_group!` sa nevolá), `entry` sa **neposúva**, súbor ostáva → výsledok `:attachment_conflict` so zoznamom (`rel`, popis záznamu) — veta U5 „Vzhľad/list … sa líši od verzie správcu —
-prevzatím sa nahradí, tvoj súbor ostane v zálohe". Pri **`decisions[g] = :overwrite`** (to isté rozhodnutie ako varovanie R4) sa konflikt rieši **náhradou podľa 15.1** (pôvodný súbor do zálohy
+(`import_group!` sa nevolá), `entry` sa **neposúva**, súbor ostáva → výsledok `attachment_conflict` so zoznamom (`rel`, popis záznamu) — veta U5 „Vzhľad/list … sa líši od verzie správcu —
+prevzatím sa nahradí, tvoj súbor ostane v zálohe". Pri **`decisions[g][:action] == :overwrite`** (jediný tvar rozhodnutí U3 R-J2; to isté rozhodnutie ako varovanie R4 — U3 volá `place(…, resolve: :overwrite)`, §15.7) sa konflikt rieši **náhradou podľa 15.1** (pôvodný súbor do zálohy
 prevzatia; snapshot zákazky ukazuje na to isté meno, teraz s obsahom správcu). Rozdielna **platná** fotka dekoru ostáva výnimkou (`kept`, bez zastavenia). `POLICIES`: `appearances`,
 `appliance_files` = **`:block`** (namiesto `:keep_local`). **Testy:** konflikt bez `:overwrite` → žiadny zápis knižníc, `entry` bez zmeny, súbor bajtovo pôvodný; s `:overwrite` → obsah
 správcu, pôvodný v `library_backups/<id>/attachments/`.
@@ -354,7 +356,8 @@ nie `*.d48-*`. Mazanie v `library_attachments.rb` len pre cestu spĺňajúcu `TE
 **15.4 Luciino prefotenie náhľadu (nález 4).** `entry` (U3 R-B1) dostane okrem `attachments_digest` (R5.1) aj **`local_replace_digest`** = `digest` (R1.5) nad **skutočnými lokálnymi bajtmi**
 príloh s politikou `:replace` (`template_previews`), na ktoré ukazuje prevzatý dokument — počíta sa **po** úspešnom prevzatí (15.1) a pri odoslaní. `status` na PC **bez správcu**: aktuálny
 ≠ uložený → `local_changes` „zmenený náhľad šablóny" → varovanie R4 (prepísať — pôvodný do zálohy podľa 15.1 — alebo preskočiť). Fotky (`:keep_valid`) a povinné prílohy sa nerátajú —
-ponechaná rozdielna fotka varovanie nevyvolá (fotku používateľ neprefotí, sťahuje sa raz — S3). `entry` bez kľúča (pred U4) → prvý `status` ho doplní bez varovania. **Testy:** B prevezme →
+ponechaná rozdielna fotka varovanie nevyvolá (fotku používateľ neprefotí, sťahuje sa raz — S3). ~~`entry` bez kľúča (pred U4) → prvý `status` ho doplní bez varovania.~~ **NAHRADENÉ §15.7 C3**
+(chýbajúci kľúč sa nikdy neberie ako čistý základ). **Testy:** B prevezme →
 `current`; B prefotí náhľad bez zmeny šablóny → `local_changes`; `:overwrite` → náhľad správcu, Luciin v zálohe; B s rozdielnou platnou fotkou → `current`.
 
 **15.5 Dĺžka ciest overená na oboch PC (nález 5).** R0 dostane **prijímacie kritérium**: skript vypíše `len(Materials.dir)` PC a pre najdlhšiu finálnu relatívnu cestu každého druhu
@@ -364,6 +367,34 @@ oboch PC))`, zapíše sa do §16. Dovtedy je prenositeľnosť mien **podmienená
 
 **15.6 Dopad na rozsah.** Kód pluginu +~60 (prílohy v žurnáli, `rollback!` a `recover_pending!` U2, `:block`, `local_replace_digest`) → **~360**; poistka §2 (400) platí. U4 teraz mení aj
 **transakciu U2** → odporúčaný **delta audit len na 15.1** (rozhodne orchestrátor); predrecenzia dostane aj PACKAGE_U2 §15. Trieda a brány (§5) bez zmeny.
+
+**15.7 Integračné zladenie (delta 17.10.)** — [AUDIT_DELTA_raw.md](AUDIT_DELTA_raw.md) A (U4/1, U4/4), B (zámok, `replacements:`, rozhodnutia, výsledok konfliktu), C1–C3; mapa
+[INTEGRACIA_2026-10-17.md](INTEGRACIA_2026-10-17.md). R1–R21 a O1–O9 bez zmeny, nová funkcia nepribúda. **Má prednosť pred 15.1–15.6 a §6, kde sa líšia.** Mená U2 = autorita PACKAGE_U2 R4.8.
+
+- **B · jediná signatúra `place`:** `LibraryAttachments.place(staged_abs, rel, sha256, resolve: :policy)` → `{'rel', 'action' => 'placed' | 'same' | 'kept' | 'conflict' | 'replace', 'replacement' => item | nil}`;
+  `item = {'rel', 'new', 'old', 'old_sha256', 'new_sha256'}` (tvar U2 15.9 (3)). `resolve:` — **`:policy`** = `POLICIES` (riadky `:block` s iným obsahom → `conflict`, nič sa nezapíše) ·
+  **`:overwrite`** = ako `:policy`, ale riadky `:block` s iným obsahom → `replace` (rozhodnutie `decisions[g][:action] == :overwrite`, 15.2; rozdielna platná fotka ostáva `kept`) · **`:force`** = akýkoľvek
+  iný obsah → `replace` bez ohľadu na politiku (len návrat zálohy U2 15.11 C1). `replace` pripraví overenú `<cieľ>.d48new-<r8>` a cieľ nemení (15.1); chýbajúci cieľ = `placed`, rovnaké SHA = `same`.
+  Vždy pod `LibraryTransfer.with_store_lock(entry_key)`, `entry_key = row_for(rel)` — v celom package sa `row` ako meno parametra zámku nepoužíva. U3 R-J3 zbiera `replacement` položky do
+  `import_group!(…, replacements:)` (U4/1 — bez tohto parametra by sa náhrada nevykonala ani nezažurnálovala).
+- **B · výsledok konfliktu:** R4.3 a U5 R-N zladené — prevzatá skupina `conflict` nehlási; konflikt povinnej prílohy = výsledok skupiny **`attachment_conflict`** (U3 R-J4) so zoznamom `[{rel, label}]`.
+- **C1 · návrat zálohy vracia archivované prílohy:** archív náhrad (15.1 „Dokončenie") = `library_backups/<backup_id>/attachments/<rel>` + `backup.json` `attachments: {rel => sha256}`. U2 `restore_backup!(A)`
+  z neho volá `place(<A>/attachments/<rel>, rel, sha256, resolve: :force)` — **kópia, nie presun** (záloha A ostáva použiteľná aj pre ďalší návrat) a vykoná položky v tej istej transakcii
+  ako dokumenty; nahradené súčasné súbory idú do novej zálohy B (U2 15.11 C1). `archive_replacement!` a `apply_replacement!` zvládnu aj `old_sha256 = 'absent'` (cieľ medzitým zmizol → len `new → cieľ`).
+- **C3 · prvé doplnenie `local_replace_digest` nie je čistý základ (U4/4).** Pravidlo 15.4 „prvý `status` ho doplní bez varovania" **zaniká**. `entry` bez `local_replace_digest` na PC bez správcu:
+  (a) prevzatý lokálny dokument neodkazuje na žiadny existujúci súbor s politikou `:replace` → kľúč sa doplní digestom prázdnej množiny, bez varovania (niet čo prepísať); (b) inak → stav
+  **`local_changes`** s dôvodom „náhľady šablón ešte neboli porovnané — prevzatím sa môžu prepísať" → **varovanie R4** (prepísať so zálohou podľa 15.1 alebo preskočiť). Kľúč sa doplní **len** po úspešnom
+  prevzatí (`:take`/`:overwrite`) skutočnými lokálnymi bajtmi po prevzatí; zarovnanie `entry` v U3 R-F3 ani `:skip` ho nedopĺňajú. V praxi (U5 je prvé UI) sa (b) prejaví nanajvýš raz na PC.
+- **Testy (`tests/pure/test_u4_prilohy.rb`, nové názvy; U3b koncový scenár ich volá cez skutočnú U2):**
+  `test_place_resolve_modes` — pre `appearances` s iným obsahom: `:policy` → `conflict` (cieľ bajtovo bez zmeny, žiadny `.d48new-*`), `:overwrite` → `replace` + overená `.d48new-*`, `:force` → `replace`;
+  `textures` s rozdielnou platnou fotkou: `:overwrite` → `kept`, `:force` → `replace`; chýbajúci cieľ → `placed`; podvrhnutý `sha256` → `IOError`, nič nevzniklo.
+  `test_u4_1_replacements_reach_journal` — prevzatie Šablón s prefoteným náhľadom: položka z `place` sa objaví v `library_import.pending.json` `attachments` **v tom istom zápise** ako `backup_id`
+  (stub zápisu žurnálu zaznamená jeden zápis s oboma kľúčmi); po úspechu náhľad = správcov, pôvodný v `library_backups/<id>/attachments/`.
+  `test_c1_restore_backup_returns_attachment` — po `test_u4_1…` `restore_backup!(id)` → náhľad = pôvodný Luciin (SHA), správcov v novej zálohe, záloha `id` bajtovo nedotknutá.
+  `test_c3_first_digest_fill_is_conservative` — `entry` bez `local_replace_digest`: (a) Lucia nemá náhľady → `current`, kľúč doplnený; (b) Lucia má vlastný (prefotený) náhľad šablóny z prevzatého
+  dokumentu → `local_changes` „náhľady šablón ešte neboli porovnané…", `take_commit` s `:take` → `skipped`, náhľad bajtovo bez zmeny; s `:overwrite` → náhľad správcu, Luciin v zálohe, kľúč doplnený;
+  **mutácia** (doplnenie pri prvom `status`) → test padne.
+- **Rez:** +~25 riadkov (`resolve:`, `:force`, `absent` v náhrade, pravidlo C3) → **~385**; poistka §2 (400) platí.
 
 ## 16 · Výsledok inventára R0
 

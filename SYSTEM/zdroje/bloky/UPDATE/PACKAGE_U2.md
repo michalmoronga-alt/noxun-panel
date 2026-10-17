@@ -1,6 +1,6 @@
 # PACKAGE U2 · Prevzatie a export per knižnica (SYNC-0 + háčiky) — blok UPDATE (D-48)
 
-> **Stav: NÁVRH — audit návrhu prebehol (Codex astra: 3 BLOCKER · 3 FIX · 1 NOTE), zapracovanie v §15 — §15 MÁ PREDNOSŤ pred §1–§14; čaká delta audit.** Dátum 17.10.2026. Package do zásoby — **implementácia až po smoke PASS bloku 9 HARDENING**
+> **Stav: NÁVRH — audit návrhu prebehol (Codex astra: 3 BLOCKER · 3 FIX · 1 NOTE), zapracovanie v §15 — §15 MÁ PREDNOSŤ pred §1–§14; delta audit 17.10. zapracovaný v §15.11 (integračné zladenie).** Dátum 17.10.2026. Package do zásoby — **implementácia až po smoke PASS bloku 9 HARDENING**
 > (alebo Michalovom „ideme ďalej") a po mergi predchodcu podľa poradia RECONCILE §3 (U1 kedykoľvek · **U2 → U3 → U4 → U5**).
 > **Autorita:** [ROZHODNUTIA_MICHALA_2026-10-17.md](ROZHODNUTIA_MICHALA_2026-10-17.md) (R1–R17, mockup O1–O8 — záväzné) · [RECONCILE_2026-10-17.md](RECONCILE_2026-10-17.md)
 > §2 riadky „U2" a §3 · [CROSS_AUDIT_A4_CLAUDE_KOD.md](CROSS_AUDIT_A4_CLAUDE_KOD.md) **B1, B2, B3, B6, B7, B8, B14** · [CROSS_AUDIT_A2_GROK.md](CROSS_AUDIT_A2_GROK.md) B4, B5, B9 ·
@@ -238,7 +238,8 @@ Načítanie v `main.rb` za `core/price_refresh` (S20) + `tests/helper.rb`; pri n
 použije vlastný obal, ktorý **skontroluje návratovú hodnotu `flock`** a výnimku **neprehltne** (S12) — ich dnešné `with_lock` sa nemení (§14).
 Reentrancia: obal nesmie nastaviť `@lock_held`/`@lock_depth` modulu; `import_document!` týchto dvoch store-ov preto beží **vo vnútri** obalu a sám zámok neberie (dokumentovať).
 - **Verejné `with_store_lock(entry_key) { … }`** (pre U3, PACKAGE_U3 §12 D6): zámok riadku registra (`lock`) pre knižnicu **aj prílohový riadok** (`appearances` → `materials.lock`,
-  `appliance_files` → `appliances.json.lock`, `template_previews` → `templates.json.lock`); neznámy kľúč alebo riadok bez zámku → `ArgumentError`; nezískaný zámok → `IOError`
+  `appliance_files` → `appliances.json.lock`, `template_previews` → `templates.json.lock`, po U4 `textures` → `materials.lock`); parameter je vždy **`entry_key`** riadku (pre prílohu
+  `LibraryAttachments.row_for(rel)` z U4 — §15.11); neznámy kľúč alebo riadok bez zámku → `ArgumentError`; nezískaný zámok → `IOError`
   (nikdy blok bez zámku). U3 v ňom ukladá prílohy **pred** `import_group!`. Vnorenie dvoch rôznych zámkov (F4) → `IOError`.
 
 **R4.5 Lokálny stav synchronizácie (B7, obálka pre U3)**
@@ -249,8 +250,27 @@ Reentrancia: obal nesmie nastaviť `@lock_held`/`@lock_depth` modulu; `import_do
 - `update_sync_meta!(attrs)` → `true`/`false`: údaje **tohto PC** oddelene od skupín — kľúče `pc_id` (String), `drive_root` (String), `admin` (true/false); iný kľúč alebo typ → `false`
   bez zápisu; zlúči `attrs` do `meta` (chýbajúci kľúč ostane), ten istý zámok a brány ako `update_sync_state!`, `groups` nemení. Význam hodnôt (ako vzniká `pc_id`, kedy `admin`) **definuje U3**.
 
-**R4.8 API pre U3/U5 (súhrn):** `export_group` · `import_group!` · `create_backup!` · `backups` · `restore_backup!` · `sync_state` · `update_sync_state!` · `update_sync_meta!` ·
-`with_store_lock` · **`peek_group`** · **`backup_peek`** · **`local_fingerprint`** (15.10; `restore_backup!` s `seen_fingerprint:`) · **`import_done`** · **`ack_import_done!`** (15.9; `import_group!` s voliteľnými `tag:` a `replacements:`) · `import_allowed?` · `export_allowed?` · `compare_versions` · `recover_pending!` · `canonical_bytes` · `fingerprint`; z registra `groups` · `members` · `depends_on` · `dependents`. Nič iné U3/U5 z U2 nevolá.
+**R4.8 API pre U3/U4/U5 — JEDINÁ autorita mien a signatúr (zladené 17.10., §15.11).** U3 R-I, U4 a U5 tieto riadky len citujú; iné meno či iný tvar = chyba package.
+
+| Volanie | Výsledok | Kto volá | Kde |
+|---|---|---|---|
+| `LibraryRegistry.groups` · `group(key)` · `group_of(entry_key)` · `members(g)` · `library_members(g)` · `depends_on(g)` · `dependents(g)` | dáta registra (R1.3) | U3, U4, U5 | R1.3 |
+| `export_group(g)` | `[:ok, packet]` \| `[kód, veta]` | U3 R-H1 | R4.1, 15.0, 15.11 |
+| `import_group!(g, packet, plugins_dir:, reason:, tag: nil, replacements: [])` | `[:ok, result]` \| `[kód, veta, detail]` | U3 R-J3, R-L2 | R4.2, 15.9, 15.11 |
+| `create_backup!(g, reason:)` · `backups(g = nil)` | `[:ok, id]` · zoznam | U3, U5 R-J1 | R4.3 |
+| `backup_peek(backup_id)` | `[:ok, {'group','documents','fingerprints','attachment_rels'}]` \| `[:broken \| :missing, veta]` | U5 R-J1 | 15.10, 15.11 |
+| `restore_backup!(backup_id, plugins_dir:, seen_fingerprint: nil)` | `[:ok, result]` \| `[kód, veta, detail]` (vrátane `:changed`) | U3 R-K, U5 R-J1 | R4.3, 15.4, 15.10, 15.11 |
+| `local_fingerprint(g, attachment_rels: [])` | String | U3 R-J2, R-L2, R-N1, R-N3; interne `restore_backup!` | 15.10, 15.11 |
+| `peek_group(g)` | `[:ok, {'documents','fingerprints'}]` \| `[:unknown, veta]` | U3 R-F1, R-N1 | 15.9 (1) |
+| `pending_block(entry_key = nil)` | `nil` \| veta | U3 R-F1, R-J2; store-y | 15.1 |
+| `recover_pending!(plugins_dir)` · `last_recovery` · `pending_issue` | výsledok obnovy · Hash \| `nil` · veta \| `nil` | `main.rb`; U3 R-J5; U5 | R4.9, 15.11 |
+| `import_done(tag)` · `ack_import_done!(tag)` | Hash \| `nil` · `true/false` | U3 R-J5 | 15.9 (2) |
+| `sync_state` · `update_sync_state!(g, entry)` · `update_sync_meta!(attrs)` | R4.5 | U3; U4 `sweep!` (len `sync_state`) | R4.5 |
+| `with_store_lock(entry_key) { … }` | hodnota bloku; `ArgumentError` / `IOError` | U3 R-M1, U4 `place` | R4.4, 15.11 |
+| `import_allowed?(v)` · `export_allowed?(disk_v)` · `compare_versions(a, b)` | R5 | U3 R-G, U5 R-L | R5 |
+| `canonical_bytes(doc)` · `fingerprint(doc)` | R4.6 | U3 | R4.6 |
+
+`entry_key` = kľúč riadku registra (knižnica **aj** prílohový riadok — `appearances`, `textures` po U4, `template_previews`, `appliance_files`). `rollback!` je interný (U3/U5 ho nevolajú). Nič iné U3/U4/U5 z U2 nevolá.
 
 **R4.6 Kanonické bajty a odtlačok**
 - `canonical_bytes(doc)` = `JSON.generate` nad kópiou s **rekurzívne zoradenými kľúčmi** Hash-ov (polia v pôvodnom poradí), UTF-8, bez medzier. `fingerprint(doc)` = SHA-256 hex.
@@ -272,7 +292,8 @@ Reentrancia: obal nesmie nastaviť `@lock_held`/`@lock_depth` modulu; `import_do
 **Guard:** tieto štyri súbory bez stavových `@` premenných (nová cache = vlastné zneplatnenie + úprava guardu). Zákazky na prestavbu = §14 N5; **S4 ostáva čiastočne otvorené** (§15 A7).
 
 **R4.7 Kódy výsledkov** (Symboly; vyhodnocovať cez `case`, nie pravdivosť): `:ok :not_ok :missing :invalid :newer :local_newer :missing_attachments :version_mismatch :other_instance
-:other_instance_unknown :busy :backup_failed :write_failed :failed_restored :failed_restore_failed :unhealthy_restored :unknown_group :broken :busy_snapshot`. Každý s **jednou slovenskou vetou**
+:other_instance_unknown :busy :backup_failed :write_failed :failed_restored :failed_restore_failed :unhealthy_restored :unknown_group :broken :busy_snapshot :dialogs_open :changed`
+(posledné dva z 15.0 a 15.10 — zladené §15.11). Každý s **jednou slovenskou vetou**
 (funkčne, bez cesty v texte okrem `:failed_restore_failed`, kde menuje ID zálohy) — U5 ich zobrazí bez úprav.
 
 ### R5 · Verzia pluginu podľa R18 (dve brány, A1 S5)
@@ -317,6 +338,8 @@ Reentrancia: obal nesmie nastaviť `@lock_held`/`@lock_depth` modulu; `import_do
   `recover_pending!` → oba súbory bajtovo pôvodné, žurnál preč, `last_recovery`; žurnál živého `pid` ostane; zlyhaný návrat → `pending_issue`; **S4** guard R4.10.
 - **Zdrojové guardy:** `import_document!` žiadneho store-u nevolá `normalize*`, `merge_seed*`, `persist_seed_merge!`, `prepare_appearance_write!`, `write_unlocked`, `write_list` ani bežné
   `write` (Grep tela metódy, vzor `test_h10b_rady.rb:462`); okná (`ui/`) nevolajú `import_document!` ani `import_group!` (do U5).
+- **Integračné testy delty (§15.11):** `test_c1_restore_returns_archived_attachments`, `test_c2_seen_fingerprint_covers_attachments`, `test_u2_6_lease_before_each_write`,
+  `test_u2_6_lease_at_snapshot_end`, `test_u2_6_second_process_during_export`, `test_u2_6_dead_export_journal` — scenáre a očakávania v §15.11.
 - **H16 sada** zelená s novými riadkami a `WRITE_SITES` (`core/library_transfer.rb` — počet podľa implementácie, dôvod „zálohy library_backups/ a library_sync.json");
   `test_h13_rozsirovacie_body.rb` (nové `STD` v §13.1).
 
@@ -457,7 +480,7 @@ na 15.0–15.6 pred U2b. Export test `P == K` platí pre všetky tri; in-SU pod�
   `bak: true`, writer `core/library_transfer.rb`). `import_done(tag)` → Hash | `nil`; `ack_import_done!(tag)` záznam zmaže (`true`/`false`). Žurnál si drží `tag`; `recover_pending!`
   vo fáze po zápise dokladu (prvok `phase: 'done'`) len zmaže žurnál — doklad ostáva do `ack`. Bez `tag` sa nič nezapisuje (spätná kompatibilita).
 - **(3) Náhrady príloh** (U4 15.1): `import_group!(…, replacements: [])` — položky `{rel, new, old, old_sha256, new_sha256}` sa zapíšu do žurnálu pod `'attachments'` **v tom istom
-  zápise** ako `backup_id` (pred prvým premenovaním aj prvým zápisom knižnice; podmienky 15.0 platia). Vykonanie medzi R4.2 krokmi 3 a 4 pod `with_store_lock(row)` každej položky
+  zápise** ako `backup_id` (pred prvým premenovaním aj prvým zápisom knižnice; podmienky 15.0 platia). Vykonanie medzi R4.2 krokmi 3 a 4 pod `with_store_lock(entry_key)` (`entry_key` = `LibraryAttachments.row_for(item['rel'])`) každej položky
   cez `LibraryAttachments.apply_replacement!(item)` (dodá U4; `:ok | :failed`, nikdy výnimku); `:failed` → návrat. `rollback!` (15.4) a `recover_pending!` volajú
   `revert_replacement!(item)` — idempotentne podľa stavu súborov; `failed > 0` = návrat zlyhal → žurnál, `pending_issue` a `pending_block` ostávajú. **Úspech:** fáza `committing` →
   `archive_replacement!(item, "library_backups/<backup_id>")` (pôvodný súbor do zálohy prevzatia, `backup.json` `attachments: {rel => sha256}`) → doklad (2) → zmazanie žurnálu.
@@ -471,15 +494,56 @@ na 15.0–15.6 pred U2b. Export test `P == K` platí pre všetky tri; in-SU pod�
 
 **15.10 Požiadavky U5 na U2 — okno dopadov pred „Vrátiť zálohu"** ([PACKAGE_U5.md](PACKAGE_U5.md) §12 D15, R-J1; mená záväzné).
 
-- **`backup_peek(backup_id)`** → `[:ok, {'group', 'documents' => {entry_key => doc}, 'fingerprints' => {entry_key => sha256}}]` | `[:broken | :missing, veta]`. Len čítanie zálohy
+- **`backup_peek(backup_id)`** → `[:ok, {'group', 'documents' => {entry_key => doc}, 'fingerprints' => {entry_key => sha256}, 'attachment_rels' => [rel]}]` | `[:broken | :missing, veta]`
+  (`attachment_rels` = kľúče `backup.json` `attachments` — prílohy archivované pri prevzatí, ktoré návrat vráti; §15.11 C1). Len čítanie zálohy
   (`library_backups/<id>/`): `backup.json` + `files/` knižníc skupiny, **overené SHA** podľa `backup.json` (nesúlad alebo nečitateľný súbor → `:broken`; neznáme ID alebo `.partial` →
   `:missing`); knižnica so stavom `absent` (15.2) v `documents` chýba. Bez zápisu, bez bariéry 15.0, bez zámku na čakanie, bez `Sketchup`. Odtlačky = `fingerprint` (R4.6).
-- **`local_fingerprint(group_key)`** → String (SHA-256 kanonických bajtov `{rel => sha256 surových bajtov primára | 'absent'}` knižníc skupiny) — čítanie bez zápisu, funguje aj nad
-  poškodeným primárom. **Jediná** definícia „lokálneho stavu, ktorý okno ukázalo"; `LibrarySync.diff_documents` (U3) vracia `seen_fingerprint` práve z nej.
-- **`restore_backup!(backup_id, plugins_dir:, seen_fingerprint: nil)`** — po podmienkach 15.0 a **pod zámkami** (pred novou zálohou) porovná `local_fingerprint(group)` so
+- **`local_fingerprint(group_key, attachment_rels: [])`** *(rozšírené §15.11 C2)* → String (SHA-256 kanonických bajtov `{rel => sha256 surových bajtov | 'absent'}` nad primármi knižníc skupiny
+  **a nad každou prílohou z `attachment_rels`**) — čítanie bez zápisu, funguje aj nad poškodeným primárom. **Jediná** definícia „lokálneho stavu, ktorý okno ukázalo"; `LibrarySync.diff`
+  aj `diff_documents` (U3) vracajú `seen_fingerprint` práve z nej.
+- **`restore_backup!(backup_id, plugins_dir:, seen_fingerprint: nil)`** — po podmienkach 15.0 a **pod zámkami** (pred novou zálohou) porovná `local_fingerprint(group, attachment_rels:
+  backup_peek(id)['attachment_rels'])` (§15.11 C1/C2) so
   `seen_fingerprint`; nesúlad → **`[:changed, „Knižnica sa od zobrazenia zmenila — otvor okno znova"]` bez akéhokoľvek zápisu** (ani záloha, ani žurnál). `nil` = bez kontroly
   (interné volania; U5 ho posiela vždy). Kód `:changed` pribúda do R4.7.
 - **Testy** (`test_u2_transfer.rb`): `backup_peek` — zdravá záloha = dokumenty a odtlačky zhodné s pôvodnými súbormi; zmenený bajt v `files/` → `:broken`; neznáme ID a `.partial` →
-  `:missing`; po volaní SHA koreňa bez zmeny. `local_fingerprint` — zmena jedného primára ho zmení, `.bak` ani prílohy nie; chýbajúci primár = `absent`. `restore_backup!` —
+  `:missing`; po volaní SHA koreňa bez zmeny. `local_fingerprint` — zmena jedného primára ho zmení, `.bak` nie; príloha **mimo** `attachment_rels` nie, príloha **v** `attachment_rels`
+  áno (§15.11 C2); chýbajúci primár aj chýbajúca príloha = `absent`. `restore_backup!` —
   zhodný `seen_fingerprint` → prebehne; zápis do knižnice medzi `local_fingerprint` a volaním → `:changed`, žiadna nová záloha ani žurnál (výpis `library_backups/` bez zmeny).
 - **Rez:** U2b (+~40 riadkov).
+
+**15.11 Integračné zladenie (delta 17.10.)** — [AUDIT_DELTA_raw.md](AUDIT_DELTA_raw.md) sekcie A (U2/6), B a C; mapa v [INTEGRACIA_2026-10-17.md](INTEGRACIA_2026-10-17.md). Rozhodnutia R1–R21 a O1–O9 sa
+nemenia, nová funkcia nepribúda — len jedno meno a jedna signatúra na API a uzavreté medzery. **Má prednosť pred 15.0–15.10, kde sa líšia.**
+
+- **B · API.** Autorita mien a signatúr = tabuľka **R4.8** (prepísaná). Doplnené: `LibraryRegistry.library_members(g)`, `pending_block(entry_key = nil)`, čítače `last_recovery` a `pending_issue`
+  (výsledok `recover_pending!`, ktorý U3 R-J5 a U5 čítajú; tvar: `last_recovery` = `{'group','backup_id','at'}` | `nil`, `pending_issue` = veta | `nil`). Zámok má jeden tvar
+  **`with_store_lock(entry_key)`** — pre prílohu `entry_key = LibraryAttachments.row_for(rel)` (U4); `row` sa ako meno parametra nepoužíva. `import_group!` má jedinú signatúru
+  `import_group!(g, packet, plugins_dir:, reason:, tag: nil, replacements: [])`; `restore_backup!(backup_id, plugins_dir:, seen_fingerprint: nil)`; `local_fingerprint(g, attachment_rels: [])`.
+  `recover_pending!(plugins_dir)` vracia `[:none | :recovered | :owner_alive | :export_cleared | :restore_failed, info]`. R4.7 dopĺňa `:dialogs_open` a `:changed`.
+- **C1 · Návrat zálohy vracia aj archivované prílohy (U4 §15.1).** `restore_backup!(A)`: po kontrole `seen_fingerprint` a novej zálohe B pripraví pre každú `rel` z `backup_peek(A)['attachment_rels']`
+  položku náhrady volaním `LibraryAttachments.place(<A>/attachments/<rel>, rel, sha256_z_backup.json, resolve: :force)` (U4 §15.7 — kópia z A sa **neberie** presunom, záloha A ostáva celá;
+  rovnaký obsah = bez položky, chýbajúci cieľ = `placed`). Položky idú do žurnálu `{phase: importing, backup_id: B, attachments: […]}` **v jednom zápise** a vykonajú sa tým istým postupom ako
+  pri prevzatí (15.9 (3)): zápis dokumentov podľa 15.2 + `apply_replacement!` → pri úspechu `committing` → **súčasné** (správcove) súbory `archive_replacement!(item, "library_backups/<B>")`
+  → zmazanie žurnálu. Zlyhanie či pád = `rollback!(B)` vráti dokumenty aj prílohy (idempotentne, 15.4). Záloha bez `attachments` = prílohy sa nemenia (len pribúdajú). `rollback!` po neúspešnom
+  prevzatí sa nemení (prílohy vracia zo žurnálu, nie zo zálohy).
+- **C2 · Odtlačok potvrdenia chráni aj prílohy.** `local_fingerprint(g, attachment_rels:)` zahŕňa SHA (alebo `absent`) **každej prílohy, ktorú rozhodnutie smie prepísať**: pri prevzatí a Vrátiť verziu
+  = všetky `local` cesty príloh skupiny z manifestu tiketu (U3 ich odvodí z tiketu rovnako pri `diff` aj pri commite — klient ich neposiela), pri návrate zálohy = `backup_peek(id)['attachment_rels']`
+  (`restore_backup!` ich odvodí zo zálohy sám). Zmena takej prílohy po zobrazení okna = nesúlad → `:changed` (U2) / `skipped_changed` (U3), **bez zápisu**.
+- **A U2/6 · Leases a ďalší proces počas exportu (vecné doplnenie 15.0).** (a) **Kontrola `Updater.live_leases` tesne pred každým zápisom** transakcie — pred každým `import_document!`, každým
+  `apply_replacement!`/zápisom súboru návratu a pred prepnutím na `committing` — nie len pred prvým; nová inštancia → zastaviť, `rollback!(backup_id)`, `[:other_instance, …]`. (b) **Export píše žurnál
+  tiež:** `export_group` (aj `create_backup!` volaná samostatne) zapíše **pred usadením** `library_import.pending.json` `{phase: 'exporting', group, pid, exe, started_at}` (bez `backup_id`) → **potom**
+  kontrola leases (poradie „žurnál → leases" zatvára okno: proces štartujúci pred zápisom žurnálu má už lease, proces štartujúci po ňom žurnál vidí) → usadenie → dva prechody → **kontrola leases pred
+  koncom snímku** (po 2. prechode, pred vrátením packetu; nová inštancia → `:other_instance`, packet sa zahodí) → zmazanie žurnálu (`ensure`). Druhý proces, ktorý štartuje počas exportu: jeho
+  `recover_pending!` vidí živého vlastníka → `:owner_alive` → boot blok preskočí zápisy (15.1) a `pending_block` mu odmietne **každý zápis** knižníc skupiny, kým žurnál existuje (bežná cesta store-ov,
+  seed, `migrate!`, UNI). Vynechané boot kroky sa v tom procese neopakujú (log; idempotentne prebehnú pri ďalšom štarte — rovnaké správanie ako 15.1). `recover_pending!` nad žurnálom
+  `exporting` mŕtveho procesu → žurnál zmaže, nič neobnovuje → `:export_cleared`.
+- **Testy (`test_u2_transfer.rb`, nové názvy):**
+  `test_c1_restore_returns_archived_attachments` — prevzatie s náhradou `appearances/U.skm` X→Y a náhľadu P1→P2 (X, P1 v `library_backups/<A>/attachments/`) → `restore_backup!(A, seen_fingerprint:` zhodný`)`
+  → dokumenty = stav A, na disku X a P1 (SHA), Y a P2 v `library_backups/<B>/attachments/`, záloha A bajtovo nedotknutá → `restore_backup!(B)` → Y a P2 späť; pád (`exit!`) po žurnáli a po
+  `cieľ→old` → `recover_pending!` → stav pred návratom; záloha bez `attachments` → prílohy bez zmeny.
+  `test_c2_seen_fingerprint_covers_attachments` — `local_fingerprint(g, attachment_rels: ['template_previews/x.png'])` = F → zmena bajtov `x.png` → iný odtlačok; `restore_backup!` s F po zmene
+  archivovanej prílohy → `:changed`, `library_backups/` bez novej položky, žurnál nevznikol.
+  `test_u2_6_lease_before_each_write` — stub `live_leases` vráti `[]` pri 1. a `[4321]` pri 2. dokumente skupiny → `:other_instance`, oba dokumenty a prílohy bajtovo pôvodné, žurnál preč.
+  `test_u2_6_lease_at_snapshot_end` — lease pribudne medzi 2. prechodom a koncom → `:other_instance`, packet sa nevráti, žurnál `exporting` zmazaný.
+  `test_u2_6_second_process_during_export` — podproces so žurnálom `exporting` živého vlastníka (stub `lease_alive?`): `Materials.write` aj seed → odmietnuté, SHA súborov skupiny bez zmeny,
+  `recover_pending!` → `:owner_alive`; po zmazaní žurnálu zápis prejde. `test_u2_6_dead_export_journal` — žurnál `exporting` mŕtveho pid → `:export_cleared`, žiadny zápis knižníc.
+- **Rez:** všetko **U2b** (+~45 riadkov → **~575**); poistka U2b sa zdvíha na **~620** (nad ňu presun `backup_peek`/C1 do samostatného commitu-PR U2b2 — rozhodne orchestrátor).

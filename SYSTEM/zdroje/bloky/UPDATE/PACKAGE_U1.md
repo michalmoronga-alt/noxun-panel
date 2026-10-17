@@ -308,7 +308,7 @@ a záznamom operácií — vzor `test_budget.rb:110`):
   bez zmeny; zastaraná generácia s `project` → veta H7a, **žiadny** zápis do modelu; cudzí dokument → žiadny zápis; `merge` bez zmeny.
 - **T9 Exporty:** `expect` z payloadu → export prejde a mená = T0c; kľúč v modeli zmenený po pushi (simulácia Ctrl+Z) → odmietnutie vetou „Okno ukazovalo …"; automatický → automatický
   tolerancia bez zmeny; `name_suffix` bez vety o čakajúcom názve.
-- **T9b `merge_18_36` v `expect_check` (F2):** všetky 4 exporty s platným `expect` nad modelom s kľúčom prejdú (žiadne `EXPECT_FAILED`); VEPO s nesúladom 18 + 36 odmietnuté.
+- **T9b `merge_18_36` v `expect_check` (F2; presný scenár §15.1):** všetky 4 exporty s platným `expect` nad modelom s kľúčom prejdú (žiadne `EXPECT_FAILED`); VEPO s nesúladom 18 + 36 odmietnuté.
 - **T10 Payload:** `vepo` = kľúče `project, default_project, merge_18_36, source, file, export_names` v tomto poradí (bez `pending`, `notice`); `project` normalizovaný.
 - **T11 Guardy:** v `ui/` a `core/` žiadny výskyt zaniknutých mien (R8.1 zoznam, `pending_name_note`, `project_key`); `ExportSettings` nevolá `set_attribute` ani `start_operation`;
   `ProjectName` neobsahuje `JsonFileStore.write(`; `legacy_project_name` nevolá `update`/`with_catalog_lock`; jediné `set_attribute(` v `project_name.rb` sú v `save` a `adopt_on_save`;
@@ -434,3 +434,10 @@ Surový výstup: [AUDIT_U1_raw.md](AUDIT_U1_raw.md). Všetky nálezy sú platné
 | **F5** FIX | sonda R7 na K spadne (`respond_to?(:name)` je na module vždy true, konštanta neexistuje) | vetvenie priamo podľa `defined?(e::ProjectName)`, test oboch vetiev | R7, T11b |
 
 **Dopad na odhad:** nová logika +~30 riadkov (`noxun_job?`, `adopt_path` s pamäťou cesty, šev `FAULT`), testy +~80; rez a trieda bez zmeny. Výsledok R0.2 sa zapíše ako §16.
+
+**15.1 Integračné zladenie (delta 17.10.)** — [AUDIT_DELTA_raw.md](AUDIT_DELTA_raw.md) A „U1/2 CIASTOCNE" (T9b bol len odkaz). Rozhodnutia R1–R21 a O1–O9 sa nemenia; nová funkcia nepribúda.
+**T9b — presný regresný scenár** (`tests/pure/test_u1_nazov_zakazky.rb`, test `test_t9b_expect_check_merge_18_36`): model s kľúčom názvu „Kuchyňa A" a nastavením 18 + 36 = zapnuté; pre **každý**
+zo 4 druhov `ExportPrep::KINDS` (VEPO, CSV kovania, XLSX rozpočtu, XLSX ponuky) sa zavolá `ProductionCore.export_expect_check` s `expect = {'project' => 'Kuchyňa A', 'merge_18_36' => true}`
+→ **očakávané:** žiadne `stop`, žiadne `EXPECT_FAILED`, výsledok nesie `:project` „Kuchyňa A". Druhý krok: VEPO s `expect['merge_18_36'] = false` pri zapnutom 18 + 36 → `stop` s vetou o nesúlade
+18 + 36 (CSV/XLSX ten istý vstup prejdú, ak brána 18 + 36 platí len pre VEPO — implementátor overí v `export_settings.rb:727-761` a test zapíše skutočné správanie). **Mutácia:** nekvalifikované
+`merge_18_36` v `ProjectName.expect_check` → `NameError` → test padne vo všetkých 4 druhoch.
