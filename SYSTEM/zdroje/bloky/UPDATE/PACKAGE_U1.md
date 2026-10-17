@@ -17,28 +17,28 @@
 Sonda **čítaním kódu** (worktree `docs/update-start` = `main` + docs). SketchUp sa nespúšťal, do modelu ani do `%APPDATA%` sa nič nezapisovalo. Tvrdenia o správaní SketchUpu,
 ktoré čítaním overiť nejde, sú označené **NEOVERENÉ** a overí ich in-SU sonda R0.2 pred implementáciou.
 
-| # | Tvrdenie o dnešnom kóde | Dôkaz | Verdikt |
+| # | Tvrdenie o dnešnom kóde | Dôkaz | ✓ = PRAVDA |
 |---|---|---|---|
-| S1 | Názov zákazky žije **len** v `%APPDATA%\NOXUN\Engine\vepo_settings.json`, mapa `project_names`, kľúč = normalizovaná cesta `.skp` (`\`→`/`, `downcase`), neuložený model `guid:<DocKey token>`; „žiadny zápis do modelu, žiadny krok Späť" | `core/export_settings.rb:2-12`, `:320-329`, `:381-383`, `:401-404`, `:450-453` | PRAVDA |
-| S2 | Čítanie `project_name(model)` = záznam pod cestou → kľúče sedenia (most `SESSION_KEY_BRIDGE`, prenos `adopt_session_name` **so zápisom do súboru pri čítaní**) → predvolené (meno súboru, inak `projekt`) | `:461-473`, `:489-529`, `:301-304`, `:22` | PRAVDA |
-| S3 | Zápis `save_project_name` ide cez `update_project_names` → `update` (zámok `Materials.with_catalog_lock`, brána R-38, `JsonFileStore.write`) → `[status, reason]` | `:623-649`, `:365-376`, `:184-211` | PRAVDA |
-| S4 | Pamäť procesu pre prvé uloženie (`SESSION_KEY_BRIDGE`, strop 32), pamäť pokusov `ADOPT_RETRY` (SHA1 primára a `.bak`), stav „čakajúci názov" `name_pending?` — všetko existuje len kvôli tomu, že názov neuloženého modelu nemá kam ísť okrem kľúča sedenia | `:352-353`, `:412-447`, `:543-600` | PRAVDA |
-| S5 | Upratovanie mostu pri výmene dokumentu volá `Engine.document_cleanups` | `core/doc_key.rb:176-180` | PRAVDA |
-| S6 | Okno Štúdia: `do_set_vepo_opts` → brána generácie → `DocKey.foreign?` → `ExportSettings.save_project_name` → `case status` → **vždy** echo `push_vepo_bar`; úspech nedvíha generáciu | `ui/studio_dialog.rb:653-702`, `:708-715` | PRAVDA |
-| S7 | Payload `vepo` skladá **jedna** funkcia: `project` (normalizovaný), `default_project`, `merge_18_36`, `source`, `file`, `export_names`, **`pending`, `notice`** | `ui/production_core.rb:222-235` | PRAVDA |
-| S8 | Exporty: `ExportPrep.start` → `ExportSettings.refresh` → `ProductionCore.export_expect_check` (jediné volanie `expect_check`, raz na export) → kontext nesie overený `:project`; koncová veta `name_suffix` = `pending_name_note` + `default_name_note` + `ctx.name_note` | `ui/export_prep.rb:155-189`, `:209-216`; `ui/production_core.rb:252-255`, `:161-169`, `:196-203` | PRAVDA |
-| S9 | `expect_check` porovnáva `normalize_project_name` oboch strán; tolerancia automatický → automatický (`AUTO_SOURCES`); výsledok `{stop, note, project, merge}` | `core/export_settings.rb:688-761` | PRAVDA |
-| S10 | Okno Štúdia má vlastný `StudioModelWatch` (`onTransactionCommit/Undo/Redo/Abort`) → `on_model_txn` → `@epoch += 1` → `markStale` („Obnoviť" zožltne), ak `@epoch > @pushed_epoch`. **Každý zápis do modelu v operácii by teda tlačidlo rozsvietil** | `ui/studio_dialog.rb:102-125`, `:271-279`, `:312-318`, `:1778` | PRAVDA |
-| S11 | Precedens zápisu na **model** v slovníku `NOXUN`: `Materials.set_project_default` (volajúci drží operáciu), `BudgetStore.write!` (vlastná `start_operation(name, true)` … `commit`, pri chybe `abort`), snapshoty `hardware_rules` / `hardware_sets` (`Store::DICT`) | `core/materials_project.rb:33-41`; `core/budget_store.rb:752-785`; `core/hardware_rules.rb:1148`; `core/hardware_sets.rb:2475` | PRAVDA |
-| S12 | Kľúč `project_name` (ani `job_name`) na modeli dnes **neexistuje** v kóde ani v testoch | Grep `noxun_engine/`, `tests/` | PRAVDA |
-| S13 | Plugin **nemá** `onPreSaveModel` ani iný háčik uloženia; jediný stále nainštalovaný AppObserver je `ScaleWatch::EngineAppObserver` (`onNewModel`/`onOpenModel` → `on_document_replaced` + `model_switched`, `onActivateModel` → `model_switched`); inštalácia `ScaleWatch.install` pri štarte | Grep; `core/scale_observer.rb:46-64`, `:962-1002`; `main.rb:721` | PRAVDA |
-| S14 | Sonda export testu (`tests/sketchup/su_export_probe.rb`) je **jedna pre K aj P** (načítaná z aktuálneho checkoutu) a skladá `expect` cez `ExportSettings.project_name` / `name_source` | `su_export_probe.rb:1-11`, `:119-120`; `scripts/export_test.ps1:152-201` | PRAVDA → R7 |
-| S15 | Export test kopíruje model do priečinka behu (cesta sa líši pre K a P) → záznam podľa cesty sa v teste nikdy nenájde, názov = meno súboru `zakazka` | `export_test.ps1:23`, `:186-204` | PRAVDA |
-| S16 | Golden H7: `names.json` (mená a nadpisy podľa textu názvu), `exports.json` (4 exporty end-to-end), `bytes.json` (bajty `vepo_settings.json` + `.bak` po každom kroku **vrátane zápisov názvu**) | `tests/pure/test_h7a_golden.rb:9-13`, `:189-228`, `:360-363` | PRAVDA → R0.1 |
-| S17 | JS hlavičky: stav `pending` („neuložené k súboru", tooltip `vepo.notice`), bodka exportov ho vylučuje | `ui/js/studio.js:1280-1345`, `:1460` | PRAVDA |
-| S18 | Register knižníc: riadok `export_settings` s poznámkou „nazvy zakaziek (kluc = cesta .skp) …"; skupina mimo knižníc `model` = „cestuje so zakazkou" | `core/library_registry.rb:140-144`, `:224-225` | PRAVDA |
-| S19 | `in-SU` blok ST-1a zapisuje a maže názov cez `ExportSettings.save_project_name` / `update_project_names` | `tests/sketchup/su_runner.rb:144`, `:15850-15880` | PRAVDA |
-| S20 | Názov zákazky ide aj do **obsahu** výstupov (LOG VEPO, 1. riadok CSV kovania, nadpisy hárkov XLSX) — pripnuté T0a | `test_h7a_golden.rb:9-13`; `VEPO_KONTRAKT.md:96-98` | PRAVDA |
+| S1 | Názov zákazky žije **len** v `%APPDATA%\NOXUN\Engine\vepo_settings.json`, mapa `project_names`, kľúč = normalizovaná cesta `.skp` (`\`→`/`, `downcase`), neuložený model `guid:<DocKey token>`; „žiadny zápis do modelu, žiadny krok Späť" | `core/export_settings.rb:2-12`, `:320-329`, `:381-383`, `:401-404`, `:450-453` | ✓ |
+| S2 | Čítanie `project_name(model)` = záznam pod cestou → kľúče sedenia (most `SESSION_KEY_BRIDGE`, prenos `adopt_session_name` **so zápisom do súboru pri čítaní**) → predvolené (meno súboru, inak `projekt`) | `:461-473`, `:489-529`, `:301-304`, `:22` | ✓ |
+| S3 | Zápis `save_project_name` ide cez `update_project_names` → `update` (zámok `Materials.with_catalog_lock`, brána R-38, `JsonFileStore.write`) → `[status, reason]` | `:623-649`, `:365-376`, `:184-211` | ✓ |
+| S4 | Pamäť procesu pre prvé uloženie (`SESSION_KEY_BRIDGE`, strop 32), pamäť pokusov `ADOPT_RETRY` (SHA1 primára a `.bak`), stav „čakajúci názov" `name_pending?` — všetko existuje len kvôli tomu, že názov neuloženého modelu nemá kam ísť okrem kľúča sedenia | `:352-353`, `:412-447`, `:543-600` | ✓ |
+| S5 | Upratovanie mostu pri výmene dokumentu volá `Engine.document_cleanups` | `core/doc_key.rb:176-180` | ✓ |
+| S6 | Okno Štúdia: `do_set_vepo_opts` → brána generácie → `DocKey.foreign?` → `ExportSettings.save_project_name` → `case status` → **vždy** echo `push_vepo_bar`; úspech nedvíha generáciu | `ui/studio_dialog.rb:653-702`, `:708-715` | ✓ |
+| S7 | Payload `vepo` skladá **jedna** funkcia: `project` (normalizovaný), `default_project`, `merge_18_36`, `source`, `file`, `export_names`, **`pending`, `notice`** | `ui/production_core.rb:222-235` | ✓ |
+| S8 | Exporty: `ExportPrep.start` → `ExportSettings.refresh` → `ProductionCore.export_expect_check` (jediné volanie `expect_check`, raz na export) → kontext nesie overený `:project`; koncová veta `name_suffix` = `pending_name_note` + `default_name_note` + `ctx.name_note` | `ui/export_prep.rb:155-189`, `:209-216`; `ui/production_core.rb:252-255`, `:161-169`, `:196-203` | ✓ |
+| S9 | `expect_check` porovnáva `normalize_project_name` oboch strán; tolerancia automatický → automatický (`AUTO_SOURCES`); výsledok `{stop, note, project, merge}` | `core/export_settings.rb:688-761` | ✓ |
+| S10 | Okno Štúdia má vlastný `StudioModelWatch` (`onTransactionCommit/Undo/Redo/Abort`) → `on_model_txn` → `@epoch += 1` → `markStale` („Obnoviť" zožltne), ak `@epoch > @pushed_epoch`. **Každý zápis do modelu v operácii by teda tlačidlo rozsvietil** | `ui/studio_dialog.rb:102-125`, `:271-279`, `:312-318`, `:1778` | ✓ |
+| S11 | Precedens zápisu na **model** v slovníku `NOXUN`: `Materials.set_project_default` (volajúci drží operáciu), `BudgetStore.write!` (vlastná `start_operation(name, true)` … `commit`, pri chybe `abort`), snapshoty `hardware_rules` / `hardware_sets` (`Store::DICT`) | `core/materials_project.rb:33-41`; `core/budget_store.rb:752-785`; `core/hardware_rules.rb:1148`; `core/hardware_sets.rb:2475` | ✓ |
+| S12 | Kľúč `project_name` (ani `job_name`) na modeli dnes **neexistuje** v kóde ani v testoch | Grep `noxun_engine/`, `tests/` | ✓ |
+| S13 | Plugin **nemá** `onPreSaveModel` ani iný háčik uloženia; jediný stále nainštalovaný AppObserver je `ScaleWatch::EngineAppObserver` (`onNewModel`/`onOpenModel` → `on_document_replaced` + `model_switched`, `onActivateModel` → `model_switched`); inštalácia `ScaleWatch.install` pri štarte | Grep; `core/scale_observer.rb:46-64`, `:962-1002`; `main.rb:721` | ✓ |
+| S14 | Sonda export testu (`tests/sketchup/su_export_probe.rb`) je **jedna pre K aj P** (načítaná z aktuálneho checkoutu) a skladá `expect` cez `ExportSettings.project_name` / `name_source` | `su_export_probe.rb:1-11`, `:119-120`; `scripts/export_test.ps1:152-201` | ✓ → R7 |
+| S15 | Export test kopíruje model do priečinka behu (cesta sa líši pre K a P) → záznam podľa cesty sa v teste nikdy nenájde, názov = meno súboru `zakazka` | `export_test.ps1:23`, `:186-204` | ✓ |
+| S16 | Golden H7: `names.json` (mená a nadpisy podľa textu názvu), `exports.json` (4 exporty end-to-end), `bytes.json` (bajty `vepo_settings.json` + `.bak` po každom kroku **vrátane zápisov názvu**) | `tests/pure/test_h7a_golden.rb:9-13`, `:189-228`, `:360-363` | ✓ → R0.1 |
+| S17 | JS hlavičky: stav `pending` („neuložené k súboru", tooltip `vepo.notice`), bodka exportov ho vylučuje | `ui/js/studio.js:1280-1345`, `:1460` | ✓ |
+| S18 | Register knižníc: riadok `export_settings` s poznámkou „nazvy zakaziek (kluc = cesta .skp) …"; skupina mimo knižníc `model` = „cestuje so zakazkou" | `core/library_registry.rb:140-144`, `:224-225` | ✓ |
+| S19 | `in-SU` blok ST-1a zapisuje a maže názov cez `ExportSettings.save_project_name` / `update_project_names` | `tests/sketchup/su_runner.rb:144`, `:15850-15880` | ✓ |
+| S20 | Názov zákazky ide aj do **obsahu** výstupov (LOG VEPO, 1. riadok CSV kovania, nadpisy hárkov XLSX) — pripnuté T0a | `test_h7a_golden.rb:9-13`; `VEPO_KONTRAKT.md:96-98` | ✓ |
 | S21 | **NEOVERENÉ (SketchUp):** (a) atribút zapísaný v `ModelObserver#onPreSaveModel` sa uloží do toho istého súboru; (b) po uložení `model.modified?` = false; (c) priehľadná operácia (`start_operation(name, true, false, true)`) v tom háčiku nevyrobí nový krok Späť a nespadne pri prázdnom zásobníku; (d) háčik pri autosave; (e) `onTransactionCommit` príde **synchrónne** v `commit_operation` | — | **NEOVERENÉ → R0.2** |
 
 ---
@@ -97,7 +97,7 @@ nová logika ~200, implementátor zastaví a orchestrátor rozhodne o rozdelení
 
 - **Trieda Ť** (CLAUDE.md, matica WORKFLOW § 2): audit-povinná **a** výrobná/cenová **a** nad 300 riadkov kódu.
 - **`codex-audit`: povinný** — mení **dátový kontrakt zákazky** (nový kľúč v `NOXUN` na modeli), **observer/undo lifecycle** (háčik uloženia, zápis v operácii, `on_model_txn`)
-  a pridáva **nový modul**. Úzke zadanie (R12): vymenované súbory tohto package. Krok 0 = §0 (sonda S21 sa urobí v R0.2 **pred** implementáciou, výsledok do package ako §15).
+  a pridáva **nový modul**. Úzke zadanie (R12): vymenované súbory tohto package. Krok 0 = §0 (sonda S21 sa urobí v R0.2 **pred** implementáciou, výsledok do package ako §16).
 - **Výrobná/cenová: áno** — mení vstup exportov (z čoho sa skladá názov v menách súborov VEPO/CSV/XLSX a v ich obsahu, S20). Na zdravom súbore a modeli bez kľúča **bajtovo bez zmeny**.
 - **Predrecenzia: povinná** (audit-povinná, výrobná, > 300 riadkov).
 - **In-SU: brána mergu** — mení **akciu panela zapisujúcu do modelu** (premenovanie), **undo a operácie** a **observer** (háčik uloženia, `on_model_txn`). Beh `-CloseWhenDone`
@@ -120,11 +120,23 @@ nová logika ~200, implementátor zastaví a orchestrátor rozhodne o rozdelení
   Po U1 **tie isté bajty** (mapa sa skalárnymi zápismi zachová) **a tie isté názvy** (cez čítanie starého záznamu).
 - **Starý T0b** (`bytes.json`, kroky so zápisom názvu do súboru) **zaniká** spolu s testom `test_h7a_golden.rb` „T0b" — **vedomá zmena** (zápis názvu už do súboru nejde); PR to uvedie.
 
-**R0.2 In-SU sonda háčika uloženia (pred 2. commitom; jednorazový skript nad kópiou `_dev\ENGINEtests.skp`, slučka runnera, `-CloseWhenDone`, **bez** zmeny pluginu):**
-odpoveď na S21 (a)–(e): ModelObserver s `onPreSaveModel`, ktorý v priehľadnej operácii zapíše `NOXUN/project_name_probe`; skript urobí úpravu (operácia „X"), `model.save`, zistí
-`modified?`, zavrie a znovu otvorí kópiu (atribút je?), skúsi `Sketchup.undo` (vráti „X" aj atribút?), zopakuje pri **čerstvo otvorenom** modeli bez úprav (prázdny zásobník) a pri
-`model.save(<nová cesta>)` (Save As); zaznamená poradie `onTransactionCommit` voči návratu `commit_operation`. Výsledok (tabuľka a–e) ide do PR a ako §15 do tohto package.
-**Rozhodnutie:** (a) ∧ (b) ∧ nespadne → R5 variant **A**. Inak R5 variant **C** (§12 D2) a orchestrátor to oznámi Michalovi (mení sa smoke krok 3).
+**R0.2 In-SU sonda háčika uloženia (pred 2. commitom; jednorazový skript nad kópiou `_dev\ENGINEtests.skp`, slučka runnera, `-CloseWhenDone`, **bez** zmeny pluginu)** — (§15 F4):
+ModelObserver s `onPreSaveModel`, ktorý zaznamená `model.path` a v priehľadnej operácii zapíše `NOXUN/project_name_probe` = `model.path`. Scenáre a merané výsledky:
+- **P1 bežné uloženie:** úprava geometrie (operácia „X", napr. posun skupiny) → `model.save` → (a) atribút v súbore (zavrieť, znovu otvoriť kópiu) · (b) `modified?` hneď po uložení ·
+  (c) **pred zatvorením** `Sketchup.undo` raz → vráti sa „X" aj atribút spolu, **žiadny samostatný krok** „Názov zákazky" v zásobníku; potom `Sketchup.redo` → „X" aj atribút späť.
+- **P2 čerstvo otvorený model bez úprav** (prázdny zásobník) → `model.save` → nespadne, (a), (b), (c) bez nového kroku.
+- **P3 Save As:** `model.save(<nová cesta>)` → **ktorú cestu vidí `model.path` v callbacku** (stará / nová) a pod ktorou je výsledný súbor; v sandboxovej mape dva rozdielne staré názvy
+  („Stará" pod starou cestou, „Nová" pod novou) → ktorý by R5 vybral.
+- **P4 autosave (d):** autosave zapnuté s najkratším intervalom (kľúč predvoľby zistí implementátor; NEOVERENÉ) + úprava + čakanie → či háčik beží, či sa mení zásobník Späť a `modified?`.
+  Keď sa autosave nedá spustiť automaticky, P4 urobí Michal ručne podľa návodu v PR **pred** výberom variantu A.
+- **P5 poradie (e):** `onTransactionCommit` voči návratu `commit_operation` (synchrónne?).
+- **P6 vynútená chyba (§15 B1):** callback po `start_operation(…, true, false, true)` vyhodí výnimku **pred** `set_attribute`, zotavenie podľa R5 (bez `abort_operation`) → geometria
+  operácie „X" **zachovaná** (porovnať transformáciu a počty), súbor sa uloží, Undo vráti „X".
+
+Výsledok (tabuľka P1–P6) ide do PR a ako §16 do tohto package.
+**Rozhodnutie:** variant **A** len keď platí **všetko:** (a) ∧ (b) ∧ (c) bez nového kroku Späť a Undo + Redo vracia a obnovuje „X" spolu s atribútom ∧ P2 nespadne ∧ P3 má zistenú cestu
+(R5 Save As podľa nej) ∧ P4 bez škody (alebo Michalovo ručné overenie) ∧ P6 geometria zachovaná. **Nový krok Späť alebo zmena geometrie pri P6 = variant A zakázaný.** Inak R5
+variant **C** (§12 D2) a orchestrátor to oznámi Michalovi (mení sa smoke krok 3).
 
 ### R1 · Kľúč v modeli (dátový kontrakt)
 
@@ -151,7 +163,8 @@ odpoveď na S21 (a)–(e): ModelObserver s `onPreSaveModel`, ktorý v priehľadn
   - `adopt_on_save(model) → :adopted | :skipped | :failed` — R5 (nikdy nevyhodí).
   - `own_txn?` — true **len** počas commitu vlastnej operácie (R4.3).
   - `FAILED_REASON = 'zápis do zákazky sa nepodaril'`.
-- `expect_check` interne volá `name(model)` namiesto `project_name(model)`; všetko ostatné z `:727-761` bez zmeny.
+- `expect_check` interne volá `name(model)` namiesto `project_name(model)` **a explicitne `ExportSettings.merge_18_36`** namiesto nekvalifikovaného `merge_18_36`
+  (`export_settings.rb:731`; bez toho `NameError` → `EXPECT_FAILED` vo **všetkých 4** exportoch — §15 F2, test T9b); všetko ostatné z `:727-761` bez zmeny.
 
 ### R3 · Čítanie názvu (`ProjectName.name`)
 
@@ -181,23 +194,34 @@ nepodarilo uložiť — skús znova" (vetva `:blocked, :unreadable` pre názov *
 **R4.3 „Obnoviť" po vlastnom zápise nezožltne:** zápis názvu nemení kusovník ani čísla. `ProjectName` drží príznak `OWN_TXN = { active: false }` (konštanta, vzor `LAST_BLOCK`), ktorý
 nastaví na `true` tesne pred `commit_operation` a v `ensure` vráti. `StudioDialog.on_model_txn` (`:271-279`) pri **commite** s `ProjectName.own_txn?` epochu **nezdvihne**
 (undo, redo, abort sa nefiltrujú — po Ctrl+Z sa názov zmení a „Obnoviť" smie zožltnúť, D6). Ostatné ModelObservery (`EdgeModelWatch`, `GrainModelWatch`, `DirectionModelWatch`,
-`PanelModelObserver`) sa **nemenia** (len označia „dirty", lenivý prepočet — neškodné). **Podmienka:** synchrónny `onTransactionCommit` (S21 e). Keď R0.2 ukáže asynchrónny callback, príznak
+`PanelModelObserver`) sa **nemenia** (len označia „dirty", lenivý prepočet — neškodné). **Podmienka:** synchrónny `onTransactionCommit` (S21 e, R0.2 P5). Keď R0.2 ukáže asynchrónny callback, príznak
 (ani náhradné `@pushed_epoch = @epoch` po commite) nepomôže — filter sa vypustí a zožltnutie po premenovaní sa prizná v docs; rozhodne orchestrátor.
 
 ### R5 · Prevzatie starého názvu do modelu (variant A — pri uložení)
 
 - **Kedy:** `ModelObserver#onPreSaveModel(model)` nového observera `ProjectName::SaveWatch` (guard `if defined?(Sketchup::ModelObserver)`, vzor `studio_dialog.rb:102`).
-- **Čo:** `adopt_on_save(model)`: kľúč je (aj neplatný) → `:skipped` · `legacy = ExportSettings.legacy_project_name(model)` prázdny → `:skipped` · inak **priehľadná** operácia
-  `model.start_operation('Názov zákazky', true, false, true)` → `set_attribute(Store::DICT, MODEL_KEY, legacy)` (už normalizovaný; zhodný s predvoleným → `''` podľa R4.1) → `commit`
-  s príznakom R4.3 → jeden riadok logu `ProjectName: nazov prevzaty do zakazky (<cesta>)` → `:adopted`. Výnimka → `abort` (s vlastným `rescue`), `log_error`, `:failed`.
-  **Nikdy nevyhodí** z háčika a **nikdy nezastaví ukladanie** používateľa.
+- **Čo:** `adopt_on_save(model)` (§15 B1, F3):
+  1. **Mimo transakcie** (všetko, čo môže zlyhať, okrem samotného zápisu): kľúč je (aj neplatný) → `:skipped` · model nie je **zákazka pluginu** (`noxun_job?`: na modeli je slovník
+     `NOXUN` **alebo** aspoň jedna entita najvyššej úrovne nesie `NOXUN/kind` `cabinet`/`board` — len prvá úroveň, žiadny hĺbkový prechod) → `:skipped` (do cudzích modelov sa nezapisuje) ·
+     `value = ExportSettings.legacy_project_name(model, path: adopt_path(model))`; zhodný s predvoleným → `''`; **prázdny → `''`** (F3: pri prvom uložení sa ustanoví **autorita modelu
+     aj pre automatický názov** — druhé PC potom nepoužije svoj historický záznam pre svoju cestu).
+  2. **Transakcia** = len `model.start_operation('Názov zákazky', true, false, true)` → `begin set_attribute(Store::DICT, MODEL_KEY, value) rescue StandardError => e; err = e end` →
+     **`commit_operation` vždy** (v `ensure`, s príznakom R4.3). **`abort_operation` sa v háčiku NIKDY nevolá** — priehľadná operácia je pripojená k predošlej operácii používateľa
+     a abort by zrušil aj ju (SketchUp API `Model#abort_operation`). Zlyhaný `set_attribute` nič nezmenil, commit bez zmeny je neškodný; zlyhaný `commit_operation` sa len zachytí.
+  3. **Po transakcii:** logovanie (`ProjectName: nazov prevzaty do zakazky (<cesta>)`, resp. `log_error(err, 'ProjectName.adopt_on_save')`) a návrat `:adopted` / `:failed`.
+     Medzi `start_operation` a `commit_operation` nebeží logovanie ani nič iné.
+
+  **Nikdy nevyhodí** z háčika a **nikdy nezastaví ukladanie** používateľa. Testovací šev `ProjectName::FAULT = { adopt: false }` (len pre T5, P6, in-SU 8; v produkcii vždy false — guard).
+  `ExportSettings.legacy_project_name(model, path: nil)` dostane voliteľnú cestu (predvolene `model.path`).
 - **Kde sa pripája:** `ProjectName.attach_save_watch(model)` — anti-double `remove_observer` → `add_observer`, každý krok vlastný `rescue` (vzor `StudioDialog.attach_stale_observer`
   `:327-345`); volá ho `ScaleWatch.install` pre `Sketchup.active_model` (`scale_observer.rb:57`) a `EngineAppObserver#model_switched` (`:993`) pre nový/otvorený dokument. Jeden
   inštančný observer na celý plugin (`@save_watch ||=`).
 - **Prečo nie pri otvorení (A4 B12, A2 B8):** zápis by zákazku označil ako zmenenú a pridal krok Späť bez akcie používateľa. Pri uložení sa súbor zapisuje tak či tak.
 - **Mapa sa nemaže** (D3): na tom PC ďalej platí kľúč v modeli (R3 krok 1); keby niekto zákazku otvoril starším pluginom, nájde názov ako doteraz.
-- **Save As:** háčik prebehne pred zápisom pod novú cestu; prevezme sa záznam **starej** cesty (kópia nesie názov — R20). Prvé uloženie neuloženého modelu: starý záznam nie je
-  (R3), nič sa nedeje.
+- **Save As (§15 F4):** kópia nesie názov **originálu** (R20) → `adopt_path(model)` = cesta, pod ktorou bol dokument otvorený alebo naposledy uložený. Keď R0.2 P3 ukáže, že `model.path`
+  v callbacku je **stará** cesta, `adopt_path = model.path`; keď **nová**, `adopt_path` = pamäť poslednej známej cesty (zapamätá ju `model_switched` pri otvorení a `onPostSaveModel` toho
+  istého observera; viazaná na DocKey token, upratuje ju `Engine.document_cleanups`). Test T5b: rozdielne staré názvy pod starou a novou cestou → prevezme sa názov **starej**.
+  Prvé uloženie neuloženého modelu: cesta nie je → zapíše sa `''` (zákazka pluginu), názov = meno nového súboru.
 - **Ak R0.2 variant A zamietne → variant C** (§12 D2): háčik sa nepridáva; kým zákazka kľúč nemá, názov ostáva per PC (ako dnes) a do súboru ide pri prvom **premenovaní**
   v hlavičke. Vzhľad okna sa nemení; smoke krok 3 sa prepíše.
 
@@ -212,9 +236,19 @@ nastaví na `true` tesne pred `commit_operation` a v `ensure` vráti. `StudioDia
 
 ### R7 · Sonda export testu (kompatibilita K aj P)
 
-`su_export_probe.rb:119-120`: `api = defined?(e::ProjectName) ? e::ProjectName : e::ExportSettings`; `project = (api.respond_to?(:name) && api.equal?(e::ProjectName) ? api.name(model) :
-api.project_name(model)).to_s`, `source = api.name_source(model, project)`, `merge` ďalej z `ExportSettings`. Komentár hlavičky (`:8`) doplniť. **Bez** toho by K (`main` bez modulu)
-alebo P spadol na `NoMethodError` a test by hlásil chybu behu, nie výsledok.
+`su_export_probe.rb:119-120` (§15 F5) — vetvenie **priamo** podľa `defined?(e::ProjectName)` (modul `ExportSettings` odpovedá na `name` ako každý Ruby modul, takže `respond_to?(:name)`
+nič nerozlíši a nekvalifikovaná konštanta na K spadne na `NameError`):
+```ruby
+if defined?(e::ProjectName)            # P (po U1)
+  project = e::ProjectName.name(model).to_s
+  source  = e::ProjectName.name_source(model, project)
+else                                   # K (main pred U1)
+  project = es.project_name(model).to_s
+  source  = es.name_source(model, project)
+end
+expect = { 'project' => project, 'merge' => es.merge_18_36, 'source' => source }
+```
+Komentár hlavičky (`:8`) doplniť. Overenie **oboch vetiev**: headless test sondy nad fake `Noxun::Engine` bez a s `ProjectName` (T11b) a samotný export test (K aj P dobehnú).
 
 ### R8 · Odstránenie zápisu názvu do súboru nastavení
 
@@ -263,7 +297,10 @@ a záznamom operácií — vzor `test_budget.rb:110`):
 - **T3 `save`:** zapíše normalizovanú hodnotu v **jednej** operácii „Názov zákazky"; rovnaká hodnota → `:unchanged` bez operácie; zhodná s predvoleným → `''`; kľúč nie je + starý „A" +
   prázdne pole → zapíše `''` a `name` = meno súboru; výnimka v `set_attribute` → `abort`, `:failed`; `vepo_settings.json` a `.bak` **bajtovo nedotknuté** pri každom zápise názvu.
 - **T4 Neuložený model:** `save` → kľúč v modeli; „uloženie" (zmena `path`) → `name` ostáva **bez** zápisu a bez kľúča sedenia (náhrada 1b-6a scenára).
-- **T5 `adopt_on_save`:** kľúč nie je + starý → priehľadná operácia (argumenty `true, false, true`), `:adopted`, log; kľúč je → `:skipped` bez operácie; starý nie je → `:skipped`;
+- **T5 `adopt_on_save`:** kľúč nie je + starý → priehľadná operácia (argumenty `true, false, true`), `:adopted`, log **až po** `commit`; kľúč je → `:skipped` bez operácie; starý nie je
+  + zákazka pluginu → zapíše `''` (F3); cudzí model (bez NOXUN) → `:skipped` bez operácie; `FAULT` → `commit` zavolaný, **`abort_operation` nikdy** (stub ho zaznamená), `:failed`;
+  **T5b** Save As s rozdielnymi starými názvami pod starou a novou cestou → názov starej (R5); **T5c dva PC:** PC1 bez starého záznamu uloží (kľúč `''`), PC2 má pod svojou cestou
+  starý „Iný" → `name` na PC2 = meno súboru, nie „Iný"; PC1 so starým „A", PC2 so starým „B" → po uložení na PC1 ukáže PC2 „A";
   výnimka → `abort`, `:failed`, **nevyhodí**; starý zhodný s predvoleným → zapíše `''`.
 - **T6 `own_txn?`:** true len počas `commit_operation` (stub commit si ho zapíše), po výnimke false (ensure).
 - **T7 `on_model_txn`:** commit s `own_txn?` → epocha bez zmeny; undo/redo/abort → +1; cudzí commit → +1.
@@ -271,10 +308,12 @@ a záznamom operácií — vzor `test_budget.rb:110`):
   bez zmeny; zastaraná generácia s `project` → veta H7a, **žiadny** zápis do modelu; cudzí dokument → žiadny zápis; `merge` bez zmeny.
 - **T9 Exporty:** `expect` z payloadu → export prejde a mená = T0c; kľúč v modeli zmenený po pushi (simulácia Ctrl+Z) → odmietnutie vetou „Okno ukazovalo …"; automatický → automatický
   tolerancia bez zmeny; `name_suffix` bez vety o čakajúcom názve.
+- **T9b `merge_18_36` v `expect_check` (F2):** všetky 4 exporty s platným `expect` nad modelom s kľúčom prejdú (žiadne `EXPECT_FAILED`); VEPO s nesúladom 18 + 36 odmietnuté.
 - **T10 Payload:** `vepo` = kľúče `project, default_project, merge_18_36, source, file, export_names` v tomto poradí (bez `pending`, `notice`); `project` normalizovaný.
 - **T11 Guardy:** v `ui/` a `core/` žiadny výskyt zaniknutých mien (R8.1 zoznam, `pending_name_note`, `project_key`); `ExportSettings` nevolá `set_attribute` ani `start_operation`;
   `ProjectName` neobsahuje `JsonFileStore.write(`; `legacy_project_name` nevolá `update`/`with_catalog_lock`; jediné `set_attribute(` v `project_name.rb` sú v `save` a `adopt_on_save`;
-  `main.rb` a `helper.rb` načítanie; `doc_key.rb` bez `ExportSettings`; `su_export_probe.rb` rozlišuje API (R7).
+  `main.rb` a `helper.rb` načítanie; `doc_key.rb` bez `ExportSettings`; `su_export_probe.rb` rozlišuje API (R7); **T11b** sonda nad fake modulom bez `ProjectName` (vetva K) aj s ním (vetva P) zloží `expect` bez výnimky; v ceste `adopt_on_save`
+  nie je `abort_operation` a medzi `start_operation` a `commit_operation` nie je volanie logu; `FAULT` je v produkcii false.
 - **T12 Golden:** T0a, T0c **bez regenerácie** zelené; T0b-U1 zelené.
 - **Prepis existujúcich:** `test_h7a_export_settings.rb` (T-A5 most, T-A10, T-A11 a guardy kľúča sedenia **zanikajú**; matica R-A2 pre 18 + 36 a `last_dir` ostáva; zápis názvu
   v matici nahradí T3 „súbor nedotknutý" aj pri poškodenom súbore — názov sa uloží do modelu aj pri `:blocked` súbore nastavení), `test_h7a_golden.rb` (starý T0b preč),
@@ -284,7 +323,8 @@ a záznamom operácií — vzor `test_budget.rb:110`):
 **Mutácie (≥ 12, každá zhodí test):** M1 `name` číta starý záznam aj pri kľúči `''` · M2 `name` zapisuje (adopt pri čítaní) · M3 `save` bez operácie · M4 `save` bez `abort` pri výnimke ·
 M5 `:unchanged` otvorí operáciu · M6 zhodný s predvoleným sa zapíše ako text · M7 `adopt_on_save` bez priehľadnosti (`start_operation(name, true)`) · M8 `adopt_on_save` prepíše existujúci
 kľúč · M9 `adopt_on_save` vyhodí · M10 `on_model_txn` filtruje aj undo · M11 `own_txn?` bez `ensure` · M12 zápis názvu siahne na `vepo_settings.json` · M13 `expect_check` číta
-`legacy_project_name` priamo (obíde model) · M14 strop 120 vypnutý pri zápise · M15 sonda R7 len s `ProjectName` (K spadne).
+`legacy_project_name` priamo (obíde model) · M14 strop 120 vypnutý pri zápise · M15 sonda R7 len s `ProjectName` (K spadne) · M16 `adopt_on_save` volá `abort_operation` · M17 log vnútri transakcie · M18 bez zápisu `''` pri prázdnom starom (F3) ·
+M19 `expect_check` s nekvalifikovaným `merge_18_36` · M20 Save As berie názov novej cesty.
 
 **DoD:** testy + mutácie (zoznam a výsledok do PR) · headless + **všetky** JS sady (`for f in tests/js/test_*.js; do node "$f" || exit 1; done`) · encoding guard · in-SU (§8) ·
 export test `P == K` · fotky `-Record` · docs (R10) · §11.
@@ -300,15 +340,18 @@ export test `P == K` · fotky `-Record` · docs (R10) · §11.
 4. *(Neuložený model runner nesimuluje — kryje ho headless T4 a smoke krok 4.)*
 5. Prevzatie: do sandboxu `vepo_settings.json` vložiť starý záznam pre cestu kópie, kľúč zmazať (`delete_attribute`), `model.save` → kľúč = starý názov, `modified?` po uložení false,
    zásobník Späť bez nového kroku (podľa R0.2); znovuotvorenie kópie (ak runner vie — inak čítanie atribútu a `model.path`) → názov z modelu.
-6. Kľúč existuje + starý záznam iný → `model.save` nič nezmení.
+6. Kľúč existuje + starý záznam iný → `model.save` nič nezmení. Model bez kľúča a bez starého záznamu → po `model.save` kľúč `''` (F3).
 7. 4 exporty cez `ExportPrep` s `expect` z payloadu (vzor existujúceho SMOKE) → mená podľa kľúča v modeli.
+8. **Vynútená chyba (B1):** `ProjectName::FAULT[:adopt] = true`, úprava geometrie (operácia „X") → `model.save` → geometria „X" **zachovaná** (rozmer,
+   transformácia), súbor uložený, log chyby, `Sketchup.undo` vráti „X"; `FAULT` späť na false v `ensure` runnera.
 
 Upratovanie: runner pracuje so **skutočným** `%APPDATA%` — vložený starý záznam po sebe zmaže **cez strikné čítanie a zápis mapy v teste** (nie cez plugin — plugin mapu už nezapisuje;
 pomocník runnera s `JsonFileStore` pod `Materials.with_catalog_lock`), kľúč v modeli vráti. Beh `scripts\run_su_tests.ps1 -CloseWhenDone` na finálnej hlave; PR uvedie hlavu.
 
 ## 9 · Riziká
 
-1. **Háčik uloženia sa správa inak, než predpokladáme** (zápis sa neuloží, zákazka ostane „zmenená", nový krok Späť, pád pri autosave) — S21. Ochrana: sonda **R0.2 pred** kódom,
+1. **Háčik uloženia sa správa inak, než predpokladáme** (zápis sa neuloží, zákazka ostane „zmenená", nový krok Späť, pád pri autosave, **chyba zruší úpravu používateľa**) — S21, §15 B1.
+   Ochrana: v háčiku **žiadny abort**, chyby a log mimo transakcie (R5), sonda **R0.2 P1–P6 pred** kódom,
    variant C pripravený (D2), háčik nikdy nevyhodí ani nezastaví uloženie.
 2. **Kópia zákazky („Uložiť ako") si nesie názov** — dve varianty s rovnakým názvom by VEPO exportovali do priečinka s rovnakým menom (dnes kópia dostane meno súboru). R20 (vedome prijaté), smoke
    krok 6; tvrdá ochrana = G-05.
@@ -316,7 +359,7 @@ pomocník runnera s `JsonFileStore` pod `Materials.with_catalog_lock`), kľúč 
 4. **Golden T0b zaniká** — vedomá zmena; bez náhrady by nič nestrážilo bajty súboru pri 18 + 36. Ochrana: T0b-U1 (R0.1) a T3 „súbor nedotknutý".
 5. **Ctrl+Z vráti názov, hlavička to neukáže** do „Obnoviť" — export s `expect` sa zastaví neutrálnou vetou (fail-closed, T9); echo po Späť mimo scope (D6).
 6. **Sonda export testu** po zmene API — K alebo P spadne na `NoMethodError`. Ochrana: R7, guard T11, M15.
-7. **„Obnoviť" zožltne po premenovaní** pri asynchrónnom `onTransactionCommit` — kozmetické; R4.3 podmienka, R0.2 (e).
+7. **„Obnoviť" zožltne po premenovaní** pri asynchrónnom `onTransactionCommit` — kozmetické; R4.3 podmienka, R0.2 P5.
 8. **Odstránenie mechanizmu kľúča sedenia** zmaže ochranu, ktorá by ešte niečo kryla. Overené: kryla len názov neuloženého modelu (S4) — ten teraz žije v modeli (T4); `DocKey`
    ostáva nezávisle (S5 cleanup DocKey bez zmeny).
 9. **Dve inštancie SketchUpu s tým istým súborom** — dnes zdieľali mapu pod zámkom; po U1 má každá svoj model a vyhrá posledné uloženie (štandardné správanie SketchUpu). Priznať v docs.
@@ -374,7 +417,20 @@ zákazky" hotová (D-48 ostáva otvorený do uzáveru bloku) → číslo PR samo
 
 ## 14 · Nálezy mimo scope
 
-- **N1:** Echo hlavičky Štúdia po Späť/Znova (D6) — aj pre iné údaje zákazky (rozpočet) by „Obnoviť" po Ctrl+Z mohlo prepočítať samo; kandidát na zásobník UI.
-- **N2:** G-05 (export do datovaného priečinka) vyrieši aj riziko 2 / Q1 natrvalo.
-- **N3:** `vepo_settings.json` po U1 nesie mŕtvu mapu `project_names`; upratanie (s doprednou bránou a `std`) až keď na oboch PC nebude plugin starší než U1 — kandidát po bloku.
-- **N4:** `ProjectName` je prirodzené jadro budúcej **karty zákazky** (G-02: zákazník, adresa, termín) — ďalšie kľúče na modeli rovnakým kontraktom.
+- **N1:** echo hlavičky Štúdia po Späť/Znova (D6), aj pre rozpočet — zásobník UI. **N2:** G-05 (export do datovaného priečinka) natrvalo vyrieši riziko 2 / R20.
+- **N3:** mŕtvu mapu `project_names` v `vepo_settings.json` upratať (s doprednou bránou a `std`), keď na oboch PC nebude plugin starší než U1.
+- **N4:** `ProjectName` = jadro budúcej **karty zákazky** (G-02) — ďalšie kľúče na modeli rovnakým kontraktom.
+
+## 15 · Audit návrhu — zapracovanie (Codex `gpt-6-astra`, 17.10.2026) — 1 BLOCKER · 4 FIX · MÁ PREDNOSŤ
+
+Surový výstup: [AUDIT_U1_raw.md](AUDIT_U1_raw.md). Všetky nálezy sú platné (F2 a F5 auditor potvrdil Ruby sondou; B1 vyplýva z dokumentácie `Model#abort_operation`).
+
+| # | Nález | Dispozícia | Kde v package |
+|---|---|---|---|
+| **B1** BLOCKER | `abort` priehľadnej operácie v háčiku uloženia zruší aj pripojenú úpravu používateľa | v háčiku **nikdy `abort_operation`**: všetko overiteľné mimo transakcie, v transakcii len `set_attribute` so zachytenou chybou, `commit_operation` vždy; logovanie až po transakcii; testovací šev `FAULT`; in-SU vynútená chyba so zachovaním geometrie. `ProjectName.save` (vlastná, nepripojená operácia z hlavičky) `abort` ponecháva | R5 body 1–3, R0.2 P6, T5, T11b, M16–M17, in-SU 8, riziko 1 |
+| **F2** FIX | presunutý `expect_check` volá nekvalifikované `merge_18_36` → `NameError` → `EXPECT_FAILED` vo všetkých 4 exportoch | explicitne `ExportSettings.merge_18_36` | R2, T9b, M19 |
+| **F3** FIX | bez starého záznamu na odosielajúcom PC sa nič nezapíše; druhé PC potom použije svoj historický názov | pri prvom uložení **zákazky pluginu** bez kľúča sa zapíše aj `''` (autorita modelu pre automatický názov). Spresnenie autora: len zákazky pluginu (`noxun_job?`), aby plugin nezapisoval do každého uloženého `.skp` | R5 bod 1, in-SU 6, T5, T5c (dva PC s rozdielnymi mapami), M18 |
+| **F4** FIX | R0.2 nepokrýva podmienky A (nový krok Späť, autosave, Undo + Redo pred zatvorením, `model.path` pri Save As, rozdielne staré názvy) | R0.2 prepísaná na scenáre P1–P6 s tvrdým pravidlom „nový krok Späť alebo zmena geometrie = A zakázané"; Save As berie cestu originálu (`adopt_path`, pamäť poslednej známej cesty, ak callback vidí novú); autosave ručne Michal, ak sa nedá automatizovať | R0.2, R5 Save As, T5b, M20 |
+| **F5** FIX | sonda R7 na K spadne (`respond_to?(:name)` je na module vždy true, konštanta neexistuje) | vetvenie priamo podľa `defined?(e::ProjectName)`, test oboch vetiev | R7, T11b |
+
+**Dopad na odhad:** nová logika +~30 riadkov (`noxun_job?`, `adopt_path` s pamäťou cesty, šev `FAULT`), testy +~80; rez a trieda bez zmeny. Výsledok R0.2 sa zapíše ako §16.
