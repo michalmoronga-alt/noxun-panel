@@ -19,15 +19,15 @@ Len čítanie kódu (Grep/Read), bez spustenia a bez zápisu do modelu či `%APP
 | S1 | Register je čisté dáta; `JsonFileStore` neregistrovaný súbor **neodmieta** — vynútenie a háčiky ostali na SYNC-0 | `core/library_registry.rb:10-14`; `core/json_file_store.rb:79-95` (žiadna kontrola cesty) | PRAVDA |
 | S2 | Zdieľaná množina = 12 riadkov (`materials appearances abs_rules hardware_rules hardware_catalog hardware_taxonomy hardware_sets templates template_previews supplier_settings appliances appliance_files`), pripnutá testom | `library_registry.rb:87-135`; `tests/pure/test_h16_kniznice.rb:44-45, :853-858` | PRAVDA |
 | S3 | Riadok registra nemá pole skupiny ani závislosti; `KINDS` už pozná `backup`, `SYNCS` = shared/local | `library_registry.rb:44-46, :75-82` | PRAVDA |
-| S4 | Guard T5 padne na **zapisovateľa v súpise bez zápisu** aj na **zápis mimo súpisu**; T5b drží počet zápisových miest per súbor (`WRITE_SITES`) | `test_h16_kniznice.rb:220-245, :72-106` | PRAVDA |
+| S4 | Guard T5 padne na zapisovateľa bez zápisu aj na zápis mimo súpisu; T5b drží `WRITE_SITES` | `test_h16_kniznice.rb:72-106, :220-245` | PRAVDA |
 | S5 | **B1:** `Materials.write` → `write_unlocked` → `prepare_appearance_write!` berie `appearance` vždy z **disku** (`copy_appearance!(rec, old)`), nie z payloadu | `core/materials.rb:309-314, :337`; `core/materials_appearance.rb:182-216, :160-165` | PRAVDA |
 | S6 | `write_unlocked` pečiatkuje `std`, `schema` = max(payload, obsah, disk) a odmietne pri `catalog_read_only?` | `materials.rb:329-334, :342-343, :367-369` | PRAVDA |
 | S7 | **B2:** čítanie samo zapisuje (seed-merge, normalizácia, migrácia) | `materials.rb:265-266`, `abs_rules.rb:231-239, :282-296`, `hardware_rules.rb:544-551`, `hardware_catalog.rb:184-191`, `templates.rb:105-107, :461-465`, `supplier_settings.rb:228-230`, `hardware_taxonomy.rb:470-484` | PRAVDA |
 | S8 | Bežné zápisy pečiatkujú/normalizujú: `abs_rules.rb:376`, `hardware_rules.rb:764-765`, `hardware_sets.rb:1517-1519`, `supplier_settings.rb:443`, `templates.rb:664`, `hardware_catalog.rb:600-603`, `appliance_catalog.rb:935-941`; všetci volajúci chytajú `StandardError` → `false` | uvedené riadky | PRAVDA |
-| S9 | Každý store má **čisté posúdenie dokumentu**, ktoré sa dá použiť ako brána importu: Materials `assess_catalog_schema(data)` (`materials_health.rb:287-321`, vrátane `schema2_complete?`, dupláka, vzhľadu, novšej schémy) · AbsRules `doc_shape_ok?` (`abs_rules.rb:266-272`; novší `std` prepúšťa) · HardwareRules `doc_shape_ok?` + `doc_std_unsupported?` (`hardware_rules.rb:604-623`) · HardwareCatalog `stored_document_issue` (`hardware_catalog.rb:250-258`) · HardwareTaxonomy `assess_doc` (`hardware_taxonomy.rb:160-180`) · HardwareSets `assess_library_doc` (`hardware_sets.rb:690-…`, whitelist + round-trip) · TemplateStore `library_doc(file)` tvar (`templates.rb:535-540`) · SupplierSettings `doc_shape_ok?` + `doc_std_unsupported?` (`supplier_settings.rb:286-298, :398`) · ApplianceCatalog `stored_document_issue` (`appliance_catalog.rb:348-362`) | uvedené riadky | PRAVDA |
-| S10 | **B6:** stav v pamäti — `Materials @catalog_state/@catalog_state_reason/@cutover_issue` (`materials_health.rb:199-223`), `HardwareCatalog @state/@price_proposals/@create_proposals` (`hardware_catalog.rb:144-230`), `HardwareTaxonomy @state*` (`hardware_taxonomy.rb:109-137`), `HardwareSets @lib_state*` (`hardware_sets.rb:590-620`), `ApplianceCatalog @state*` (`appliance_catalog.rb:265-328`), `@shape_logged/@write_block_reason` (abs, rules, supplier), `TemplateStore @unhealthy_logged` | uvedené riadky | PRAVDA |
+| S9 | Každý store má **čisté posúdenie dokumentu** použiteľné ako brána importu (stĺpec „Brána“ v R3.4) | `materials_health.rb:287-321`, `abs_rules.rb:266-272`, `hardware_rules.rb:604-623`, `hardware_catalog.rb:250-258`, `hardware_taxonomy.rb:160-180`, `hardware_sets.rb:690+`, `templates.rb:535-540`, `supplier_settings.rb:286-298, :398`, `appliance_catalog.rb:348-362` | PRAVDA |
+| S10 | **B6:** stav v pamäti modulov (posúdenie, návrhy cien, log príznaky) — zoznam v R3.3 | `materials_health.rb:199-223`, `hardware_catalog.rb:144-230`, `hardware_taxonomy.rb:109-137`, `hardware_sets.rb:590-620`, `appliance_catalog.rb:265-328` | PRAVDA |
 | S11 | Resety sú dnes „test-only" a **dva nulujú aj zámkový čítač**: `HardwareCatalog.reset_state!` → `@lock_depth = 0` (`hardware_catalog.rb:226-231`), `ApplianceCatalog.reset_state!` → `@lock_held = false` (`appliance_catalog.rb:323-328`) — volanie pod zámkom by rozbilo reentranciu | uvedené riadky | PRAVDA → R4.3 |
-| S12 | Zámky: `Materials.with_catalog_lock` reentrantný, kontroluje `flock` (`materials.rb:503-530`); `HardwareCatalog.with_lock` `flock` nekontroluje (`hardware_catalog.rb:128`); `TemplateStore.with_lock` výnimku **prehltne a vráti `false`** (`templates.rb:636-653`); `ApplianceCatalog.with_lock` kontroluje (`appliance_catalog.rb:225-245`) | uvedené riadky | PRAVDA (F3) |
+| S12 | Zámky: `Materials` a `ApplianceCatalog` kontrolujú `flock` (`materials.rb:503-530`, `appliance_catalog.rb:225-245`); `HardwareCatalog.with_lock` nie (`hardware_catalog.rb:128`); `TemplateStore.with_lock` výnimku prehltne → `false` (`templates.rb:636-653`) | uvedené riadky | PRAVDA (F3) |
 | S13 | **B14:** značky UNI zapisujú `write_uni_marker` / `write_drawer_uni_marker` (`materials_catalog.rb:1104-1108, :1184-1188`); bez značky `ensure_uni_records!` / `ensure_drawer_uni!` UNI záznamy pri štarte doplnia (`:1071-1098`, `:1142-1182`) | uvedené riadky | PRAVDA |
 | S14 | **B7:** `.bak` sa prepíše každým ďalším zápisom (`json_file_store.rb:84, :190-199`) — nie je to záloha R4 | uvedené riadky | PRAVDA |
 | S15 | Druhá inštancia: `Updater.live_leases(plugins_dir)` existuje, je fail-closed (`Refused` pri chýbajúcom priečinku) | `updater.rb:751-760`, použitie `:924, :970` | PRAVDA |
@@ -72,15 +72,10 @@ pre obe** (vzor H7a/H7b); U2b nemení rámec z U2a — ak by musela, delta audit
 
 ## 3 · Scope IN
 
-- `core/library_registry.rb`: pole `group` na zdieľaných riadkoch, konštanta `GROUPS` (O3), API skupín a závislostí (B8), riadky `library_backups` a `library_sync` (B7).
-- `core/json_file_store.rb`: odmietnutie zápisu do koreňa knižníc mimo registra (SYNC-0).
-- **Kontrakt store-u** (R3) v 9 moduloch: `export_document` (kanonický, bez pečiatok), `import_document!(doc)` (celý dokument s bránami, bez seed-merge a pečiatkovania),
-  `after_import!` (reset stavu v pamäti + nové posúdenie + usadenie), pri Materiáloch a Spotrebičoch `attachment_refs(doc)`.
-- **Nový modul** `core/library_transfer.rb` (`Noxun::Engine::LibraryTransfer`): export a import **skupiny**, brány, pomenovaná záloha + návrat zo zálohy, úschova lokálneho
-  stavu synchronizácie (obálka; obsah plní U3), rovnosť verzie pluginu (R14), kanonické bajty a odtlačok.
-- Značky UNI po prevzatí Materiálov (B14).
-- Dokumentácia: odseky `library_registry` + nový `library_transfer` ([kniznice.md](../../../../docs/architecture/kniznice.md)), `json_file_store` (model-a-identita.md),
-  odseky dotknutých store-ov, STANDARD §13.1 (nové `STD`), rozcestník ARCHITEKTURA.md, scenár 7.
+- Register: skupiny, závislosti, riadky `library_backups`, `library_sync`, `library_import_pending` (R1, R4.9) · vynútenie v `JsonFileStore.write` (R2).
+- Kontrakt store-u v 9 moduloch: `export_document`, `import_check`/`import_document!`, `after_import!`, `attachment_refs` (R3).
+- Nový modul `core/library_transfer.rb`: snímok a prevzatie skupiny, záloha a návrat, žurnál a obnova po páde, stav synchronizácie, verzia podľa R18, odtlačok (R4, R5) · značky UNI (R6).
+- Dokumentácia (R7).
 
 ## 4 · Scope OUT
 
@@ -157,7 +152,9 @@ Každý zdieľaný store typu `library` dostane **tri verejné metódy** (`modul
    + `load`, `HardwareTaxonomy.load`, `HardwareSets.load`, `TemplateStore.load`, `SupplierSettings.load_with_origin`, `ApplianceCatalog.assess!`). Tá smie zapísať seed-merge či
    normalizáciu **ako dnes** — zámer: odoslaný dokument je už „usadený" a prijímajúce PC s rovnakou verziou ho pri prvom čítaní neprepíše (B3, §9 R5).
 2. **Stav:** store musí byť `:ok` (nie degradovaný, len na čítanie, z novšej verzie, zo seed fallbacku). Inak `[:not_ok, dôvod store-u]` — Odoslať z poškodenej knižnice nikdy.
-3. **Čítanie pod zámkom store-u** (`lock` riadku): `JSON.parse(File.binread(path))` **priamo z primára** — bez cache, bez `.bak`, bez seedu, bez normalizácie. Chýbajúci primár → `[:missing, …]`.
+3. **Čítanie pod zámkom store-u** (`lock` riadku): `JSON.parse(File.binread(path))` **priamo z primára** — bez cache, bez `.bak`, bez seedu, bez normalizácie. **Zdravý primár je
+   podmienka (A1 S2):** primár chýba a `.bak` existuje, primár sa neparsuje alebo `JsonFileStore.degraded?(path[, shape:])` → `[:not_ok, „najprv obnov knižnicu"]` — tichý fallback
+   zo zálohy sa **nikdy** neodošle; chýba primár aj `.bak` (prvé založenie) → `[:missing, …]`.
 4. Dokument prejde **tou istou bránou ako import** (R3.2 krok 2); neprejde → `[:invalid, dôvod]`.
 - Výsledok je **presne obsah súboru** (aj `std`, `schema`, `seed_version`, neznáme top-level kľúče). Kanonické bajty a odtlačok robí `LibraryTransfer` (R4.6).
 
@@ -203,10 +200,12 @@ Načítanie v `main.rb` za `core/price_refresh` (S20) + `tests/helper.rb`; pri n
 **R4.1 `export_group(group_key)` → `[:ok, packet]` | `[kód, správa]`**
 - `packet = {'group', 'plugin_version' => Engine::VERSION, 'documents' => {entry_key => doc}, 'attachment_refs' => {entry_key => [rel. cesty]}, 'fingerprints' => {entry_key => sha256}}`.
 - Členy v poradí `GROUPS`; každý `export_document` (R3.1). Prvý neúspech = celý výsledok neúspech s menom člena (Odoslať skupinu „naraz alebo vôbec").
-- Zámky sa berú **postupne**, nikdy vnorene (F4). Súdržnosť medzi dvoma súbormi skupiny nie je atomická (§9 R6).
+- **Konzistentný snímok (A1 S3):** usadenie (R3.1 krok 1) všetkých členov → **1. prechod** čítania surových bajtov každého člena pod jeho zámkom, **postupne** (zámky sa nevnárajú,
+  F4) → **2. prechod** rovnako → SHA-256 každého člena sa v oboch prechodoch musí zhodovať (každý súbor bol nemenný v spoločnom okne medzi koncom 1. a začiatkom 2. prechodu =
+  jedna revízia skupiny). Nezhoda → opakovať najviac 3×, potom `[:busy_snapshot, „knižnica sa práve mení — skús o chvíľu"]`. Do packetu ide obsah 1. prechodu.
 
 **R4.2 `import_group!(group_key, packet, plugins_dir:, reason:)` → `[:ok, result]` | `[kód, správa, detail]`**
-1. **Predpoklady (nič sa nezapisuje):** `packet['group'] == group_key`; **`packet['plugin_version'] == Engine::VERSION`** inak `:version_mismatch` (R14 — porovnanie reťazcov presne);
+1. **Predpoklady (nič sa nezapisuje):** `packet['group'] == group_key`; **`import_allowed?(packet['plugin_version'])`** inak `:version_mismatch` (R5/R18);
    `documents` obsahuje **práve** knižnice skupiny; `Updater.live_leases(plugins_dir)` prázdne, inak `:other_instance` (`Refused` = `:other_instance_unknown`, fail-closed — S15);
    `PriceRefresh.running?` → `:busy` (S16).
 2. **Brány všetkých dokumentov naraz** (R3.2 kroky 2–4 ako čistá kontrola `import_check(doc)` každého store-u — nová verejná metóda bez zápisu, ktorú `import_document!`
@@ -251,20 +250,38 @@ Reentrancia: obal nesmie nastaviť `@lock_held`/`@lock_depth` modulu; `import_do
   bez zápisu; zlúči `attrs` do `meta` (chýbajúci kľúč ostane), ten istý zámok a brány ako `update_sync_state!`, `groups` nemení. Význam hodnôt (ako vzniká `pc_id`, kedy `admin`) **definuje U3**.
 
 **R4.8 API pre U3/U5 (súhrn):** `export_group` · `import_group!` · `create_backup!` · `backups` · `restore_backup!` · `sync_state` · `update_sync_state!` · `update_sync_meta!` ·
-`with_store_lock` · `compatible?` · `canonical_bytes` · `fingerprint`; z registra `groups` · `members` · `depends_on` · `dependents`. Nič iné U3/U5 z U2 nevolá.
+`with_store_lock` · `import_allowed?` · `export_allowed?` · `compare_versions` · `recover_pending!` · `canonical_bytes` · `fingerprint`; z registra `groups` · `members` · `depends_on` · `dependents`. Nič iné U3/U5 z U2 nevolá.
 
 **R4.6 Kanonické bajty a odtlačok**
 - `canonical_bytes(doc)` = `JSON.generate` nad kópiou s **rekurzívne zoradenými kľúčmi** Hash-ov (polia v pôvodnom poradí), UTF-8, bez medzier. `fingerprint(doc)` = SHA-256 hex.
 - Rovnosť platí len pri **rovnakej verzii pluginu a Ruby** (R14, R10 — obe PC SketchUp 2026); formát desatinných čísel je formát `JSON.generate` danej verzie (§9 R7).
 
+**R4.9 Obnova po páde procesu uprostred prevzatia (A1 S1)**
+- Nový riadok registra `library_import_pending` · `file: 'library_import.pending.json'` · `kind: marker` · `sync: local` · `lock: 'materials.lock'`, `lock_mode: 'module'` · `bak: true` ·
+  `writers: core/library_transfer.rb`. Obsah `{'pid', 'exe', 'group', 'backup_id', 'started_at'}`.
+- `import_group!` / `restore_backup!` ho zapíšu **po** úspešnej zálohe a **pred** prvým zápisom knižnice; zmažú ho až po `after_import!` a značkách UNI (úspech) alebo po úspešnom
+  návrate zo zálohy. Pri `:failed_restore_failed` **ostáva**. Žurnál živého procesu na začiatku importu → `:busy`.
+- **`recover_pending!(plugins_dir)`** — `main.rb` ho volá v boot bloku **ako prvé, pred `Materials.boot_cutover!`** (`main.rb:614-621`), teda pred prvým čítaním knižníc; vlastný
+  `begin/rescue`. Žurnál + proces `pid` nežije (`Updater.lease_alive?`, `updater.rb:717`) → **návrat** zo zálohy `backup_id` (`restore_backup!` bez kontroly leases; R6 a `after_import!`
+  platia), zmazanie žurnálu, `last_recovery` pre U5 („Prevzatie sa prerušilo — knižnica vrátená na stav pred ním"). Dokončenie sa **nerobí** (packet sa neukladá). Návrat zlyhá →
+  žurnál ostáva, `pending_issue` (veta s ID zálohy) — U5 ju ukáže červeno a ponúkne len „Vrátiť zálohu".
+
+**R4.10 Odvodené výpočty po prevzatí (A1 S4)** — sonda: `core/budget.rb`, `sheet_estimate.rb`, `sheet_layout.rb`, `bom.rb` **nedržia stav v module** (žiadna `@` premenná;
+`BudgetStore` len `@in_write`); Štúdio počíta odhad platní, plán aj rozpočet nanovo v každom `push_state` (`ui/studio_dialog.rb:1647-1723`). Zneplatniť treba len **zobrazenie**:
+`import_group!`/`restore_backup!` vrátia `'refresh' => true` a **U5 povinne** zavolá `push_state(bump: true)` otvorených okien (nová generácia zahodí akcie zo starých dát).
+**Guard:** tieto štyri súbory bez stavových `@` premenných (nová cache = vlastné zneplatnenie + úprava guardu). Zákazky na prestavbu = §14 N5.
+
 **R4.7 Kódy výsledkov** (Symboly; vyhodnocovať cez `case`, nie pravdivosť): `:ok :not_ok :missing :invalid :newer :local_newer :missing_attachments :version_mismatch :other_instance
-:other_instance_unknown :busy :backup_failed :write_failed :failed_restored :failed_restore_failed :unhealthy_restored :unknown_group :broken`. Každý s **jednou slovenskou vetou**
+:other_instance_unknown :busy :backup_failed :write_failed :failed_restored :failed_restore_failed :unhealthy_restored :unknown_group :broken :busy_snapshot`. Každý s **jednou slovenskou vetou**
 (funkčne, bez cesty v texte okrem `:failed_restore_failed`, kde menuje ID zálohy) — U5 ich zobrazí bez úprav.
 
-### R5 · Rovnosť verzie pluginu (R14) — pravidlo, nie len kontrola v UI
+### R5 · Verzia pluginu podľa R18 (dve brány, A1 S5)
 
-- `LibraryTransfer.compatible?(plugin_version)` = `plugin_version == Engine::VERSION` — **jediná** autorita pravidla; volá ju R4.2 aj U3 (manifest) aj U5 (veta O7).
-- Pravidlo do STANDARD (nový odsek **§13.4 „Zdieľanie knižníc"**, 3 vety: zdieľa sa len pri zhode verzie pluginu; dopredné brány store-ov ostávajú poistkou; dôvod A4 B3).
+- `import_allowed?(v)` = `v == Engine::VERSION` (**Aktualizovať** len pri rovnakej verzii; volá R4.2 krok 1, U3, U5 veta O7).
+- `export_allowed?(disk_v)` = `disk_v.nil?` ∨ `compare_versions(disk_v, Engine::VERSION) <= 0` (**Odoslať** blokuje len knižnica na Disku z **novšieho** pluginu).
+  Druhú podmienku R18 (správcova verzia pluginu ešte nie je na Disku pre druhé PC) posudzuje **U3** nad distribúciou D-52 — U2 dáva len `compare_versions(a, b)` (−1/0/1, číselne po
+  segmentoch `x.y.z`, neplatný reťazec → `ArgumentError`). Tieto tri metódy sú **jediná** autorita; `compatible?` sa nezavádza. Test: `0.18.1`/`0.18.10`/`0.19.0`, rovnosť, `nil`, neplatný.
+- STANDARD nový odsek **§13.4 „Zdieľanie knižníc"** (3 vety: R18 dve brány; dopredné brány store-ov ostávajú poistkou; dôvod A4 B3).
 
 ### R6 · Značky UNI po prevzatí Materiálov (B14)
 
@@ -273,12 +290,9 @@ Reentrancia: obal nesmie nastaviť `@lock_held`/`@lock_depth` modulu; `import_do
 
 ### R7 · Dokumentácia (na mieste, nie na koniec súboru)
 
-- kniznice.md: odsek `library_registry.rb` (skupiny, API, vynútenie — veta „Čo register nerobí" sa prepíše), **nový odsek `library_transfer.rb`**, riadky §3 pre `library_backups`
-  a `library_sync`, F5/F12 doplniť „rieši U2" — tabuľky stráži T8.
-- model-a-identita.md `### json_file_store.rb`: odsek o vynútení (R2). Odseky dotknutých store-ov (materials.md, hardware.md, model-a-identita.md `templates.rb`, outputs.md
-  `supplier_settings.rb`, appliances.md): jedna veta o `export_document`/`import_document!`/`after_import!` a tom, že bežné zápisy sa nemenia.
-- ARCHITEKTURA.md rozcestník: riadok `library_transfer.rb` (guard). rozsirovacie-body.md scenár 7: riadok „nový zdieľaný store = `group` + tri metódy R3 + riadok R3.4".
-- STANDARD §13.1: `LibraryTransfer::SYNC_STD` = 1, `LibraryTransfer::BACKUP_STD` = 1 (stĺpec Schéma áno); §13.4 (R5).
+- kniznice.md: odsek `library_registry.rb` (skupiny, API, vynútenie; prepísať „Čo register nerobí"), **nový odsek `library_transfer.rb`**, riadky §3 nových riadkov registra, F5/F12 „rieši U2" (T8).
+- model-a-identita.md `json_file_store.rb` (R2); odseky dotknutých store-ov (materials, hardware, templates, supplier_settings, appliances) — jedna veta o R3 a o tom, že bežné zápisy sa nemenia.
+- ARCHITEKTURA.md riadok `library_transfer.rb` (guard) · rozsirovacie-body.md scenár 7 („nový zdieľaný store = `group` + R3 + riadok R3.4") · STANDARD §13.1 `SYNC_STD`, `BACKUP_STD` = 1 (Schéma áno), §13.4 (R5).
 
 ## 7 · Testy a DoD
 
@@ -298,7 +312,9 @@ Reentrancia: obal nesmie nastaviť `@lock_held`/`@lock_depth` modulu; `import_do
   overenie SHA — poškodený súbor zálohy → odmietnutie bez zápisu); značky UNI po Materiáloch (zmazaný UNI záznam po `ensure_uni_records!` nepribudne); `sync_state` (tvar, degradovaný
   súbor, neznáma skupina); `update_sync_meta!` (zlúčenie, zlý kľúč/typ → `false` bez zápisu, `groups` nedotknuté a naopak `update_sync_state!` nemení `meta`); `with_store_lock`
   (prílohové riadky dostanú zámok svojej knižnice, neznámy kľúč → `ArgumentError`, stub `flock` → `false` = `IOError` a blok sa nevykoná, vnorenie dvoch zámkov → `IOError`);
-  kanonické bajty (poradie kľúčov nemení odtlačok, poradie poľa áno).
+  kanonické bajty (poradie kľúčov nemení odtlačok, poradie poľa áno); **S2** export pri chýbajúcom primári s `.bak` a pri degradovanom → `:not_ok`; **S3** stub zápisu medzi
+  prechodmi → opakovanie, trvalá zmena → `:busy_snapshot`; **S1** podproces prevzatia ukončený `exit!` po 1. dokumente skupiny (vzor `tests/h16_first_use.rb`) → nový proces
+  `recover_pending!` → oba súbory bajtovo pôvodné, žurnál preč, `last_recovery`; žurnál živého `pid` ostane; zlyhaný návrat → `pending_issue`; **S4** guard R4.10.
 - **Zdrojové guardy:** `import_document!` žiadneho store-u nevolá `normalize*`, `merge_seed*`, `persist_seed_merge!`, `prepare_appearance_write!`, `write_unlocked`, `write_list` ani bežné
   `write` (Grep tela metódy, vzor `test_h10b_rady.rb:462`); okná (`ui/`) nevolajú `import_document!` ani `import_group!` (do U5).
 - **H16 sada** zelená s novými riadkami a `WRITE_SITES` (`core/library_transfer.rb` — počet podľa implementácie, dôvod „zálohy library_backups/ a library_sync.json");
@@ -318,22 +334,19 @@ PR uvedie hlavu behu. U2b bez behu (len nové cesty bez volajúceho).
 | # | Riziko | Dopad | Opatrenie |
 |---|---|---|---|
 | R1 | Vynútenie (R2) odmietne zápis, ktorý dnes prechádza | knižnica sa prestane ukladať | R0.3 pred R2; H16 T4/T6; in-SU beh U2a; export test |
-| R2 | Import obíde brány bežného zápisu a zapíše dokument, ktorému store nerozumie | tichá strata dát po prvom bežnom zápise | brány S9 (tie isté funkcie, ktoré chránia čítanie) + dopredná brána + `after_import!` s návratom pri ne-`:ok` |
-| R3 | Návrat zo zálohy zlyhá po čiastočnom prevzatí | skupina zmiešaná z dvoch PC | záloha **pred** zápisom, overené SHA; `:failed_restore_failed` menuje zálohu; U5 ponúkne „Vrátiť zálohu" |
-| R4 | Reset stavu pod držaným zámkom rozbije reentranciu (S11) | zablokovaný SketchUp | samostatné `reset_after_import!` bez zámkových čítačov; volanie mimo zámku; test (g) |
-| R5 | Usadenie na prijímajúcom PC prepíše prevzatý dokument (seed-merge) → falošné „lokálne zmeny" | Lucia vidí zmeny, ktoré nerobila | export usadzuje pred odoslaním; R14; odtlačky po `after_import!`; rozdiel sa loguje |
-| R6 | Export skupiny nie je atomický medzi súbormi | nesúdržná dvojica (sety bez nového kódu) | jeden správca; zámok odosielania U3; §12 D5 |
-| R7 | Kanonické bajty závislé od verzie Ruby/JSON (formát `Float`) | falošný rozdiel odtlačkov | R14 + R10 (rovnaký SketchUp); test poradia kľúčov; formát čísel sa nenormalizuje (vedome) |
+| R2 | Import obíde brány bežného zápisu | strata dát po prvom bežnom zápise | brány S9 + dopredná brána + návrat pri ne-`:ok` |
+| R3 | Pád alebo zlyhanie uprostred skupiny | zmes z dvoch PC | záloha pred zápisom, žurnál a obnova pri štarte (R4.9), `:failed_restore_failed` |
+| R4 | Reset stavu pod zámkom (S11) | zablokovaný SketchUp | `reset_after_import!` bez zámkových čítačov; test (g) |
+| R5 | Usadenie na prijímajúcom PC prepíše prevzatý dokument | falošné „lokálne zmeny“ | export usadzuje; R14; odtlačky po `after_import!` |
+| R6 | Súbežná úprava počas exportu | nesúdržný snímok | dva prechody s porovnaním (R4.1), `:busy_snapshot` |
+| R7 | Kanonické bajty závislé od Ruby/JSON (`Float`) | falošný rozdiel | R14 + R10; formát čísel sa vedome nenormalizuje |
 | R8 | `PriceRefresh` / kontrola ceny dobehne po prevzatí | stará cena prepíše prevzatú | `:busy`; revízie riadkov (`base_rev`); `@price_proposals` vymazané |
 | R9 | Otvorené okno uloží starý obsah po prevzatí (B6) | prepis prevzatých dát | bariéra v U5; revízie `save_library!`/`row_rev` |
 
 ## 10 · Smoke checklist pre Michala
 
-U2 nemá viditeľnú funkciu — **plný smoke prevzatia je až v U5**. Po mergi U2a aj U2b (2 minúty, na tvojom PC):
-1. Otvor Štúdio → **Materiály**: zmeň cenu jednej dosky a ulož → cena ostane po zatvorení a otvorení okna.
-2. **Kovanie**: uprav poznámku položky a ulož → ostane. **Šablóny**: ulož šablónu zo skrinky → je v zozname.
-3. **Nastavenia rozpočtu**: zmeň sadzbu a vráť ju → uloží sa bez červenej hlášky. **Spotrebiče**: otvor okno → zoznam ako predtým.
-4. Hláška „nepodarilo sa uložiť" kdekoľvek → nahlás (kontrola súpisu zastavila zápis, ktorý mal prejsť).
+U2 nemá viditeľnú funkciu — plný smoke až v U5. Po mergi U2a aj U2b: v Štúdiu ulož zmenu v Materiáloch, Kovaní, Šablónach a Nastaveniach rozpočtu
+a otvor Spotrebiče → všetko sa uloží a ostane ako predtým. Hláška „nepodarilo sa uložiť" kdekoľvek → nahlás (kontrola súpisu zastavila zápis, ktorý mal prejsť).
 
 ## 11 · Checklist uzáveru (každá časť zvlášť)
 
@@ -367,4 +380,5 @@ U2 nemá viditeľnú funkciu — **plný smoke prevzatia je až v U5**. Po mergi
   bežné zápisy by na súborovom systéme bez zámkov bežali bez ochrany. U2 sa im vyhne (R4.4); oprava bežných ciest = samostatná fix dávka (mení správanie okien → vlastná predrecenzia).
 - **N2 · `reset_state!` HardwareCatalog/ApplianceCatalog** nulujú zámkový čítač (S11) — komentár „nikdy pod zámkom".
 - **N3 · `Materials.write` ignoruje `appearance` z payloadu** (B1, zámer pre okná) — povedať to v komentári `materials.rb:309`.
+- **N5 · Zákazky na prestavbu po prevzatí** (A1 S4: hrúbka, ABS) — označiť ako neaktuálne; návrh do U5/Kontroly (ceny kryje R17).
 - **N4 · F10 `Debug.report`** — `fingerprint` per skupina = porovnanie Michal vs. Lucia; návrh do U3.

@@ -61,7 +61,7 @@ R-M prílohy (rozhranie pre U4) · R-N zoznam zmien pre R4 · R-O register a dok
 
 **Čo z návrhu 6.9. ostáva** (s jedným správcom): nemenné artefakty s jedinečným menom · ukazovateľ zapísaný posledný · prevzatie len celej overenej verzie (§8 bod 1) · JSON +
 prílohy ako celok (§8 bod 3 — cez zálohu a návrat U2) · single-flight čítanie bez únikov vlákien (§8 bod 6). **Odpadá:** `parent`/`supersedes`/lineage, konfliktné okno,
-rekonštrukcia manifestu, `publish.lock` na Disku, `files/<sha>` naprieč verziami, dvojfázové zametanie, dopredná brána (nahradená R14 `compatible?`).
+rekonštrukcia manifestu, `publish.lock` na Disku, `files/<sha>` naprieč verziami, dvojfázové zametanie, dopredná brána (nahradená R14/R18 `import_allowed?` / `export_allowed?`).
 
 ## 4 · Scope OUT
 
@@ -177,15 +177,16 @@ Roly `-Role writer` (Michal) / `-Role reader` (Lucia), spojené menom behu. Čas
 - **R-F1 `status(scan, local:)`** — hlavné vlákno; `local` = `fingerprints` z `export_group` per skupina. `state` ∈ `current` · `newer` · `local_changes` (lokálny `group_fingerprint`
   ≠ `entry.fingerprint`) · `newer_and_local` · `syncing` · `broken` · `plugin_newer_on_disk` / `plugin_older_on_disk` · `not_on_disk` · `never_taken` (prvé pripojenie, R16) ·
   `pending` (R-J5) · `head_conflict`; + `disk_version`, `local_version`, `note`, `can_send`, `can_take`, `reason`.
-- **R-F2 `startup_check`** = sken vo vlákne + `status` → skupiny `newer`/`newer_and_local`/`never_taken` pre O4 a príznak bodky. **Nič nesťahuje ani nezapisuje.**
+- **R-F2 `startup_check`** = (beží až po `LibraryTransfer.recover_pending!` pri boote — R-J5) sken vo vlákne + `status` → skupiny `newer`/`newer_and_local`/`never_taken` pre O4 a príznak bodky. **Nič nesťahuje ani nezapisuje.**
 - **R-F3 zmena verzie pluginu:** keď `entry.plugin ≠ Engine::VERSION` a `entry.clean` (posledné vyhodnotenie pod starou verziou bez lokálnych zmien), stav sa **prebázuje**
   (nový odtlačok = `fingerprint`, seedové migrácie nie sú zmeny používateľa); inak `local_changes`. `clean` sa aktualizuje pri každom `status` (zápis len pri zmene) — D4.
 
 ### R-G · Verzia pluginu (R14, R18, O7)
 
-- **R-G1 Aktualizovať** len keď `LibraryTransfer.compatible?(head.plugin)` (U2 R5 — jediná autorita); Disk novší → `plugin_newer_on_disk` („najprv aktualizuj plugin"); starší →
+- **R-G1 Aktualizovať** len keď `LibraryTransfer.import_allowed?(head.plugin)` (U2 R5 — jediná autorita); Disk novší → `plugin_newer_on_disk` („najprv aktualizuj plugin"); starší →
   `plugin_older_on_disk` („správca ju po aktualizácii pluginu odošle znova").
-- **R-G2 Odoslať (R18)** odmietne, keď (a) ktorýkoľvek aktuálny ukazovateľ je z **novšieho** pluginu, alebo (b) `Updater.check(Updater.source_dir, VERSION)` vráti `older` (správcova
+- **R-G2 Odoslať (R18)** odmietne, keď (a) `LibraryTransfer.export_allowed?(head.plugin)` je `false` pre ktorýkoľvek aktuálny ukazovateľ (Disk z **novšieho**
+  pluginu — U2 R5), alebo (b, druhá podmienka R18 — posudzuje U3) `Updater.check(Updater.source_dir, VERSION)` vráti `older` (správcova
   verzia ešte nie je na Disku pre druhé PC). Distribúcia nečitateľná → odmietnutie s dôvodom „nedá sa overiť aktualizácia pluginu na Disku" (fail-closed; §12 D2).
   Odoslanie z novšieho pluginu než na Disku je povolené (R18).
 
@@ -214,7 +215,9 @@ Roly `-Role writer` (Michal) / `-Role reader` (Lucia), spojené menom behu. Čas
 | prevzatie celej skupiny | `import_group!(g, packet, plugins_dir:, reason:)` (R4.2) | brány, záloha, návrat, druhé okno, UNI, `after_import!`; kódy R4.7 |
 | zálohy | `create_backup!`, `backups(g)`, `restore_backup!(id, plugins_dir:)` (R4.3) | U3 vlastné zálohy **nerobí** |
 | lokálny stav | `sync_state`, `update_sync_state!(g, entry)` (R4.5) | obsah `entry` R-B1 |
-| verzia | `compatible?(plugin_version)` (R5) | R-G1 |
+| verzia | `import_allowed?(v)`, `export_allowed?(disk_v)`, `compare_versions(a, b)` (R5) | R-G1, R-G2 |
+| obnova po páde | `recover_pending!(plugins_dir)` (R4.9; volá `main.rb` pri boote pred `Materials.boot_cutover!`; žurnál `library_import.pending.json`, `last_recovery`, `pending_issue`) | R-J5 |
+| zneplatnenie zobrazenia | výsledok `import_group!`/`restore_backup!` s `'refresh' => true` (R4.10) | R-J4 (U3 prenesie, `push_state` robí U5) |
 
 **Doplnené v U2** (§12 D6): (a) `update_sync_meta!` pre údaje PC (`pc_id`, `drive_root`, `admin`); (b) predpoklad R4.2 krok 2 „prílohy už ležia" — U3 ich uloží
 pred `import_group!` (R-M), ale riadky prílohy majú v registri `lock` (`materials.lock`, `appliances.json.lock`, `templates.json.lock` drží volajúci) → U3 potrebuje
@@ -231,9 +234,12 @@ pred `import_group!` (R-M), ale riadky prílohy majú v registri `lock` (`materi
   attachment_refs, fingerprints}` → `import_group!(g, packet, plugins_dir:, reason: 'prevzatie verzie N')` · (4) `:ok` → `update_sync_state!` (`fingerprint` z `result['fingerprints']`
   po usadení, `pending: nil`); iný kód → výsledok so slovenskou vetou U2, `pending: nil` okrem `:failed_restore_failed` (ostáva, U5 ponúkne „Vrátiť zálohu").
   `:other_instance` / `:other_instance_unknown` na prvej skupine → zvyšok sa nespúšťa („Zavri ostatné okná SketchUpu").
-- **R-J4 výsledok per skupina:** `taken` · `skipped` · `skipped_changed` · `syncing` · `broken` · `plugin_mismatch` · + kódy U2 R4.7 bez prekladu. Staging sa zmaže po dobehu;
+- **R-J4 výsledok per skupina:** `taken` · `skipped` · `skipped_changed` · `syncing` · `broken` · `plugin_mismatch` · + kódy U2 R4.7 bez prekladu; `'refresh'` z U2 sa prenesie (U5). Staging sa zmaže po dobehu;
   zvyšky staršie ako 24 h zmaže najbližšie `take_prepare`.
-- **R-J5** `pending` pri štarte → stav `pending` („Prevzatie sa prerušilo — Aktualizuj znova alebo vráť zálohu"); nič automaticky.
+- **R-J5 (A1 S1) prerušené prevzatie:** `version`/`id`/`fingerprint` prevzatej verzie sa do `entry` zapíšu **až po `:ok` celej skupiny** (R-J3 krok 4), nikdy po jednom store-e.
+  Pád počas `import_group!` rieši pri štarte **`LibraryTransfer.recover_pending!`** (U2 R4.9, žurnál `library_import.pending.json`, volá ho `main.rb` pred `Materials.boot_cutover!`,
+  teda pred `startup_check`). U3 potom: `entry.pending` + `last_recovery` → `pending: nil` (skupina má pôvodný obsah); `pending_issue` → stav `pending` („Prevzatie sa prerušilo
+  a návrat zlyhal — vráť zálohu"), Aktualizovať tej skupiny vypnuté, kým sa nevyrieši. Polovičná skupina sa nikdy nepoužije bez pokusu o návrat.
 
 ### R-K · Zálohy (O5) — len cez U2
 
@@ -289,6 +295,7 @@ U3b so skutočnou U2):
 | odoslanie | ukazovateľ až po čítaní späť; zlyhanie kopírovania → bez ukazovateľa, stav nezmenený; súbežný ukazovateľ → `failed`; nezmenená skupina `skipped`; zametanie necháva 5, nemaže cudzie |
 | zámok | druhá operácia počas prvej → `:busy`; uvoľnený po chybe |
 | prevzatie | staging overený znova (súbor vymenený medzi kópiou a overením); prílohy pred `import_group!`; príloha sa nikdy nezmaže; lokálne zmeny bez `:overwrite` → `skipped`; zmena po `status` → `skipped_changed`; kódy U2 (`:failed_restored`, `:failed_restore_failed` → `pending` ostáva, `:other_instance` zastaví zvyšok) prenesené bez zmeny |
+| prerušenie (A1 S1) | pád simulovaný medzi dvoma store-mi skupiny → `entry` bez novej verzie, pri „štarte" `recover_pending!` pred skenom → bajty = pred prevzatím; zlyhaná obnova → `pending`, Aktualizovať skupiny vypnuté |
 | Vrátiť | verzia K → lokálne K + Disk N+1 s `reverted_from`; K z iného pluginu odmietnuté |
 | lokálne zmeny | po prevzatí `current`; po úprave `local_changes`; prebázovanie len pri `clean` (R-F3) |
 | diff | pridané/zmenené/zmiznuté, `used` z `used_ids`, `price_changed` |
@@ -297,6 +304,8 @@ U3b so skutočnou U2):
 **Koncový scenár („dve PC" = dva sandboxy `Materials.dir` + jeden „Disk"):** A claim → odošle všetko (v1) → B `never_taken` → prevezme → `current` → A zmení Materiály, odošle (v2)
 s poznámkou → B `newer` + poznámka → B zmení Materiály → `newer_and_local` → `:skip` (Kovanie prevzaté) → `:overwrite` → záloha U2 + prevzatie → A Vrátiť v1 → B dostane v3 = v1.
 **DoD:** Ruby a všetky JS sady zelené (každá zvlášť), encoding guard, R0 v §15 pred implementáciou; **U3b: export test P == K**.
+**Akceptačná brána uzáveru bloku (A1 S6 — nie U3a/U3b, až po U4 a U5):** na dvoch skutočných PC cez skutočný Disk: odoslanie (vrátane príloh) → prevzatie na druhom PC
+→ Vrátiť staršiu verziu → druhé PC ju prevezme: knižnice, prílohy a lokálny stav (`entry`, zálohy) sedia s verziou; postup = §10 bod 4.
 
 ## 8 · In-SU
 
@@ -321,6 +330,8 @@ U3 nemá okno — uvidíš ju až v U5. Od teba treba **R0 sondu** (pred impleme
    CSV a `_summary.txt` z `%TEMP%\noxun_sonda_disk\` oboch PC pošli do okna (alebo nechaj v `_sonda\` na Disku).
 2. Pri T4 skript povie „TERAZ" na oboch PC — Enter naraz (± 2 s). Pri T7 ťa požiada pozastaviť synchronizáciu Disku a po 5 min ju obnoviť.
 3. **Po inštalácii U3a/U3b:** SketchUp sa spustí ako doteraz, O plugine vyzerá rovnako, v Materiáloch nič nepribudlo ani nezmizlo, v `%APPDATA%\NOXUN\Engine` nepribudol súbor.
+4. **Akceptácia bloku (po U4 a U5, A1 S6):** odošli Materiály s novým dekorom a fotkou → na Luciinom PC Aktualizovať → dekor aj fotka sú tam → v Histórii vráť predošlú verziu
+   → Lucia Aktualizovať → dekor zmizol, fotka na disku ostala, O plugine u oboch ukazuje rovnakú verziu. Až potom uzáver bloku.
 
 ## 11 · Checklist uzáveru (U3a aj U3b zvlášť)
 
