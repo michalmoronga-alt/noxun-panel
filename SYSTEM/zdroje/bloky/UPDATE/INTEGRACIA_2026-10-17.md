@@ -66,3 +66,11 @@
 | U4 | ~360 | **~385** | ~400 |
 | U5a | ~720 | **~735** | ~780 |
 | U5b | ~470 | ~470 | — |
+
+## Delta 2 a stav balíka (17.10.2026)
+
+Delta 2 (Codex `gpt-6.1-sol`, [AUDIT_DELTA2_raw.md](AUDIT_DELTA2_raw.md)): všetkých 28 položiek A/B/C **UZAVRETÝCH**, nové BLOCKERy žiadne.
+**Blok UPDATE je pripravený do zásoby** s výhradou: U3 a U4 sa zmrazia až po sondách R0 (Google Disk na oboch PC — U3 §16; inventár príloh — U4 §16).
+Rozhodnutie orchestrátora: poistka veľkosti U2b sa zdvíha na ~620 riadkov kódu pluginu.
+Poradie dávok: U1 (nezávislá) · U2a → U2b (pred ním sondy) → U2c → U3a → U3b → U4 → U5a → U5b; akceptačná brána uzáveru bloku = odoslanie → prevzatie na druhom PC → Vrátiť staršiu verziu vrátane príloh (U3 §7/§10).
+Implementácia až po smoke PASS bloku 9 HARDENING; úvodné PR bloku (rozhodnutia + mockup) a zápis do PLAN/STAV pri štarte bloku.
