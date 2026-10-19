@@ -1,7 +1,7 @@
 # Blok PRAVIDLA — návrh štruktúry (18.10.2026, orchestrátor)
 
-> **Stav: NÁVRH na schválenie Michalom (ako mockup).** Nič z neho neplatí, kým ho Michal neschváli; body „❓ potvrdí Michal" musia
-> dostať odpoveď pred písaním packages. Vstupy: [ZADANIE_BLOKU.md](ZADANIE_BLOKU.md) · [RESERS_POROVNANIE.md](RESERS_POROVNANIE.md) ·
+> **Stav: Michal 19.10.2026 odpovedal na otázky 1–5 a 7 (rámček „platí" v § 9); otázka 6 čaká na odpoveď po vysvetlení.**
+> Packages sa píšu až po odpovedi na otázku 6. Vstupy: [ZADANIE_BLOKU.md](ZADANIE_BLOKU.md) · [RESERS_POROVNANIE.md](RESERS_POROVNANIE.md) ·
 > sonda Claude Code 2.1.299 (§ 1) · prieskum 18 sessions 6.–17.10. lacným modelom ([PRIESKUM_SESSIONS.md](PRIESKUM_SESSIONS.md)) ·
 > inventúra pravidiel (§ 3) · koncept routera `noxun-mods/router/NAVRH.md` a benchmark `noxun-mods/benchmark/`.
 
@@ -311,6 +311,17 @@ tenké obaly na Sonnete/Haiku pre Codex, Grok a agy.
 6. Záložný orchestrátor (Codex) prečíta HANDOFF a správne povie, čo je rozpracované a čo nesmie mergovať.
 
 ## 9 · Otvorené otázky pre Michala (❓)
+
+> **Platí — odpovede Michala 19.10.2026** (majú prednosť pred textom vyššie):
+> 1. **Záložný orchestrátor Codex — áno.** Pri výpadku alebo limite Claude Michal prejde do Codexu. Obmedzenia z § 2.3 platia ako predvolené;
+>    Michal ich smie v konkrétnom prípade výslovne zrušiť („musím byť flexibilný").
+> 2. **Karty modelov a hodnotenia v `noxun-mods` — áno.**
+> 3. **Stupnica 1–5 bez prepočtu na x/10.**
+> 4. **Recenzia podľa rizika — áno** (a: Ť navyše Codex sol · b: kontrola opráv P2/P3 v Ľ/S Sonnetom).
+> 5. **Ochranu vetvy `main` na GitHube zapne Michal.**
+> 6. *otvorené* — Michal požiadal o vysvetlenie (zlúčenie retro + hodnotenie modelu).
+> 7. **Zjednodušenia a–e — áno všetky** (trieda D drobnosť · inštalácia len po zmene pluginu · číslo PR skriptom · KRONIKA po súboroch ·
+>    experimenty s ľahkou bránou).
 
 1. **Záložný orchestrátor Codex** — zaviesť (a s obmedzeniami z § 2.3), alebo pri výpadku Claude len čakať?
 2. **Karty modelov a hodnotenia v `noxun-mods`** (spoločné pre všetky projekty) — áno?
