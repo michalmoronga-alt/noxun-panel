@@ -1,6 +1,12 @@
 # Pilot pravidelných cloudových úloh — nočná hliadka výroby + strážca pravidiel (19.10.–5.11.2026)
 
-> **Stav: zadania na schválenie Michalom.** Rola „hliadka" = analytik v cloude (návrh bloku PRAVIDLA, [NAVRH_STRUKTURY.md](NAVRH_STRUKTURY.md) § 4).
+> **Stav: BEŽÍ od 19.10.2026** (schválil Michal). Routines: nočná hliadka výroby `trig_015okBjVs4S4nLN596XobFPx`
+> (https://claude.ai/code/routines/trig_015okBjVs4S4nLN596XobFPx, prvý beh 20.10. 00:05 UTC) · strážca pravidiel `trig_014kELU72qnr89ghyh2LcHN3`
+> (https://claude.ai/code/routines/trig_014kELU72qnr89ghyh2LcHN3, prvý beh 20.10. 03:03 UTC). Zrušiť alebo vypnúť sa dajú na claude.ai/code/routines.
+> **Pasca pri vytváraní:** API pri `create` samo pripojilo všetky claude.ai konektory účtu (Gmail, Drive, Supabase, Figma, SketchUp…) —
+> hneď po vytvorení sa odpojili cez `update` s `clear_mcp_connections: true`; pri každej novej routine skontrolovať `mcp_connections: []`.
+>
+> Pôvodne: zadania na schválenie Michalom. Rola „hliadka" = analytik v cloude (návrh bloku PRAVIDLA, [NAVRH_STRUKTURY.md](NAVRH_STRUKTURY.md) § 4).
 > Pilot beží z kreditu Claude cloud (100 USD do 5.11.2026). Vyhodnotenie pred 5.11.: koľko nálezov orchestrátor prijal (D-číslo),
 > koľko zamietol a koľko stál beh → ponechať, upraviť alebo vypnúť.
 
