@@ -27,9 +27,14 @@ parametrami zo skillu `.claude/skills/antigravity-outside-in/SKILL.md` a vráti�
 2. Model zo zadania, inak: `agy models | grep -oE '^gemini-[0-9.]+-flash-high' | sort -V | tail -1`. Model sa vždy píše výslovne cez `--model`.
 3. Beh jedným volaním Bash s timeoutom 600000 ms (priečinok sa medzi volaniami nezachováva):
    ```
-   R="$TEMP/agy_research"; mkdir -p "$R" && cd "$R" && agy -p "$(cat '<cesta k promptu>')" --model <model> --mode plan --print-timeout 9m > "$R/<x>_packet.md" 2> "$R/<x>_err.txt"; echo "exit=$?"
+   OBM='OBMEDZENIE NÁSTROJOV: nepoužívaj terminál, príkazy ani čítanie či zápis súborov — sú zablokované. Používaj výhradne vyhľadávanie na webe (search_web) a čítanie stránok (read_url_content). Ukážky kódu píš len ako text.'
+   R="$TEMP/agy_research"; mkdir -p "$R" && cd "$R" && agy -p "$(printf '%s
+
+' "$OBM"; cat '<cesta k promptu>')" --model <model> --mode plan --print-timeout 9m > "$R/<x>_packet.md" 2> "$R/<x>_err.txt"; echo "exit=$?"
    ```
-4. Vráť prvý riadok `agy <x>: exit=<kód>, model <model>, packet <cesta k packetu>`, potom obsah packetu bez úprav; pri nenulovom kóde aj
+4. Zmeraj packet (`wc -c`). Keď má **menej ako 200 bajtov** (bez ohľadu na exit kód — agy končí prázdny aj s exit 0), prvý riadok je
+   `agy <x>: ZLYHAL (prázdny výstup), exit=<kód>, model <model>` + posledných 20 riadkov `<x>_err.txt`. Inak vráť prvý riadok
+   `agy <x>: exit=<kód>, model <model>, packet <cesta k packetu>`, potom obsah packetu bez úprav; pri nenulovom kóde aj
    posledných 20 riadkov `<x>_err.txt`. Voliteľne za packetom vlastná sekcia **„Postrehy k workflowu"** (0–3 body o behu `agy`, nie
    o obsahu packetu: konkrétna udalosť · čo stála · voliteľne návrh; ticho je v poriadku) pre retro orchestrátora (`SYSTEM/WORKFLOW.md`, časť 9).
 
@@ -37,5 +42,7 @@ parametrami zo skillu `.claude/skills/antigravity-outside-in/SKILL.md` a vráti�
 
 - `-p -` (stdin) nefunguje — prompt ide ako argument cez `$(cat …)`.
 - Hláška o chýbajúcom povolení (`read_url`, `search_web`) = chýbajú web granty v `~/.gemini/config/config.json` — nahlás, nič nemeň.
+- Hláška „a tool required the "command" / "read_file" permission" v `<x>_err.txt` = v deny zozname `~/.gemini/config/config.json` chýba daná
+  akcia (agy v režime bez obsluhy nástroj mäkko zamietne a skončí prázdny) — nahlás, nič nemeň.
 - Rešerš dlhšia ako ~9 minút sa do jedného volania nezmestí (nástroj čaká najviac 10 minút). Orchestrátor ju má rozdeliť na menšie behy
   (skill: jeden beh = 1–2 otázky) alebo spustiť priamo podľa skillu na pozadí s `--print-timeout 30m`.
