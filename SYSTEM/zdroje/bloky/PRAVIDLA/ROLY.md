@@ -237,6 +237,13 @@ VÝSTUP  odporúčanie + dôvod + alternatíva → rozhoduje orchestrátor
 
 ## 8 · Otvorené body pre Michala ❓
 
+> **Platí — odpovede Michala 22.10.2026:** 1 áno · 2 áno · 3 áno · 4 áno · 6 áno (Haiku na mechanické výťahy) ·
+> **5 otvorené** — Michal chce vysvetlenie, prečo agy zlyháva a či sa dá povoliť. Zistenie orchestrátora 22.10.: agy v režime bez
+> obsluhy (`-p`) nevie požiadať o povolenie; keď model siahne po nástroji mimo zoznamu povolených (shell, „command"), CLI ho zamietne
+> a **celý beh skončí bez výstupu s kódom 0** (17.10. aj 4.9.; webové nástroje povolené sú). Varianty: pokyn v prompte (overené 4.9.,
+> do skillu sa nedostal) · výslovný zákaz `command(*)` v zozname deny (neoverené) · povoliť shell (neodporúčané — web môže vložiť
+> príkaz). Vedľajšie zistenie: CodexBar volá `agy -p /usage` každých ~5 min aj v noci (len kvóta, bez modelu).
+
 1. **Skript `scripts/otvor_pr.ps1`** — jeden príkaz urobí kvótovú bránu (draft pri Codexe < 10 %), `gh pr create` a doplní číslo PR
    commitom (spája schválené 7c). Implementátor tak nemusí poznať pravidlá kvót. Áno?
 2. **Rešeršér bez jadra** — rešerš na webe nepotrebuje pravidlá gitu ani testov; dostane len svoju kartu (~3 kB namiesto ~15 kB). Áno?
