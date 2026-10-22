@@ -1,7 +1,7 @@
 # Blok PRAVIDLA — návrh štruktúry (18.10.2026, orchestrátor)
 
 > **Stav: Michal odpovedal na všetky otázky § 9 (1–5 a 7 dňa 19.10., 6 a rozdelenie P1 dňa 22.10.2026 — rámček „platí" v § 9).**
-> 22.10. otvoril Michal debatu o jasnejšom rozdelení rolí a o routeri — výsledok pred packages. Vstupy: [ZADANIE_BLOKU.md](ZADANIE_BLOKU.md) · [RESERS_POROVNANIE.md](RESERS_POROVNANIE.md) ·
+> 22.10. Michal schválil oddelenie rolí, obsadenia a routera (bod 9); návrh kariet rolí [ROLY.md](ROLY.md) čaká na schválenie. Vstupy: [ZADANIE_BLOKU.md](ZADANIE_BLOKU.md) · [RESERS_POROVNANIE.md](RESERS_POROVNANIE.md) ·
 > sonda Claude Code 2.1.299 (§ 1) · prieskum 18 sessions 6.–17.10. lacným modelom ([PRIESKUM_SESSIONS.md](PRIESKUM_SESSIONS.md)) ·
 > inventúra pravidiel (§ 3) · koncept routera `noxun-mods/router/NAVRH.md` a benchmark `noxun-mods/benchmark/`.
 
@@ -327,6 +327,9 @@ tenké obaly na Sonnete/Haiku pre Codex, Grok a agy.
 > 8. **(22.10.) P1 sa delí:** **P1a** = `DEFINICIE.md` + guard G3 (kópie definícií v CLAUDE.md, WORKFLOW a skilloch nahradí odkaz) ·
 >    **P1b** = `AGENTS.md` jadro + most `CLAUDE.md` + `ORCHESTRATOR.md` + guardy G1–G2. Drobnosti z P4 (JS testy jedným príkazom,
 >    runner berie ENGINEtests z hlavného checkoutu, skript čísla PR, pripomienka po mergi) idú hneď za P1a.
+> 9. **(22.10.) Roly a router:** oddeliť **rolu** (čo robí a čo dostane) · **obsadenie** (ktorý model) · **router** (koho teraz) ·
+>    7 rolí (orchestrátor, implementátor, recenzent, audítor, rešeršér, analytik, review PR) · záložný orchestrátor je režim, nie rola ·
+>    router v0 pevný (pravidlá + kvóty), učiaci v1 až s dátami. Karty rolí, typy úloh a návrh obsadenia: [ROLY.md](ROLY.md) — schvaľuje Michal pred úvodným PR bloku.
 
 1. **Záložný orchestrátor Codex** — zaviesť (a s obmedzeniami z § 2.3), alebo pri výpadku Claude len čakať?
 2. **Karty modelov a hodnotenia v `noxun-mods`** (spoločné pre všetky projekty) — áno?
