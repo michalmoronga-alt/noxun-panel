@@ -17,6 +17,10 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **OPRAVA SKILLU `antigravity-outside-in` a agenta `agy-reserser` (22.10.2026, PR #?, trieda Ľ — len skill a definícia agenta, kód pluginu a VERSION bez zmeny).** `agy -p` v režime bez obsluhy
+  nevie požiadať o povolenie nástroja; keď model siahne po termináli (`command`) alebo čítaní súborov (`read_file`), CLI ho mäkko zamietne a beh skončí prázdny s exit 0 (4.9. a 17.10.2026).
+  `--mode plan` tomu nezabráni (opravené tvrdenie v skille). Riešenie overil orchestrátor tromi testami (agy 1.4.5): deny zoznam v `~/.gemini/config/config.json` + blok OBMEDZENIE NÁSTROJOV
+  na začiatku každého promptu. Skill má novú pascu (príčina, lieky, platné akcie, úspech podľa veľkosti packetu); agent predraďuje blok automaticky a pri packete pod 200 bajtov hlási ZLYHAL.
 - **KOMENTÁR H11c v `core/app_lifecycle.rb` (11.10.2026, v0.18.1, PR #474, trieda Ľ — len komentár a verzia).** Hlavičkový komentár ešte opisoval H11c ako budúcu dávku
   („riešenie je dávka H11c, záložný návrh Z1“); prepísaný na skutočný stav: quit test H11a (26.0.429) aj H11c (26.2.243, 5×) ukázal poradie B, ale vždy exit 0 bez pádu, in-SU na 2026.2
   3421/0, Z1 sa nerobí (PACKAGE_H11 §18, AUDIT_REGISTER R-42). Grep v `noxun_engine/` (H11c, Z1, #1117, onQuit, F-01, R-42) inú zastaranú vetu nenašiel. Patch bump 0.18.0 → 0.18.1
