@@ -1,7 +1,7 @@
 # Blok PRAVIDLA — návrh štruktúry (18.10.2026, orchestrátor)
 
-> **Stav: Michal 19.10.2026 odpovedal na otázky 1–5 a 7 (rámček „platí" v § 9); otázka 6 čaká na odpoveď po vysvetlení.**
-> Packages sa píšu až po odpovedi na otázku 6. Vstupy: [ZADANIE_BLOKU.md](ZADANIE_BLOKU.md) · [RESERS_POROVNANIE.md](RESERS_POROVNANIE.md) ·
+> **Stav: Michal odpovedal na všetky otázky § 9 (1–5 a 7 dňa 19.10., 6 a rozdelenie P1 dňa 22.10.2026 — rámček „platí" v § 9).**
+> 22.10. otvoril Michal debatu o jasnejšom rozdelení rolí a o routeri — výsledok pred packages. Vstupy: [ZADANIE_BLOKU.md](ZADANIE_BLOKU.md) · [RESERS_POROVNANIE.md](RESERS_POROVNANIE.md) ·
 > sonda Claude Code 2.1.299 (§ 1) · prieskum 18 sessions 6.–17.10. lacným modelom ([PRIESKUM_SESSIONS.md](PRIESKUM_SESSIONS.md)) ·
 > inventúra pravidiel (§ 3) · koncept routera `noxun-mods/router/NAVRH.md` a benchmark `noxun-mods/benchmark/`.
 
@@ -319,9 +319,14 @@ tenké obaly na Sonnete/Haiku pre Codex, Grok a agy.
 > 3. **Stupnica 1–5 bez prepočtu na x/10.**
 > 4. **Recenzia podľa rizika — áno** (a: Ť navyše Codex sol · b: kontrola opráv P2/P3 v Ľ/S Sonnetom).
 > 5. **Ochranu vetvy `main` na GitHube zapne Michal.**
-> 6. *otvorené* — Michal požiadal o vysvetlenie (zlúčenie retro + hodnotenie modelu).
+> 6. **(22.10.) Retro a hodnotenie modelu zlúčiť do jedného povinného záznamu po každej delegovanej úlohe — áno, s dvomi úpravami:**
+>    (a) povolený aj záznam bez modelu (rola „workflow") pre postrehy o procese, Michalovu spätnú väzbu a problémy celého bloku;
+>    (b) pri skóre 1–2 alebo 4 a viac kolách review je pole „postreh" povinné (proti rutinnému „ok, 4").
 > 7. **Zjednodušenia a–e — áno všetky** (trieda D drobnosť · inštalácia len po zmene pluginu · číslo PR skriptom · KRONIKA po súboroch ·
 >    experimenty s ľahkou bránou).
+> 8. **(22.10.) P1 sa delí:** **P1a** = `DEFINICIE.md` + guard G3 (kópie definícií v CLAUDE.md, WORKFLOW a skilloch nahradí odkaz) ·
+>    **P1b** = `AGENTS.md` jadro + most `CLAUDE.md` + `ORCHESTRATOR.md` + guardy G1–G2. Drobnosti z P4 (JS testy jedným príkazom,
+>    runner berie ENGINEtests z hlavného checkoutu, skript čísla PR, pripomienka po mergi) idú hneď za P1a.
 
 1. **Záložný orchestrátor Codex** — zaviesť (a s obmedzeniami z § 2.3), alebo pri výpadku Claude len čakať?
 2. **Karty modelov a hodnotenia v `noxun-mods`** (spoločné pre všetky projekty) — áno?

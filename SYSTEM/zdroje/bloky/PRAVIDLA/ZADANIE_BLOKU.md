@@ -38,7 +38,7 @@ nejaké zmätené." Dôkaz: retro záznamy sa od 2.10.2026 prestali písať, vyh
 0. ✅ rešerš (Grok + Codex SOL; agy zlyhal) — [RESERS_POROVNANIE.md](RESERS_POROVNANIE.md)
 1. ✅ (18.10.) sonda na lokálnom Claude Code (docs pre 2.1.299) + **inventúra pravidiel** + prieskum 18 sessions lacným modelom
    ([PRIESKUM_SESSIONS.md](PRIESKUM_SESSIONS.md)) — spracované v [NAVRH_STRUKTURY.md](NAVRH_STRUKTURY.md)
-2. návrh štruktúry → schvaľuje Michal (ako mockup) — **[NAVRH_STRUKTURY.md](NAVRH_STRUKTURY.md), 19.10. zodpovedané otázky 1–5 a 7, otázka 6 čaká**
+2. návrh štruktúry → schvaľuje Michal (ako mockup) — **[NAVRH_STRUKTURY.md](NAVRH_STRUKTURY.md), zodpovedané všetky otázky (19.10. a 22.10.); 22.10. debata o rolách a routeri**
 3. prepis po dávkach (jadro AGENTS.md → roly → miesta → hooky a stropy veľkosti → retro a karty modelov)
 
 ## Otvorené otázky (odpovie Michal v novej session)
