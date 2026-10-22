@@ -27,7 +27,7 @@ parametrami zo skillu `.claude/skills/antigravity-outside-in/SKILL.md` a vráti�
 2. Model zo zadania, inak: `agy models | grep -oE '^gemini-[0-9.]+-flash-high' | sort -V | tail -1`. Model sa vždy píše výslovne cez `--model`.
 3. Beh jedným volaním Bash s timeoutom 600000 ms (priečinok sa medzi volaniami nezachováva):
    ```
-   OBM='OBMEDZENIE NÁSTROJOV: nepoužívaj terminál, príkazy ani čítanie či zápis súborov — sú zablokované. Používaj výhradne vyhľadávanie na webe (search_web) a čítanie stránok (read_url). Ukážky kódu píš len ako text.'
+   OBM='OBMEDZENIE NÁSTROJOV: nepoužívaj terminál, príkazy ani čítanie či zápis súborov — sú zablokované. Používaj výhradne vyhľadávanie na webe (search_web) a čítanie stránok (read_url_content). Ukážky kódu píš len ako text.'
    R="$TEMP/agy_research"; mkdir -p "$R" && cd "$R" && agy -p "$(printf '%s
 
 ' "$OBM"; cat '<cesta k promptu>')" --model <model> --mode plan --print-timeout 9m > "$R/<x>_packet.md" 2> "$R/<x>_err.txt"; echo "exit=$?"

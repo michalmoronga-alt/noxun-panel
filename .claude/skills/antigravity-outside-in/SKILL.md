@@ -29,7 +29,7 @@ precedens nesie **licenciu** (GPL = vzory áno, kód nie; proprietárny produkt 
 
 1. **Prompt do súboru (UTF-8):** na začiatku vždy blok (presný text, kryje beh pred prázdnym výstupom — viď Pasce):
    ```
-   OBMEDZENIE NÁSTROJOV: nepoužívaj terminál, príkazy ani čítanie či zápis súborov — sú zablokované. Používaj výhradne vyhľadávanie na webe (search_web) a čítanie stránok (read_url). Ukážky kódu píš len ako text.
+   OBMEDZENIE NÁSTROJOV: nepoužívaj terminál, príkazy ani čítanie či zápis súborov — sú zablokované. Používaj výhradne vyhľadávanie na webe (search_web) a čítanie stránok (read_url_content). Ukážky kódu píš len ako text.
    ```
    potom rola + HARD RULES + OUTPUT FORMAT + TARGETED QUESTIONS + inline kontext (text package z PLAN.md,
    výsek FINAL/koncept, prípadne mockup). Vzor: `scratchpad/ag_outside_in_kovcd.md` z 3.9. (pilot KOV-C/D) a `ag_outside_in_sweep.md`
