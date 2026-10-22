@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **OPRAVA SKILLU `antigravity-outside-in` a agenta `agy-reserser` (22.10.2026, PR #?, trieda Ľ — len skill a definícia agenta, kód pluginu a VERSION bez zmeny).** `agy -p` v režime bez obsluhy
+- **OPRAVA SKILLU `antigravity-outside-in` a agenta `agy-reserser` (22.10.2026, PR #475, trieda Ľ — len skill a definícia agenta, kód pluginu a VERSION bez zmeny).** `agy -p` v režime bez obsluhy
   nevie požiadať o povolenie nástroja; keď model siahne po termináli (`command`) alebo čítaní súborov (`read_file`), CLI ho mäkko zamietne a beh skončí prázdny s exit 0 (4.9. a 17.10.2026).
   `--mode plan` tomu nezabráni (opravené tvrdenie v skille). Riešenie overil orchestrátor tromi testami (agy 1.4.5): deny zoznam v `~/.gemini/config/config.json` + blok OBMEDZENIE NÁSTROJOV
   na začiatku každého promptu. Skill má novú pascu (príčina, lieky, platné akcie, úspech podľa veľkosti packetu); agent predraďuje blok automaticky a pri packete pod 200 bajtov hlási ZLYHAL.
