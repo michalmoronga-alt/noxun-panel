@@ -183,7 +183,7 @@ Prepis dnešných troch tabuliek (Obsadenie rolí, Náhradníci, Matica výberu)
 | `aud-navrh` | Codex `gpt-6.1-sol` · `gpt-6-astra` len úzke zadanie ❓4 | — | Grok, agy, Sonnet | čaká / Michal |
 | `aud-blok` | Grok `grok-4.7` + Codex `gpt-6.1-sol` (rovnaké zadanie) | rešeršér Sonnet | — | — |
 | `res-web` | Claude Sonnet | Grok | — | — |
-| `res-out` | agy (Gemini Flash), nie bez obsluhy | Grok | — | — ❓5 |
+| `res-out` | agy (Gemini Flash), nie bez obsluhy | Grok | — | — |
 | `ana-*` | Claude Sonnet (`medium`) · Haiku na mechanické výťahy ❓6 | — | — | — |
 | `ana-hliadka` | Claude Sonnet (cloud routine) | — | — | — |
 | `pr-review` | GH Codex | náhradná brána (`rec-pred` + `rec-delta`) | — | Codex < 10 %: bežná → náhradná brána, Ť → Michal |
@@ -243,6 +243,10 @@ VÝSTUP  odporúčanie + dôvod + alternatíva → rozhoduje orchestrátor
 > a **celý beh skončí bez výstupu s kódom 0** (17.10. aj 4.9.; webové nástroje povolené sú). Varianty: pokyn v prompte (overené 4.9.,
 > do skillu sa nedostal) · výslovný zákaz `command(*)` v zozname deny (neoverené) · povoliť shell (neodporúčané — web môže vložiť
 > príkaz). Vedľajšie zistenie: CodexBar volá `agy -p /usage` každých ~5 min aj v noci (len kvóta, bez modelu).
+> **Michal 22.10.: A + B.** Výsledok testov orchestrátora (agy 1.4.5, gemini-3.8-flash-high): zákaz len terminálu nestačil (model siahol
+> po čítaní súborov → prázdny výstup); zákaz `command(*)`, `read_file(*)`, `write_file(*)` → model dostane „zablokované" a pokračuje cez web
+> (reálna outside-in rešerš 1 min 44 s so zdrojmi, 0 zamietnutí). **agy ostáva primárny pre `res-out`, Grok náhradník.** Oprava skillu
+> a obalu (blok v prompte, prázdny výstup = ZLYHAL): samostatné PR `fix/agy-prazdny-vystup`. ❓ Súbor nastavení je zdieľaný s Antigravity IDE.
 
 1. **Skript `scripts/otvor_pr.ps1`** — jeden príkaz urobí kvótovú bránu (draft pri Codexe < 10 %), `gh pr create` a doplní číslo PR
    commitom (spája schválené 7c). Implementátor tak nemusí poznať pravidlá kvót. Áno?
