@@ -20,7 +20,7 @@
 - **ŠTART BLOKU 10 · PRAVIDLA (23.10.2026, PR #?, dokumentačné PR — kód pluginu a VERSION bez zmeny).** Michal 17.10. zadal prestavbu pravidiel pre agentov (univerzálne
   `AGENTS.md`, pravidlá podľa roly, menej kontextu, ochrana proti „pretekaniu", retro, hodnotenie modelov a router). Do repa ide priečinok `SYSTEM/zdroje/bloky/PRAVIDLA/`:
   zadanie, surová rešerš (Grok, Codex), prieskum 18 sessions, návrh štruktúry (vrstvy pravidiel, roly, stráže G1–G11, dávky P0–P6), karty rolí a typy úloh (`ROLY.md`),
-  súpis kópií definícií s 10 rozpormi a package P1a s auditom znenia. Rozhodnutia Michala 19.–23.10. sú v rámčekoch „platí". Blok je v PLAN ako 10, STAV prepísal „Robí sa"
+  súpis kópií definícií s 10 rozpormi (package P1a s auditom znenia je pripravený a ide s PR dávky). Rozhodnutia Michala 19.–23.10. sú v rámčekoch „platí". Blok je v PLAN ako 10, STAV prepísal „Robí sa"
   a „Ďalší krok"; smoke bloku 9 naďalej čaká. Nahradený text STAV: „Nič — blok 9 je uzavretý, ďalší blok určí Michal".
 
 - **STRÁŽ `agy` V PRIEČINKU BEHU (23.10.2026, PR #476, trieda Ľ — skripty, skill a agent, kód pluginu a VERSION bez zmeny).** Globálny deny zoznam v `~/.gemini/config/config.json` (PR #475) je zdieľaný s Antigravity IDE
