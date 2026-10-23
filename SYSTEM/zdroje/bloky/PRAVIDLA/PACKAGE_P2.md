@@ -27,6 +27,11 @@ Každý typ subagenta dostane **len pravidlá svojej roly** (Z-4) a typy sa nero
    Michal 22.10. schválil, ❓6 v ROLY.md); nástroje len čítanie (`Read, Grep, Glob, Bash`), žiadny zápis mimo výstupu určeného zadaním.
    Do WORKFLOW § 2 (tabuľka Obsadenie rolí) pridať riadok typu `analytik` **v rovnakom tvare** ako ostatné (mod usage-bar a guard
    `test_agent_definitions.rb` ho čítajú).
+6. **Rozhodnutie Michala 23.10.2026 — zatvorenie a rozdelenie PR:** PR sa pri oprave meniacej koncept (alebo P0/P1) **zatvára a delí až vtedy,
+   keď nálezy vráti aj 3. GH kolo** (pravidlo 3 kôl b v skille `codex-po-pr`). Riadok „P0/P1 v review" v tabuľke „Keď Michal neodpovie"
+   (`SYSTEM/pravidla/roly/ORCHESTRATOR.md`) prepísať tak, aby s tým súhlasil: „oprava + nové plné GH kolo; pri zmene konceptu opravu robí nový
+   implementátor s novým zadaním; zatvoriť a rozdeliť až podľa pravidla 3 kôl (skill `codex-po-pr`)". Grep „zavrieť a rozdeliť" / „zatvoriť" cez
+   `SYSTEM/pravidla/`, WORKFLOW a skilly — každé ďalšie miesto zosúladiť. Zapísať aj do rámčeka „platí" v `NAVRH_STRUKTURY.md` § 9 (bod 10).
 5. **Zjednotenie výnimky testovania** (ENGINEtests alebo neuložené Untitled okno bez NOXUN korpusov) — vďaka generovaniu ju typy implementátorov
    dostanú z IMPLEMENTATOR.md; ručné odchýlky v telách zmiznú.
 
