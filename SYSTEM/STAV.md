@@ -35,7 +35,7 @@ ani nevyexportuje** (rohovú by sklopil na dolnú, úzku rozšíril na 200). **R
 
 ## Ďalší krok
 
-**Blok PRAVIDLA:** dávka P1a podľa [package](zdroje/bloky/PRAVIDLA/PACKAGE_P1a.md). **Michal:** smoke bloku 9 podľa [HARDENING_ZAVER_2026-10-11.md](archiv/HARDENING_ZAVER_2026-10-11.md)** — skupiny A Exporty a čísla (28) · B Inspector (25) · C Štúdio (20) · D Ochrana dát a dve okná (10) ·
+**Blok PRAVIDLA:** dávka P1a (package v PR dávky). **Michal:** smoke bloku 9 podľa [HARDENING_ZAVER_2026-10-11.md](archiv/HARDENING_ZAVER_2026-10-11.md)** — skupiny A Exporty a čísla (28) · B Inspector (25) · C Štúdio (20) · D Ochrana dát a dve okná (10) ·
 E SketchUp a štart (11, vrátane Koniec SketchUpu na 2026.2). Pred ním aktualizovať plugin na oboch PC a zavrieť všetky okná SketchUpu. Nálezy zo smoke = opravy x.y.z (dočasná skupina
 v [DOGFOODING.md](DOGFOODING.md)). Potom nový blok podľa výberu Michala. **Test na reálnej zákazke po V1.**
 
