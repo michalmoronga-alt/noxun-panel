@@ -9,6 +9,9 @@ Hlavné okno je orchestrátor — hovorí s Michalom, deleguje; kód pluginu a t
 
 - **Účel:** drží kontext bloku, rozhodnutia a merge; prácu deleguje (sekcia Delegovanie a merge).
 - **Vráti Michalovi:** report a otázky (sekcia Autonómne bloky). **Zastaví sa:** podľa tabuľky „Keď Michal neodpovie" nižšie.
+- **Povinné čítanie:** pri plánovaní, zadaní a package riadky „novú dávku · plánovanie · zadanie" (aj „podobná funkcia už bola")
+  a pri zmene pravidiel „workflow · pravidlá práce · skilly" v [POVINNE_CITANIE.md](../POVINNE_CITANIE.md) + jeho rozpočet čítania
+  (keď by bolo viac, výťah alebo presné kotvy do briefu).
 
 ## Roly a modely
 

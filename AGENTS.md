@@ -11,7 +11,7 @@ Tento súbor číta každý agent a nástroj (Claude Code cez most `CLAUDE.md`, 
 - **slepý recenzent, audítor, rešeršér** → typ agenta v `.claude/agents/` a zadanie od orchestrátora
 - **review PR** → sekcia [Code Review Rules](#code-review-rules) nižšie
 - Každá rola: [SYSTEM/pravidla/DEFINICIE.md](SYSTEM/pravidla/DEFINICIE.md) — jediné znenie definícií brán a tried (D1–D6).
-- Implementátor, recenzent a audítor: riadok svojho zásahu v [SYSTEM/pravidla/POVINNE_CITANIE.md](SYSTEM/pravidla/POVINNE_CITANIE.md)
+- Každá rola podľa druhu práce: riadok svojho zásahu v [SYSTEM/pravidla/POVINNE_CITANIE.md](SYSTEM/pravidla/POVINNE_CITANIE.md)
   — povinné čítanie PRED prácou.
 
 ## Rozcestník (všetko v tomto repe)

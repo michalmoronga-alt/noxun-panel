@@ -1,9 +1,10 @@
 # Povinné čítanie podľa typu práce
 
-> Platí pre implementátora, recenzenta a audítora (rozcestník: [AGENTS.md](../../AGENTS.md)). Cesty v zátvorkách sú od koreňa repa.
+> Platí pre každú rolu podľa druhu práce (rozcestník: [AGENTS.md](../../AGENTS.md)). Cesty v zátvorkách sú od koreňa repa.
 
-**Nájdi riadok svojho zásahu a uvedené dokumenty si prečítaj PRED prácou.** Je to povinnosť, nie odporúčanie: automaticky sa načítajú
-len pravidlá (AGENTS.md a súbor roly) — architektúra, štandard ani pravidlá kódu nie. Neprečítaný riadok = zásah naslepo.
+**Nájdi riadok svojho zásahu a uvedené dokumenty si prečítaj PRED prácou.** Je to povinnosť, nie odporúčanie: automaticky sa načíta
+len AGENTS.md (Claude Code cez most `CLAUDE.md` aj ORCHESTRATOR.md); súbor svojej roly čítaj podľa typu agenta alebo zadania —
+architektúra, štandard ani pravidlá kódu sa nenačítajú. Neprečítaný riadok = zásah naslepo.
 
 Riadok = **Ideš robiť…** → **Pred prácou POVINNE prečítaj**:
 
