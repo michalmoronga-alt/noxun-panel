@@ -52,7 +52,9 @@ Riadok = **Ideš robiť…** → **Pred prácou POVINNE prečítaj**:
 - **testy — novú sadu alebo úpravu** → [IMPLEMENTATOR.md, sekcia **Testovanie**](roly/IMPLEMENTATOR.md#testovanie) + vzory v `tests/pure/`,
   `tests/js/`, `tests/sketchup/` (nová sada = štruktúra najbližšej existujúcej, nie vlastný formát)
 - **code review · audit návrhu** → dotknuté § [SYSTEM/STANDARD.md](../STANDARD.md) (kontrakt, proti ktorému sa posudzuje; Grep podľa
-  nadpisu) + odseky dotknutých modulov v `docs/architecture/` + skill `codex-audit`
+  nadpisu) + odseky dotknutých modulov v `docs/architecture/` + skill `codex-audit` + pri review diffu pravidlá, proti ktorým sa kontroluje
+  uzáver dávky: [IMPLEMENTATOR.md, Verzia a uzáver dávky](roly/IMPLEMENTATOR.md#verzia) (checklist uzáveru, číslo PR) a
+  [Testovanie](roly/IMPLEMENTATOR.md#testovanie) (export test `P == K`, hlava in-SU behu)
 - **dynamické komponenty (DC)** → [docs/DC_PRAVIDLA.md](../../docs/DC_PRAVIDLA.md) — vždy a bez výnimky (draho zaplatené pasce)
 - **workflow · pravidlá práce · skilly** → [SYSTEM/WORKFLOW.md](../WORKFLOW.md) (roly a ich obsadenie, diagramy blok · dávka · review,
   brány, hranice) + záznam „prečo" [WORKFLOW_ROZHODNUTIA_2026-09-26.md](../zdroje/next_sessions/WORKFLOW_ROZHODNUTIA_2026-09-26.md)
