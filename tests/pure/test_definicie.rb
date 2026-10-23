@@ -42,9 +42,11 @@ NX_DEF_PHRASES = {
 
 # Subory pravidiel, ktore nesmu niest kopiu definicie (relativne k rootu; glob povoleny).
 # STANDARD.md navyse oproti package P1a § 5 — v §13 niesol parafrazu D1/D2 (R10); docs/architecture/*.md
-# po review PR #478 (rozsirovacie-body.md prerozpravalo hranice D1 a D5).
+# po review PR #478 (rozsirovacie-body.md prerozpravalo hranice D1 a D5). Davka P1b: subory roli
+# a povinne citanie (pravidla presunute z CLAUDE.md).
 NX_DEF_SCAN = %w[
   CLAUDE.md AGENTS.md SYSTEM/WORKFLOW.md SYSTEM/PLAN.md SYSTEM/README.md SYSTEM/STANDARD.md
+  SYSTEM/pravidla/roly/*.md SYSTEM/pravidla/POVINNE_CITANIE.md
   .claude/agents/*.md .claude/skills/*/SKILL.md docs/architecture/*.md
 ].freeze
 
@@ -92,14 +94,18 @@ NxTest.test('definicie: podpisove frazy su LEN v DEFINICIE.md (ziadna kopia v pr
                 'Nahrad znenie odkazom (napr. „vyrobna/cenova davka — DEFINICIE.md § D1"), obsah neopakuj.')
 end
 
-NxTest.test('definicie: guard chyti kopiu vlozenu do docasnej kopie CLAUDE.md (aj s inym zalomenim a pismom)') do
+# Od davky P1b je CLAUDE.md len most — skutocny text pravidiel je v AGENTS.md a suboroch roli,
+# preto sa testuje ich spojenie (presne to, co Claude Code nacita cez most).
+NxTest.test('definicie: guard chyti kopiu vlozenu do docasnej kopie pravidiel (aj s inym zalomenim a pismom)') do
   Dir.mktmpdir('nx-definicie-') do |dir|
-    src = File.read(File.join(NxTest::ROOT, 'CLAUDE.md'), encoding: 'UTF-8')
-    clean = File.join(dir, 'CLAUDE.md')
+    src = %w[AGENTS.md SYSTEM/pravidla/roly/ORCHESTRATOR.md SYSTEM/pravidla/roly/IMPLEMENTATOR.md].map do |rel|
+      File.read(File.join(NxTest::ROOT, rel), encoding: 'UTF-8')
+    end.join("\n")
+    clean = File.join(dir, 'pravidla.md')
     File.write(clean, src, encoding: 'UTF-8')
-    NxTest.assert(nx_def_offenders([clean]).empty?, 'negativny pripad: ciste CLAUDE.md nesmie mat nalez')
+    NxTest.assert(nx_def_offenders([clean]).empty?, 'negativny pripad: ciste pravidla nesmu mat nalez')
 
-    dirty = File.join(dir, 'CLAUDE_kopia.md')
+    dirty = File.join(dir, 'pravidla_kopia.md')
     File.write(dirty, "#{src}\n- **Ďalšia voľba** v existujúcom\n  zozname nie je nový prvok.\n" \
                       "> Platí NAJVYŠŠIA\n> trieda.\n", encoding: 'UTF-8')
     found = nx_def_offenders([dirty])

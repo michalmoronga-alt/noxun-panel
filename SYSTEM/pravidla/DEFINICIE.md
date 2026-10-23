@@ -83,4 +83,4 @@ Slepá predrecenzia pred PR (skill `predrecenzia`) je **povinná** pri dávke:
   sada geometriu ani undo neoverí.
 - **Finálna hlava:** nový beh netreba, keď commity po poslednom behu nemenia Ruby kód spúšťačov — len JS (kryjú ho JS sady), texty,
   dokumentáciu alebo testy; PR uvedie, na ktorej hlave in-SU bežal a čo sa zmenilo potom. Pri akejkoľvek zmene Ruby spúšťača beh znova.
-- Ako sa runner spúšťa (`-CloseWhenDone`, zámok, ENGINEtests): [CLAUDE.md](../../CLAUDE.md), sekcia Testovanie.
+- Ako sa runner spúšťa (`-CloseWhenDone`, zámok, ENGINEtests): [IMPLEMENTATOR.md](roly/IMPLEMENTATOR.md#testovanie), sekcia Testovanie.
