@@ -57,7 +57,7 @@ Slepá predrecenzia pred PR (skill `predrecenzia`) je **povinná** pri dávke:
 
 - audit-povinnej ([D2](#d2)) · výrobnej/cenovej ([D1](#d1)) · nad 300 riadkov kódu pluginu ([D3](#d3)) · s novým ovládacím prvkom v UI
   ([D5](#d5)) · každej dávke náhradného implementátora (kód iného providera vždy kontroluje aj recenzent Claude).
-- Pri dávke **Ť** sa pridá druhý slepý recenzent **iného providera než implementátor**.
+- Pri dávke **Ť**, pri ktorej je predrecenzia povinná podľa tohto zoznamu, sa pridá druhý slepý recenzent **iného providera než implementátor**.
 - **Odporúčaná** (nie povinná): nová interakcia v UI bez nového ovládacieho prvku (klávesnica, fokus, prepnutie dokumentu, prekreslenie).
 - **Nie:** dokumentačná dávka (docs-only), dávka, ktorá mení len verziu, a trieda D — **okrem dávky náhradného implementátora** (tá má
   predrecenziu vždy).

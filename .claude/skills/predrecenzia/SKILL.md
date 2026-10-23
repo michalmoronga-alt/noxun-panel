@@ -31,8 +31,13 @@ povinné pre každý PR — predrecenzia je lacnejšie kolo navyše medzi hotov�
    podľa tabuľky — bez neho subagent beží na predvolenom modeli. **Slepý** = dostane len ZADANIE (čo sa má zmeniť pre používateľa
    a kľúčové rozhodnutia z briefu) a rozsah diffu — nie výsledky auditu, nie vlastné hodnotenie orchestrátora, nie zoznam „na čo si dať pozor".
    Medzitým orchestrátor pripravuje PR popis.
+   **Druhý recenzent pri dávke Ť** (kedy: `SYSTEM/pravidla/DEFINICIE.md` § D4): model roly **bežný audit a delta** z tabuľky Obsadenie rolí
+   (provider iný než implementátor), spustený cez companion `task --background --model <model>` (postup ako v bode 7) alebo subagent
+   `codex:codex-rescue` — model vždy výslovne; **rovnaké zadanie a rovnaký rozsah diffu** ako prvý recenzent, beží súbežne. Pred ním Codex brána
+   `-Gate codex`: exit 3 → predrecenzia len Claude recenzentom a PR to uvedie.
 4. **Po výsledku** zapíš spotrebu: `& ".claude\skills\usage\usage.ps1" -Label "predrecenzia <dávka>" -Phase after` (ten istý Label).
-5. **Nálezy:** P1/P2 oprav pred PR (commit `predrecenzia: …`, testy znova). P3 zváž — oprav, alebo v PR uveď, prečo nie. Oprava, ktorá
+5. **Nálezy:** P1/P2 oprav pred PR (commit `predrecenzia: …`, testy znova) — pri dvoch recenzentoch sa opravuje **každý P1/P2 od ktoréhokoľvek**
+   z nich (verdikty sa spájajú, nie priemerujú). P3 zváž — oprav, alebo v PR uveď, prečo nie. Oprava, ktorá
    mení koncept riešenia → späť k briefu; pri audit-povinnej dávke aj k auditu.
 6. **PR popis** má sekciu **„Predrecenzia"**: počty P1/P2/P3 a čo sa opravilo (pri „bez nálezov" jedna veta; pri náhrade aj prečo).
 7. **Postup náhrady pri nedostatku Claude kvóty** (kedy: skill `usage`, Prahy a reakcie) — lokálny Codex CLI, model vždy výslovne cez
