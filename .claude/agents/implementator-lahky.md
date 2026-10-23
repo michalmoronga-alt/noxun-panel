@@ -16,7 +16,7 @@ Pravidlá práce sú v `CLAUDE.md` a v skilloch `.claude/skills/` — tu je len 
 2. Vetva podľa CLAUDE.md (`feat/…`, `fix/…`, `docs/…`) z čerstvého `origin/main`. Nikdy commit do `main`.
 3. Implementácia a testy: headless sada + KAŽDÁ JS sada zvlášť; test v SketchUpe (runner vždy s `-CloseWhenDone`), keď dávka spadá do spúšťačov
    podľa DEFINICIE § D6 (runner: CLAUDE.md, sekcia Testovanie). Testuje sa len v `_dev\ENGINEtests.skp`, nikdy v okne so zákazkou.
-4. Uzáver podľa checklistu v CLAUDE.md (Verzia a uzáver dávky): kódová dávka celý checklist, dokumentačné PR KRONIKA (keď mení stav bloku, smoke alebo poradie prác, aj STAV: aktualizuje faktický stav v „Stav" bez verzie a čísel testov a prepíše „Robí sa" a „Ďalší krok"). Číslo PR najprv `PR #?`.
+4. Uzáver podľa checklistu v CLAUDE.md (Verzia a uzáver dávky): kódová dávka celý checklist (okrem triedy D — STAV sa neprepisuje, len KRONIKA; DEFINICIE § D3), dokumentačné PR KRONIKA (keď mení stav bloku, smoke alebo poradie prác, aj STAV: aktualizuje faktický stav v „Stav" bez verzie a čísel testov a prepíše „Robí sa" a „Ďalší krok"). Číslo PR najprv `PR #?`.
 5. Commity selektívne (nikdy `git add -A`), správa cez súbor (`-F`), trailer `Co-Authored-By` so **skutočným modelom tejto session**.
 6. **Predrecenzia (skill `predrecenzia`) — rozhodni PRED `gh pr create`:** je pre túto dávku povinná podľa `SYSTEM/pravidla/DEFINICIE.md`
    § D4? **Áno → po pushi vetvy STOP:** PR neotváraj a vráť report orchestrátorovi (vetva, plný SHA, ktorá hranica platí).

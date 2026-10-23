@@ -120,7 +120,7 @@ Keď zásah spadá do viacerých riadkov, platia VŠETKY. **Súbor nad ~50 kB sa
 
 - `VERSION` žije na 2 miestach: `noxun_engine.rb` (autorita) + `noxun_engine/main.rb` (fallback) — synchro stráži guard test.
 - **Každý PR meniaci kód pluginu = bump patch** (0.5.0 → 0.5.1); **minor = výhradne uzáver bloku z `SYSTEM/PLAN.md`** (0.5.x → 0.6.0).
-- **Každé zvýšenie VERSION = prepis `SYSTEM/STAV.md`** (aj pri malom fixe). **Dokumentačné PR, ktoré mení stav bloku, smoke alebo poradie prác**
+- **Každé zvýšenie VERSION = prepis `SYSTEM/STAV.md`** (aj pri malom fixe; okrem triedy D — [DEFINICIE § D3](SYSTEM/pravidla/DEFINICIE.md#d3)). **Dokumentačné PR, ktoré mení stav bloku, smoke alebo poradie prác**
   (štart či uzáver bloku, smoke PASS, Michalovo rozhodnutie o poradí), **aktualizuje faktický stav v sekcii „Stav"** (napr. „smoke čaká" → „smoke PASS";
   **verzia a čísla testov sa nemenia**) **a prepíše sekcie „Robí sa" a „Ďalší krok"**; nahradený text stačí zhrnúť v zázname dávky v KRONIKE
   (od 1.10.2026); ostatné dokumentačné PR STAV nemenia.

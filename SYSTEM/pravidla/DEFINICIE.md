@@ -38,7 +38,8 @@ alebo oprava výrobnej ceny je Ť, aj keď zadanie nevyžaduje vlastné rozhodov
 a nespĺňa kritérium S ani Ť, je D (nie Ľ).
 
 - **D drobnosť:** oprava komentára, vety alebo textu bez zmeny správania a bez zmeny čísel. Profil ľahký · STAV sa neprepisuje (len záznam
-  v KRONIKE), aj keď sa kvôli zmene súboru pluginu zvyšuje patch verzia · review len kolo 1.
+  v KRONIKE), aj keď sa kvôli zmene súboru pluginu zvyšuje patch verzia · review len kolo 1: kolo 1 je plné GH review; nálezy P2/P3 →
+  oprava + reply a kontrolu opravy urobí orchestrátor sám (bez delta subagenta a bez ďalšieho GH kola); P0/P1 → eskalácia nižšie.
 - **Ľ ľahká:** docs, texty, preklady, ikony, rozloženie, mechanické presuny, testy, presné zadanie bez vlastného rozhodovania.
 - **S stredná:** bežná kódová dávka bez zmeny kontraktu (nová logika, bugfix mimo výroby, nový ovládací prvok UI) do ~300 riadkov kódu pluginu.
 - **Ť ťažká:** audit-povinná ([D2](#d2)), výrobná/cenová ([D1](#d1)), nad 300 riadkov kódu pluginu, oprava P0/P1.
@@ -58,7 +59,8 @@ Slepá predrecenzia pred PR (skill `predrecenzia`) je **povinná** pri dávke:
   ([D5](#d5)) · každej dávke náhradného implementátora (kód iného providera vždy kontroluje aj recenzent Claude).
 - Pri dávke **Ť** sa pridá druhý slepý recenzent **iného providera než implementátor**.
 - **Odporúčaná** (nie povinná): nová interakcia v UI bez nového ovládacieho prvku (klávesnica, fokus, prepnutie dokumentu, prekreslenie).
-- **Nie:** dokumentačná dávka (docs-only), dávka, ktorá mení len verziu, a trieda D.
+- **Nie:** dokumentačná dávka (docs-only), dávka, ktorá mení len verziu, a trieda D — **okrem dávky náhradného implementátora** (tá má
+  predrecenziu vždy).
 - Slepý recenzent dostane len zadanie a `git diff main...HEAD`; jeho P1/P2 sa opravia ešte pred PR a výsledok ide do PR popisu (sekcia
   „Predrecenzia"). Predrecenzia nenahrádza audit návrhu (`codex-audit`) ani review PR (`codex-po-pr`).
 

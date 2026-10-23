@@ -76,6 +76,10 @@ GitHub Codex review (rola **review PR** v tabuľke Obsadenie rolí, `SYSTEM/WORK
    Merge s pripnutou odrevidovanou hlavou (ochrana pred pretekom s cudzím pushom): `sha=$(git rev-parse HEAD)` → `gh pr merge <N> --merge --match-head-commit "$sha"` (vetvu na GitHube maže repo automaticky). Potom **návrat na čerstvý main**: `git checkout main && git pull && git branch -d <vetva>` a **inštalácia mainu do SketchUpu** (`INSTALL_noxun_engine.ps1` z čerstvého mainu — in-SU runner nechal nasadenú rozpracovanú vetvu a updater pri rovnakom čísle verzie nič neponúkne) — ďalšia dávka štartuje výhradne odtiaľto. Over `git log origin/main --oneline -3`, že merge commit v maine naozaj je.
 6. **Záznam do reportu** (nahrádza niekdajšie hlásenie „môžeš mergovať"): čo PR mení z pohľadu používateľa · stav testov · výsledok Codex review (počet nálezov + ako vyriešené). Report ide Michalovi vždy, keď autonómny beh skončí alebo sa zastaví (najneskôr večer), zrozumiteľný z mobilu bez čítania diffu.
 
+**Trieda D (drobnosť, `SYSTEM/pravidla/DEFINICIE.md` § D3) — len kolo 1:** kolo 1 je plné GH review ako pri každom PR. Nálezy **P2/P3** →
+oprava pôvodným implementátorom + reply s hashom (krok 4) a **kontrolu opravy urobí orchestrátor sám** — bez delta subagenta a bez ďalšieho GH kola.
+Nález **P0/P1** (alebo oprava meniaca koncept) → eskalácia podľa D3: opravu robí profil Ť s novým zadaním a ďalej platia kroky 3–5 ako pri bežnej dávke.
+
 **Pravidlo 3 kôl (spresnené 25.9.2026):** počítajú sa **GH kolá review, ktoré vrátili nálezy** (kolo s 👍 sa nepočíta; pri dávkach, kde stačí delta-verifikácia,
 sa ďalšie GH kolo po P2/P3 ani nevyžaduje — pravidlo sa teda týka hlavne kôl s P0/P1, zmenou konceptu a dávok bez predrecenzie). Keď nálezy vráti aj **3. kolo**:
 
