@@ -29,7 +29,10 @@
   zmena seedu ako príklad v D1 (R10). Nový guard `tests/pure/test_definicie.rb` (G3): 20 podpisových fráz smie byť len v DEFINICIE.md (prehľadá CLAUDE, AGENTS, WORKFLOW,
   PLAN, README, STANDARD, typy agentov a skilly; bez ohľadu na veľkosť písmen, zalomenie a zvýraznenie) + test vlastného správania; DEFINICIE.md je v strážach odkazov
   a dĺžky riadkov `test_docs_navigacia.rb`. Do DEFINICIE.md navyše (forma, bez zmeny významu) príklad prednosti tried z WORKFLOW a z predrecenzie „prekreslenie" a „len zmena
-  verzie". Testy: headless 5430/0/0, JS sady 163/163 (každá zvlášť).
+  verzie". Akceptačné overenie slepým recenzentom („nič sa nestratilo"): 4× P2 + 4× P3 opravené pred PR — trieda D zosúladená so STAV, review a predrecenziou
+  náhradníka; náhradník slepého recenzenta (R4) zapísaný do tabuľky Náhradníci; „Codex nedostupný" len pre audit návrhu a audit pod prahom bez náhradnej brány; druhý
+  recenzent pri Ť len pri povinnej predrecenzii (postup v skille `predrecenzia`). Rozpor riadku „P0/P1 v review" (CLAUDE.md, Autonómne bloky) s pravidlom 3 kôl
+  ostáva doslova — rozhodne Michal. Testy: headless 5430/0/0, JS sady 163/163 (každá zvlášť).
 
 - **ŠTART BLOKU 10 · PRAVIDLA (23.10.2026, PR #477, dokumentačné PR — kód pluginu a VERSION bez zmeny).** Michal 17.10. zadal prestavbu pravidiel pre agentov (univerzálne
   `AGENTS.md`, pravidlá podľa roly, menej kontextu, ochrana proti „pretekaniu", retro, hodnotenie modelov a router). Do repa ide priečinok `SYSTEM/zdroje/bloky/PRAVIDLA/`:
