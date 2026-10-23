@@ -96,9 +96,8 @@ hrany novej roly — inak sa na existujúcich PC postaví **bez pásky**). Dávk
 ## 3 · Nový stĺpec Kusovníka
 
 Kontrakt stĺpcov je **UI20_KONTRAKT Š2** ([../../SYSTEM/zdroje/ui20/UI20_KONTRAKT.md](../../SYSTEM/zdroje/ui20/UI20_KONTRAKT.md)).
-Trieda dávky podľa [DEFINICIE § D1 a § D5](../../SYSTEM/pravidla/DEFINICIE.md#d1): **popisný čítací stĺpec** bez zmeny `row_key`, zoskupenia a exportov (vzor stĺpca Rola cez
-`rows_with_roles`) **nie je výrobný**; stĺpec s číslom, podľa ktorého sa objednáva alebo cenotvorí, zmena `row_key`, zoskupenia či obsahu
-exportu **je výrobný/cenový**. Voľba stĺpca je per počítač (`localStorage`), ďalší stĺpec v menu „Stĺpce" nie je nový ovládací prvok.
+Či je dávka výrobná/cenová, určuje [DEFINICIE § D1](../../SYSTEM/pravidla/DEFINICIE.md#d1), či ide o nový ovládací prvok v UI,
+[§ D5](../../SYSTEM/pravidla/DEFINICIE.md#d5). Vzor popisného stĺpca je stĺpec Rola cez `rows_with_roles`; voľba stĺpca je per počítač (`localStorage`).
 
 | Súbor | Mená | Čo tam urobiť |
 |---|---|---|

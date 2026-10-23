@@ -283,7 +283,8 @@ pre N+1 začína až na čerstvom maine po mergi N — keď merge N zmenil kontr
 **Číslo PR** je všade, kde ho dávka píše (PLAN, KRONIKA, STAV, `DOGFOODING_vyriesene`), do otvorenia PR `PR #?`; hneď po `gh pr create`
 ho doplní samostatný commit, ktorý mení len číslo — ten pred mergom skontroluje orchestrátor (pri čistom kole 1 inak žiadna delta nebeží).
 **Dokumentačné PR** (bez kódu pluginu) idú skrátene: vetva `docs/…` → odsek v KRONIKE → headless testy (guardy dokumentácie) → kvóta →
-PR → číslo PR → review → merge. Verzia, `?v=` ani predrecenzia sa pri nich nerobia; STAV len vtedy, keď PR mení stav bloku, smoke alebo
+PR → číslo PR → review → merge. Verzia, `?v=` ani predrecenzia sa pri nich nerobia (výnimka: dávka náhradného implementátora má
+predrecenziu vždy, aj docs-only — DEFINICIE § D4); STAV len vtedy, keď PR mení stav bloku, smoke alebo
 poradie prác — vtedy aktualizuje faktický stav v „Stav" (verzia a čísla testov sa nemenia) a prepíše sekcie „Robí sa" a „Ďalší krok".
 
 ## 5 · Review po PR

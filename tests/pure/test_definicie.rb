@@ -41,10 +41,11 @@ NX_DEF_PHRASES = {
 }.freeze
 
 # Subory pravidiel, ktore nesmu niest kopiu definicie (relativne k rootu; glob povoleny).
-# STANDARD.md navyse oproti package P1a § 5 — v §13 niesol parafrazu D1/D2 (R10).
+# STANDARD.md navyse oproti package P1a § 5 — v §13 niesol parafrazu D1/D2 (R10); docs/architecture/*.md
+# po review PR #478 (rozsirovacie-body.md prerozpravalo hranice D1 a D5).
 NX_DEF_SCAN = %w[
   CLAUDE.md AGENTS.md SYSTEM/WORKFLOW.md SYSTEM/PLAN.md SYSTEM/README.md SYSTEM/STANDARD.md
-  .claude/agents/*.md .claude/skills/*/SKILL.md
+  .claude/agents/*.md .claude/skills/*/SKILL.md docs/architecture/*.md
 ].freeze
 
 def nx_def_normalize(text)
