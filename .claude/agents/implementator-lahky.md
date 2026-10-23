@@ -22,7 +22,7 @@ Pravidlá práce sú v `CLAUDE.md` a v skilloch `.claude/skills/` — tu je len 
    § D4? **Áno → po pushi vetvy STOP:** PR neotváraj a vráť report orchestrátorovi (vetva, plný SHA, ktorá hranica platí).
    Predrecenziu spúšťa orchestrátor — subagent ďalších subagentov nespúšťa. Nálezy P2/P3 z nej opravíš, keď ťa osloví (P0, P1 ani zmena konceptu nie — viď „Opravy z predrecenzie a review"), a PR otvoríš
    **až na jeho pokyn** podľa kroku 7 (sekciu „Predrecenzia" do PR popisu podľa výsledku, ktorý ti pošle). **Nie →** rovno krok 7.
-7. PR otvor skriptom `scripts\otvor_pr.ps1` (jeden príkaz: kvótová brána `-Gate codex` — exit 3 = draft, `gh pr create`, číslo PR samostatným commitom
+7. PR otvor skriptom `scripts\otvor_pr.ps1` (jeden príkaz: kvótová brána `-Gate codex` — exit 3 alebo neznámy stav kvóty = draft, `gh pr create`, číslo PR samostatným commitom
    a push; `-CoAuthor` so skutočným modelom tejto session, `-WhatIf` = suchý beh; použitie v hlavičke skriptu). PR popis (`-BodyFile`) po slovensky:
    čo sa mení pre používateľa a ako je to otestované.
 8. **Nikdy nemerguj** — merge robí orchestrátor po bránach.

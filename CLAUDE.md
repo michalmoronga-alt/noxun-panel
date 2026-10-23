@@ -47,8 +47,8 @@ Keď zásah spadá do viacerých riadkov, platia VŠETKY. **Súbor nad ~50 kB sa
   kontext bloku, rozhodnutia a merge (dôvod: kompresia kontextu).
 - **Merge robí orchestrátor** (`gh pr merge <N> --merge --match-head-commit <SHA>` — pripnutá presne tá hlava, ktorá prešla bránami) po
   splnení OBOCH brán **pre aktuálnu hlavu vetvy**: **CI zelené** + **review kolo uzavreté**. Nikdy nemergovať hneď po pushi opráv len
-  preto, že CI zbehlo skôr než review. Po mergi **návrat na čerstvý `main`** (`git checkout main && git pull`) a — **len keď PR menil
-  plugin** — **inštalácia mainu** (sekcia Verzia a uzáver) — ďalšia dávka štartuje odtiaľ. Vetvy na GitHube maže repo automaticky. Postup: skill `codex-po-pr`.
+  preto, že CI zbehlo skôr než review. Po mergi **návrat na čerstvý `main`** (`git checkout main && git pull`) a — **keď PR menil
+  plugin alebo je nasadené niečo iné než main** — **inštalácia mainu** (sekcia Verzia a uzáver; hook po mergi to konštatuje) — ďalšia dávka štartuje odtiaľ. Vetvy na GitHube maže repo automaticky. Postup: skill `codex-po-pr`.
 - **Review kolá, opravy z review a pravidlo 3 kôl** — jediný domov: skill `codex-po-pr`.
 - **Výrobná/cenová dávka** a **nový ovládací prvok v UI** — jediné znenie s hranicami a príkladmi: [DEFINICIE § D1](SYSTEM/pravidla/DEFINICIE.md#d1)
   a [§ D5](SYSTEM/pravidla/DEFINICIE.md#d5).
@@ -143,9 +143,11 @@ Keď zásah spadá do viacerých riadkov, platia VŠETKY. **Súbor nad ~50 kB sa
 - **Priečinok bloku je v repe od štartu bloku:** debata, mockup, packages, briefy a smoke checklist v `SYSTEM/zdroje/bloky/<BLOK>/` — nie
   v `_dev/` ani v chate; počas bloku sú autoritou. Po uzávere sa **celý priečinok fyzicky presúva** do `SYSTEM/archiv/bloky/<BLOK>/`
   s kontrolou odkazov. Existujúce mockupy v `SYSTEM/zdroje/ui20/` sa nepresúvajú.
-- **Po mergi PR, ktorý mení plugin** (`noxun_engine/`, `noxun_engine.rb`), nainštalovať main do SketchUpu (`INSTALL_noxun_engine.ps1`
-  z čerstvého `main`) — in-SU runner nasadzuje rozpracovanú vetvu a updater pri rovnakom čísle verzie nič neponúkne. Pri PR bez zmeny
-  pluginu (docs, skripty, hooky, testy) inštalácia netreba. Hook `.claude/hooks/po_merge.js` po `gh pr merge` konštatuje, či PR menil plugin.
+- **Po mergi nainštalovať main** do SketchUpu (`INSTALL_noxun_engine.ps1` z čerstvého `main`), **keď PR menil plugin** (`noxun_engine/`, `noxun_engine.rb`)
+  **alebo keď je nasadené niečo iné než main** — in-SU runner, foto okien (`ui_foto.ps1 -Record`) a export test nasadzujú rozpracovanú vetvu a po sebe ju
+  nevracajú, a updater pri rovnakom čísle verzie nič neponúkne. Čo je nasadené, zapisuje `INSTALL_noxun_engine.ps1` do značky `%TEMP%\noxun_nasadene.txt`
+  (vetva, SHA, či bol strom čistý, čas). Pri PR bez zmeny pluginu a s nasadeným mainom (docs, skripty, hooky, testy) inštalácia netreba. Hook
+  `.claude/hooks/po_merge.js` po `gh pr merge` obe podmienky konštatuje („inštalácia mainu je potrebná / nie je potrebná"; pri neznámom stave radšej „potrebná").
 
 ## Špecifikácia a kontext (všetko v tomto repe)
 
@@ -197,8 +199,9 @@ Keď zásah spadá do viacerých riadkov, platia VŠETKY. **Súbor nad ~50 kB sa
   a po nástroji len pri prechode do vyššieho pásma (50–95 %); subagentov nechá na pokoji. **Od 75 %** zapísať rozpracovaný stav do repa/pamäte a čítanie delegovať
   subagentom; **od 90 %** navrhnúť Michalovi `/compact` na hranici dávky.
   **Pripomienka po mergi** (od 23.10.2026, `.claude/hooks/po_merge.js`, PostToolUse na Bash s filtrom `gh pr merge`): po `gh pr merge <N>` vloží hlavnému
-  agentovi vecné konštatovanie „PR #N zmergovaný · zmenil plugin áno/nie → inštalácia mainu potrebná/nie je potrebná" (z `gh pr view`); sama nič nespúšťa,
-  pri chybe mlčí a príkaz nikdy neblokuje.
+  agentovi vecné konštatovanie v dvoch riadkoch: „PR #N menil plugin: áno/nie" (z `gh pr view`) a „Nasadený je <vetva> <sha> (<čas>) → inštalácia mainu
+  je potrebná / nie je potrebná" (zo značky nasadenia a porovnania pluginu s `origin/main`; chýbajúca značka alebo neznámy stav = „potrebná"). Sama nič nespúšťa,
+  pri chybe mlčí a príkaz nikdy neblokuje. Filtruje si príkaz sám (v settings je len matcher Bash, bez poľa `if`); živé spustenie z Claude Code sa overí pri prvom reálnom merge.
 - Interaktívny kanál: MCP `mcp__vbo-sketchup__execute_ruby` (SketchUp 2026 + VBO SkAgent, port 7891); fallback file-bridge (`vbo_sk_agent\bridge\command.rb` → `result.json`, pozor na mtime pascu); overená slučka `-RubyStartup skript + kópia modelu` (vzor v `scripts\run_su_tests.ps1`). Deploy: `INSTALL_noxun_engine.ps1`.
 - **Diagnostika MCP (V0.4.7+):** pri visiacom/zamrznutom porte 7891 spusti `scripts\skagent_doctor.ps1` — zistí držiteľa portu a `/health`, `-Kill` odstráni zamrznutý bridge (živú zákazku ani cez `-Force` nezabije). Dump stavu enginu pre bugcatch: `Noxun::Engine::Debug.report` cez `execute_ruby` (model + výber + stav panela ako read-only JSON, nikdy nezapisuje).
 - **Testuje sa VÝHRADNE v testovacom projekte `_dev\ENGINEtests.skp`** (alebo neuloženom Untitled okne BEZ existujúcich NOXUN korpusov) — v ňom môžu agenti tvoriť/mazať čokoľvek. `_dev/` je gitignorované, preto ho **vo worktree nie je** — skripty (`run_su_tests.ps1`, `ui_foto.ps1`,

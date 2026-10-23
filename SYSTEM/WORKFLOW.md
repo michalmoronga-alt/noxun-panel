@@ -226,7 +226,7 @@ flowchart TD
   RV["Review po PR · mapa 3"]:::ext
   MG["Merge s pripnutou hlavou<br/>CI zelené + kolo uzavreté"]:::orch
   NM["checkout main + pull"]:::orch
-  INS["Nainštalovať main do SketchUpu (len keď PR menil plugin)<br/>INSTALL_noxun_engine.ps1"]:::orch
+  INS["Nainštalovať main do SketchUpu (keď PR menil plugin<br/>alebo je nasadené niečo iné než main — hook po mergi)<br/>INSTALL_noxun_engine.ps1"]:::orch
   NX["Ďalšia dávka"]:::orch
   S --> R0
   R0 --> Q1

@@ -1,6 +1,6 @@
 ---
 name: codex-po-pr
-description: Po odoslaní PR — budík ~10 min, kontrola Codex GH review (nálezy sú v review threadoch, nie komentoch), oprava nálezov pôvodným implementátorom, kontrola opravy novým slepým subagentom, reply s commit hashom; po splnení brán (CI zelené + review vybavené) merge robí orchestrátor, nainštaluje main a výsledok ide do reportu.
+description: Po odoslaní PR — budík ~10 min, kontrola Codex GH review (nálezy sú v review threadoch, nie komentoch), oprava nálezov pôvodným implementátorom, kontrola opravy novým slepým subagentom, reply s commit hashom; po splnení brán (CI zelené + review vybavené) merge robí orchestrátor, main nainštaluje len keď PR menil plugin alebo je nasadené niečo iné než main (hook po mergi to konštatuje) a výsledok ide do reportu.
 ---
 
 # Codex review po PR
@@ -23,7 +23,7 @@ GitHub Codex review (rola **review PR** v tabuľke Obsadenie rolí, `SYSTEM/WORK
      otvorí ako draft** (`gh pr create --draft`; Codex draft nerecenzuje) a ďalej podľa triedy dávky — prah a reakcie (náhradná brána z kroku 3, alebo
      rozhodne Michal a draft dovtedy čaká): skill `usage`, sekcia „Prahy a reakcie". Dôvod draftu: kolo, ktoré beží samo po otvorení PR, sa nedá zastaviť.
 1. **Otvorenie PR:** `powershell -NoProfile -File scripts\otvor_pr.ps1 -Title "<názov>" -BodyFile <popis.md> -CoAuthor "Claude <model> <noreply@anthropic.com>"`
-   (PR popis po slovensky v súbore, nie here-string; `-WhatIf` = suchý beh) — skript pushne vetvu, spraví kvótovú bránu, `gh pr create` a hneď **doplní číslo PR**
+   (PR popis po slovensky v súbore, nie here-string; `-WhatIf` = suchý beh) — skript spraví kvótovú bránu (exit 3 aj neznámy stav kvóty = draft), pushne vetvu, `gh pr create` a hneď **doplní číslo PR**
    namiesto `PR #?` (PLAN, KRONIKA, STAV, `DOGFOODING_vyriesene`; len na riadkoch pridaných vetvou) samostatným commitom, ktorý mení len číslo, a pushne ho.
    **Záloha ručne:** `git push` + `gh pr create` (`--body-file`) a samostatný commit s číslom. Tento commit **pred mergom skontroluje orchestrátor** (pri čistom
    kole 1 inak žiadna delta nebeží; keď delta beží, patrí do nej). Potom nastav budík — Bash `sleep 600` s `run_in_background: true`;
@@ -75,7 +75,7 @@ GitHub Codex review (rola **review PR** v tabuľke Obsadenie rolí, `SYSTEM/WORK
    **Draft otvorený pre kvótu** treba pred mergom prepnúť `gh pr ready` (GitHub draft nezmerguje) — **tým sa spustí kolo Codexu**. Ak je kvóta stále
    pod prahom (`-Gate codex` exit 3), **na výsledok kola sa nečaká** — náhradná brána už prebehla; neskorší nález z tohto kola rieši **nový fix PR**.
    Ak sa kvóta medzitým obnovila, na kolo sa čaká a vybaví sa podľa krokov 2–4.
-   Merge s pripnutou odrevidovanou hlavou (ochrana pred pretekom s cudzím pushom): `sha=$(git rev-parse HEAD)` → `gh pr merge <N> --merge --match-head-commit "$sha"` (vetvu na GitHube maže repo automaticky). Potom **návrat na čerstvý main**: `git checkout main && git pull && git branch -d <vetva>` a — **len keď PR menil plugin** (`noxun_engine/`, `noxun_engine.rb`; po `gh pr merge` to konštatuje hook `po_merge.js`) — **inštalácia mainu do SketchUpu** (`INSTALL_noxun_engine.ps1` z čerstvého mainu — in-SU runner nechal nasadenú rozpracovanú vetvu a updater pri rovnakom čísle verzie nič neponúkne) — ďalšia dávka štartuje výhradne odtiaľto. Over `git log origin/main --oneline -3`, že merge commit v maine naozaj je.
+   Merge s pripnutou odrevidovanou hlavou (ochrana pred pretekom s cudzím pushom): `sha=$(git rev-parse HEAD)` → `gh pr merge <N> --merge --match-head-commit "$sha"` (vetvu na GitHube maže repo automaticky). Potom **návrat na čerstvý main**: `git checkout main && git pull && git branch -d <vetva>` a — **keď PR menil plugin** (`noxun_engine/`, `noxun_engine.rb`) **alebo je v SketchUpe nasadené niečo iné než main** (runner, foto okien a export test nasadzujú vetvu; značka `%TEMP%\noxun_nasadene.txt`; oboje po `gh pr merge` konštatuje hook `po_merge.js`) — **inštalácia mainu do SketchUpu** (`INSTALL_noxun_engine.ps1` z čerstvého mainu — in-SU runner nechal nasadenú rozpracovanú vetvu a updater pri rovnakom čísle verzie nič neponúkne) — ďalšia dávka štartuje výhradne odtiaľto. Over `git log origin/main --oneline -3`, že merge commit v maine naozaj je.
 6. **Záznam do reportu** (nahrádza niekdajšie hlásenie „môžeš mergovať"): čo PR mení z pohľadu používateľa · stav testov · výsledok Codex review (počet nálezov + ako vyriešené). Report ide Michalovi vždy, keď autonómny beh skončí alebo sa zastaví (najneskôr večer), zrozumiteľný z mobilu bez čítania diffu.
 
 **Trieda D (drobnosť, `SYSTEM/pravidla/DEFINICIE.md` § D3) — len kolo 1:** kolo 1 je plné GH review ako pri každom PR. Nálezy **P2/P3** →
