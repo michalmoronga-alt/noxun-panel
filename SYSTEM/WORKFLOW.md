@@ -22,7 +22,7 @@ Pravidlá hovoria o **rolách**, nie o modeloch — model aj nástroj každej ro
 | **audítor** | audit návrhu pred kódom (audit bloku, audit-povinné dávky), bežné audity a delta | nič — nálezy BLOCKER / FIX / NOTE |
 | **rešeršér** | outside-in rešerš (čo už SketchUp a CAD svet rieši), krížový audit bloku | nič — výstup triedi orchestrátor (reconcile) |
 | **review PR** | review každého PR: 1. kolo samo, ďalšie na vyžiadanie | nič — nálezy P0–P3 v review threadoch |
-| **automaty** | CI (headless + všetky JS sady), runner testov v SketchUpe, hook po úprave súboru, updater pluginu | CI a in-SU test sú brány mergu |
+| **automaty** | CI (headless + všetky JS sady), runner testov v SketchUpe, hook po úprave súboru, hook po mergi, skripty `otvor_pr.ps1` a `run_js_tests.ps1`, updater pluginu | CI a in-SU test sú brány mergu |
 
 **Nástroje a ich rola (N14):** Codex — audítor (audit návrhu, delta), review PR a náhradný implementátor bežných dávok · Grok — rešerš
 a krížový audit bloku, skúšobne implementátor (shadow, nikdy sa nemerguje) ·
@@ -213,7 +213,7 @@ flowchart TD
   IMN["Náhradný implementátor (časť 2)<br/>predrecenzia vždy slepý recenzent Claude"]:::ext
   IM["Implementácia<br/>subagent vo worktree"]:::sub
   VV["Verzia: patch 2×<br/>+ všetky ?v= v HTML"]:::sub
-  T1["Testy: headless<br/>+ každá JS sada zvlášť"]:::auto
+  T1["Testy: headless<br/>+ všetky JS sady (run_js_tests.ps1)"]:::auto
   Q2{"Spúšťač in-SU testu?<br/>DEFINICIE D6"}:::gate
   SU["Test v SketchUpe = brána mergu<br/>runner -CloseWhenDone · znova len pri zmene<br/>Ruby spúšťača po poslednom behu"]:::auto
   DOC["Docs v tej istej dávke: architektúra na mieste,<br/>D-čísla do archívu, STAV (nie pri triede D), KRONIKA,<br/>v PLAN riadok s ✅, číslo PR zatiaľ PR #?"]:::sub
@@ -222,11 +222,11 @@ flowchart TD
   QK{"Codex weekly<br/>zostatok pod 10 %?"}:::gate
   PR["gh pr create<br/>implementátor"]:::sub
   PRD["PR ako draft, implementátor<br/>ďalej podľa triedy dávky · mapa 3"]:::sub
-  NUM["Doplniť číslo PR všade, kde je PR #?<br/>samostatný commit implementátora, len číslo<br/>pred mergom ho skontroluje orchestrátor"]:::sub
+  NUM["Doplniť číslo PR všade, kde je PR #?<br/>skript otvor_pr.ps1: samostatný commit, len číslo<br/>pred mergom ho skontroluje orchestrátor"]:::sub
   RV["Review po PR · mapa 3"]:::ext
   MG["Merge s pripnutou hlavou<br/>CI zelené + kolo uzavreté"]:::orch
   NM["checkout main + pull"]:::orch
-  INS["Nainštalovať main do SketchUpu<br/>INSTALL_noxun_engine.ps1"]:::orch
+  INS["Nainštalovať main do SketchUpu (len keď PR menil plugin)<br/>INSTALL_noxun_engine.ps1"]:::orch
   NX["Ďalšia dávka"]:::orch
   S --> R0
   R0 --> Q1
@@ -281,7 +281,7 @@ pre N+1 začína až na čerstvom maine po mergi N — keď merge N zmenil kontr
 **PR otvára implementátor.** Pri dávke s povinnou predrecenziou po pushi vetvy stojí a vráti report; predrecenziu spúšťa orchestrátor
 (subagent ďalších subagentov nespúšťa) a PR sa otvorí až na jeho pokyn po oprave P1/P2.
 **Číslo PR** je všade, kde ho dávka píše (PLAN, KRONIKA, STAV, `DOGFOODING_vyriesene`), do otvorenia PR `PR #?`; hneď po `gh pr create`
-ho doplní samostatný commit, ktorý mení len číslo — ten pred mergom skontroluje orchestrátor (pri čistom kole 1 inak žiadna delta nebeží).
+ho doplní samostatný commit, ktorý mení len číslo (PR aj commit jedným príkazom: `scripts\otvor_pr.ps1`) — ten pred mergom skontroluje orchestrátor (pri čistom kole 1 inak žiadna delta nebeží).
 **Dokumentačné PR** (bez kódu pluginu) idú skrátene: vetva `docs/…` → odsek v KRONIKE → headless testy (guardy dokumentácie) → kvóta →
 PR → číslo PR → review → merge. Verzia, `?v=` ani predrecenzia sa pri nich nerobia (výnimka: dávka náhradného implementátora má
 predrecenziu vždy, aj docs-only — DEFINICIE § D4); STAV len vtedy, keď PR mení stav bloku, smoke alebo
@@ -369,7 +369,7 @@ Všetko, čo musí platiť, aby práca pokračovala. „Kto" = kto bránu uzatv�
 | audit návrhu dávky bez BLOCKER | audit-povinná dávka; pred ním sonda na kóde | audítor → orchestrátor | DEFINICIE § D2 · skill `codex-audit` |
 | kvóta | štart okna; pred auditom, implementačným subagentom, predrecenziou, `gh pr create` a `@codex review` | skript `usage` → orchestrátor | skill `usage` (Prahy a reakcie) · CLAUDE.md · Kvóty a štart okna |
 | počkať, nie náhradník | primárny agent roly má čoskoro reset; kedy sa čaká a kedy smie náhradník | orchestrátor | skill `usage` (Prahy a reakcie) · časť 2 Náhradníci |
-| testy zelené | vždy headless + každá JS sada zvlášť | CI + orchestrátor | CLAUDE.md · Testovanie |
+| testy zelené | vždy headless + všetky JS sady (`scripts\run_js_tests.ps1` — každá sada zvlášť) | CI + orchestrátor | CLAUDE.md · Testovanie |
 | test v SketchUpe zelený | dávka spadá do spúšťačov in-SU; na finálnej hlave podľa tej istej definície (PR uvedie hlavu behu) | runner → orchestrátor | DEFINICIE § D6 · CLAUDE.md · Testovanie (runner) |
 | docs a verzia na mieste | kódová dávka: celý checklist (trieda D bez prepisu STAV, DEFINICIE § D3); dokumentačné PR: KRONIKA + pri zmene stavu bloku, smoke alebo poradia prác aktualizuje faktický stav v STAV „Stav" (bez verzie a čísel testov) a prepíše „Robí sa" a „Ďalší krok" | orchestrátor + guard testy | CLAUDE.md · Verzia a uzáver dávky |
 | predrecenzia bez P1/P2 | keď je povinná podľa DEFINICIE § D4 | slepý recenzent → orchestrátor | DEFINICIE § D4 · skill `predrecenzia` |

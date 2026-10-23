@@ -21,7 +21,7 @@ povinné pre každý PR — predrecenzia je lacnejšie kolo navyše medzi hotov�
 
 ## Postup
 
-1. **Vetva je hotová:** testy zelené (headless + všetky JS sady; in-SU podľa `SYSTEM/pravidla/DEFINICIE.md` § D6), docs na mieste, všetko commitnuté.
+1. **Vetva je hotová:** testy zelené (headless + všetky JS sady cez `scripts\run_js_tests.ps1`; in-SU podľa `SYSTEM/pravidla/DEFINICIE.md` § D6), docs na mieste, všetko commitnuté.
 2. **Kvóta PRED spustením** (subagent míňa Claude kvótu, orientačne 200–350 k tokenov na beh):
    `& ".claude\skills\usage\usage.ps1" -Label "predrecenzia <dávka>" -Phase before -Gate claude` — **exit 3** = subagenta nespúšťaj;
    prah a náhrada: skill `usage`, sekcia „Prahy a reakcie" (riadok Predrecenzia), postup náhrady bod 7.

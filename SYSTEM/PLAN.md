@@ -33,7 +33,7 @@ Priečinok [zdroje/bloky/PRAVIDLA/](zdroje/bloky/PRAVIDLA/) — zadanie, návrh 
 
 - ✅ Rešerš agy už nekončí prázdna — oprava postupu (PR #475) a stráž v priečinku behu (PR #476).
 - ✅ **P1a** definície na jednom mieste (`SYSTEM/pravidla/DEFINICIE.md` + guard, rozpory R1–R10) — PR #478.
-- **P4a** drobnosti: JS testy jedným príkazom · runner berie ENGINEtests z hlavného checkoutu · `otvor_pr.ps1` (kvóta + PR + číslo PR) · pripomienka po mergi.
+- ✅ **P4a** drobnosti: JS testy jedným príkazom · runner berie ENGINEtests z hlavného checkoutu · `otvor_pr.ps1` (kvóta + PR + číslo PR) · pripomienka po mergi — PR #?.
 - **P1b** jadro `AGENTS.md` + most `CLAUDE.md` + `ORCHESTRATOR.md` + strop veľkosti.
 - **P2** roly — karty rolí, generované typy agentov, rola analytik, jedna tabuľka obsadenia.
 - **P3** pravidlá oblastí (`.claude/rules/`) + skilly `uzaver-bloku` a `smoke`.
@@ -77,7 +77,7 @@ Priečinok [zdroje/bloky/PRAVIDLA/](zdroje/bloky/PRAVIDLA/) — zadanie, návrh 
   (`BoardBuilder.dedup_copies` a dedup skrinky dnes značku ticho prepíšu na aktuálnu a ORANGE nález zanikne bez kontroly kusa); potrebné až pri prvom zvýšení `Store::STD`
   (vzor R-12 pre `config_schema`). Package [PACKAGE_H8.md](archiv/bloky/HARDENING/PACKAGE_H8.md) §14.
 - **Runner testov v SketchUpe po teste sám vráti pôvodnú verziu pluginu** (workflow N4, 26.9.2026) — `scripts\run_su_tests.ps1` dnes nechá nasadenú
-  rozpracovanú vetvu; dovtedy platí pravidlo „po každom mergi nainštalovať main" (CLAUDE.md, Verzia a uzáver).
+  rozpracovanú vetvu; dovtedy platí pravidlo „po mergi PR meniaceho plugin nainštalovať main" (CLAUDE.md, Verzia a uzáver).
 - **D-147 · Nárezový plán: menšie dielce nad seba v páse** (Michal 29.9.2026, smoke bloku 2) — vnárať menšie dielce do voľného miesta pásu nad nižším dielcom (plán býva niekedy o platňu opatrnejší, než musí); plné znenie v [DOGFOODING.md](DOGFOODING.md).
 - **D-146 · Falošný duplák** (Michal 28.9.2026) — spodná vrstva dupláku zo 100 mm širokých výstuh namiesto plnej dosky (šetrí materiál aj váhu, keď obe strany nie sú pohľadové); plné znenie v [DOGFOODING.md](DOGFOODING.md).
 - **M-R nadstavby zo smoke 12.9.2026:** **D-126** otočenie zdrojového obrázka o ±90° pred uložením; **D-127** prirodzenejšie umiestnenie textúry (náhodný posun, nadväzovanie na skrinke alebo ručné umiestnenie — výber podľa praxe Lucie). Odložené, bez termínu, neblokujú uzáver M-R; plný kontext v [DOGFOODING.md](DOGFOODING.md).

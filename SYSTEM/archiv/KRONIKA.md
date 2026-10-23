@@ -17,6 +17,23 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **P4a · DROBNOSTI WORKFLOWU (23.10.2026, PR #?, blok 10 · PRAVIDLA, trieda S — nové skripty, hook, úpravy pravidiel a testy; kód pluginu, VERSION, `?v=` ani STAV
+  bez zmeny).** Štyri drobnosti z retro záznamov, ktoré šetria čas každej ďalšej dávke. (1) `scripts\run_js_tests.ps1` spustí všetky JS sady jedným príkazom (každú
+  `tests/js/test_*.js` zvlášť, súhrn `JS: N sad, M PASS, K FAIL`, exit 1 pri zlyhaní; predvolene beží do konca, `-FailFast` skončí po prvom páde — CI ostáva pri bash
+  slučke). (2) Testovací model a zákazka na export test sa vo worktree berú z hlavného checkoutu: `Resolve-NxTestModel` sa presunul z `ui_foto.ps1` do spoločného
+  `scripts/lib/nx_paths.ps1`, ktorý používa aj `run_su_tests.ps1` (nový `-DryRun` = len vyhľadá SketchUp a model) a `export_test.ps1`; hláška pri chýbajúcom súbore
+  menuje obe skúšané cesty. (3) `scripts\otvor_pr.ps1` otvorí PR jedným príkazom (`-Title`, `-BodyFile`, povinný `-CoAuthor` so skutočným modelom session, `-Base`,
+  `-Draft`, `-WhatIf`): kontrola vetvy a stromu, push, kvótová brána `-Gate codex` (exit 3 = draft; exit 2/4 neblokuje, skript to vypíše), `gh pr create`, doplnenie čísla PR
+  samostatným commitom s trailerom a push; číslo sa dopĺňa len v `SYSTEM/PLAN.md`, `STAV.md`, `archiv/KRONIKA.md`, `archiv/DOGFOODING_vyriesene.md` a len na riadkoch,
+  ktoré vetva pridala (inde je zástupný text čísla PR text pravidla). (4) Hook `.claude/hooks/po_merge.js` (PostToolUse, matcher Bash, filter `if: Bash(gh pr merge *)`,
+  timeout 12 s) po `gh pr merge <N>` zistí cez `gh pr view` (`files,mergedAt,state`), či PR menil plugin (`noxun_engine/`, `noxun_engine.rb`), a vloží vecné konštatovanie
+  „zmergovaný · plugin áno/nie → inštalácia mainu potrebná/nie je potrebná"; pri chybe, nezmergovanom PR alebo subagentovi mlčí. Pravidlo „po každom mergi inštalovať
+  main" sa zúžilo na „po mergi PR, ktorý mení plugin" (CLAUDE.md, WORKFLOW, `codex-po-pr`, PLAN). Pravidlá (CLAUDE.md Testovanie a Verzia a uzáver, typy implementátorov,
+  skilly `codex-po-pr` a `predrecenzia`, WORKFLOW) odkazujú na nové príkazy; ručný postup čísla PR ostal ako záloha. Overenie hooku na Claude Code 2.1.301 podľa
+  dokumentácie: vstup PostToolUse nesie `tool_name`, `tool_input.command`, `cwd`; pole `if` (permission rule syntax) existuje a je podľa dokumentácie best-effort,
+  preto hook filtruje sám; živé spustenie hooku z novej session sa overí pri prvom reálnom merge. Testy: `tests/js/test_po_merge.js`, `tests/pure/test_p4a_skripty.rb`
+  (nx_paths oboma vetvami v dočasnom worktree, run_js_tests, nahradenie čísla PR na dočasnom repe, `otvor_pr -WhatIf` aj ostrý beh so stubom `gh` a bránou).
+
 - **P1a · DEFINÍCIE NA JEDNOM MIESTE (23.10.2026, PR #478, blok 10 · PRAVIDLA, trieda Ť — pravidlá, dokumentácia a testy; kód pluginu, VERSION, `?v=` ani STAV
   bez zmeny).** Šesť definícií, podľa ktorých sa rozhoduje o bránach každej dávky (výrobná/cenová D1, audit-povinná D2, triedy D3 vrátane novej triedy D, povinná
   predrecenzia D4, nový ovládací prvok v UI D5, in-SU ako brána mergu D6), má jediné znenie v novom `SYSTEM/pravidla/DEFINICIE.md` (znenie z package P1a § 2 po audite

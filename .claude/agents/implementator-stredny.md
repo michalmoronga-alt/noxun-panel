@@ -14,7 +14,7 @@ Pravidlá práce sú v `CLAUDE.md` a v skilloch `.claude/skills/` — tu je len 
 1. Prečítaj `CLAUDE.md` a `SYSTEM/pravidla/DEFINICIE.md` (definície tried a brán); v tabuľke „Povinné čítanie" nájdi riadky, do ktorých
    zásah spadá — ich dokumenty prečítaj PRED prácou. Potom celé zadanie.
 2. Vetva podľa CLAUDE.md (`feat/…`, `fix/…`, `docs/…`) z čerstvého `origin/main`. Nikdy commit do `main`.
-3. Implementácia a testy: headless sada + KAŽDÁ JS sada zvlášť; test v SketchUpe (runner vždy s `-CloseWhenDone`), keď dávka spadá do spúšťačov
+3. Implementácia a testy: headless sada + všetky JS sady (`powershell -NoProfile -File scripts\run_js_tests.ps1`); test v SketchUpe (runner vždy s `-CloseWhenDone`), keď dávka spadá do spúšťačov
    podľa DEFINICIE § D6 (runner: CLAUDE.md, sekcia Testovanie). Testuje sa len v `_dev\ENGINEtests.skp`, nikdy v okne so zákazkou.
 4. Uzáver podľa checklistu v CLAUDE.md (Verzia a uzáver dávky): kódová dávka celý checklist, dokumentačné PR KRONIKA (keď mení stav bloku, smoke alebo poradie prác, aj STAV: aktualizuje faktický stav v „Stav" bez verzie a čísel testov a prepíše „Robí sa" a „Ďalší krok"). Číslo PR najprv `PR #?`.
 5. Commity selektívne (nikdy `git add -A`), správa cez súbor (`-F`), trailer `Co-Authored-By` so **skutočným modelom tejto session**.
@@ -22,8 +22,9 @@ Pravidlá práce sú v `CLAUDE.md` a v skilloch `.claude/skills/` — tu je len 
    § D4? **Áno → po pushi vetvy STOP:** PR neotváraj a vráť report orchestrátorovi (vetva, plný SHA, ktorá hranica platí).
    Predrecenziu spúšťa orchestrátor — subagent ďalších subagentov nespúšťa. Nálezy P2/P3 z nej opravíš, keď ťa osloví (P0, P1 ani zmena konceptu nie — viď „Opravy z predrecenzie a review"), a PR otvoríš
    **až na jeho pokyn** podľa kroku 7 (sekciu „Predrecenzia" do PR popisu podľa výsledku, ktorý ti pošle). **Nie →** rovno krok 7.
-7. Pred `gh pr create` kvótová brána (skill `usage`, `-Gate codex`; exit 3 = PR ako draft). PR popis po slovensky: čo sa mení pre používateľa
-   a ako je to otestované. Hneď po vytvorení PR doplň číslo PR samostatným commitom, ktorý mení len číslo.
+7. PR otvor skriptom `scripts\otvor_pr.ps1` (jeden príkaz: kvótová brána `-Gate codex` — exit 3 = draft, `gh pr create`, číslo PR samostatným commitom
+   a push; `-CoAuthor` so skutočným modelom tejto session, `-WhatIf` = suchý beh; použitie v hlavičke skriptu). PR popis (`-BodyFile`) po slovensky:
+   čo sa mení pre používateľa a ako je to otestované.
 8. **Nikdy nemerguj** — merge robí orchestrátor po bránach.
 
 ## Reklasifikácia podľa skutočného diffu
