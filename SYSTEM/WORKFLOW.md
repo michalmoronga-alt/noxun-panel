@@ -70,6 +70,7 @@ na rad, až keď primárny agent roly nemôže a čakanie nepripadá do úvahy (
 |---|---|---|---|
 | audítor audit-povinných | — | Grok, Antigravity, Sonnet | čaká / rozhodne Michal |
 | bežný audit a delta | slepý recenzent (Claude Opus) = náhradná brána | Antigravity | — |
+| slepý recenzent (predrecenzia) | Codex `gpt-6.1-sol` (keď Claude weekly nestačí) | — | predrecenzia dávky náhradného implementátora Codex čaká — kód Codexu nekontroluje len Codex |
 | review PR | náhradná brána: slepý subagent + delta | — | — |
 | implementátor (všetky profily) | Codex `gpt-6.1-sol` vo worktree — **len bežné dávky** | Grok (kým neprejde shadow, Matica výberu), Antigravity | audit-povinné a výrobné/cenové dávky čakajú na reset |
 | rešerš / krížový audit | rešeršér Sonnet | — | — |
