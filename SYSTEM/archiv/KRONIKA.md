@@ -27,8 +27,8 @@
   Mapa presunu sekcia po sekcii: [P1b_MAPA_PRESUNU.md](../zdroje/bloky/PRAVIDLA/P1b_MAPA_PRESUNU.md). Typy `implementator*` a `slepy-recenzent` čítajú
   AGENTS.md + DEFINICIE (+ IMPLEMENTATOR.md, resp. POVINNE_CITANIE.md) namiesto CLAUDE.md; odkazy „CLAUDE.md, sekcia X" v WORKFLOW, README, STAV, PLAN,
   STANDARD, DEFINICIE, docs, skilloch, hooku, skriptoch a testoch prepnuté na nové miesta. Nový guard `tests/pure/test_pravidla_velkost.rb`: **G1** stropy
-  (AGENTS.md ≤ 12 kB a 150 riadkov, CLAUDE.md ≤ 1 kB, roly ≤ 12 kB, POVINNE_CITANIE ≤ 8 kB, DEFINICIE ≤ 10 kB; jedna konštanta) a **G2** bez histórie
-  (dátumy „od …", revízie, „PR #číslo", „pokus 2…" v AGENTS.md, CLAUDE.md a `SYSTEM/pravidla/`; test vlastného správania). `test_docs_navigacia.rb`:
+  (AGENTS.md ≤ 12 kB a 150 riadkov, CLAUDE.md ≤ 1 kB, roly ≤ 14 kB (dočasne, P3 zníži na 8 kB), POVINNE_CITANIE ≤ 8 kB, DEFINICIE ≤ 10 kB; jedna konštanta) a **G2** bez histórie
+  (dátumy „od …", revízie s dátumom alebo kolom, „PR #číslo", „pokus 2…" v AGENTS.md, CLAUDE.md a `SYSTEM/pravidla/`; test vlastného správania). `test_docs_navigacia.rb`:
   nové súbory v kontrole odkazov a limitu riadka, odkaz na `docs/ARCHITEKTURA.md` sa stráži v AGENTS.md; `test_definicie.rb` (G3) prehľadáva aj roly
   a POVINNE_CITANIE. **Vypustená história** (z textu pravidiel, zapisuje sa sem): Git workflow záväzný od 16.7.2026, revízie RETRO 12.8., WORKFLOW 26.9.
   a retro bloku 7 27.9.2026 · výber profilu implementátora od 7.10.2026 (schválil Michal) · štart bloku a otvorené body mockupu od 27.9.2026; dôvod

@@ -39,4 +39,4 @@ Predtým: **v0.8.0 — FÁZA ŠTÚDIO KOMPLET.** Plugin má **dve okná**: **Ins
 
 - **Inštalácia (dev):** `INSTALL_noxun_engine.ps1` → **reštartuj SketchUp** → Extensions → Noxun Engine → Panel. Je to **jeden balík**: nástroje Mower a Snaper sú od v0.9.25 súčasťou enginu (toolbar „Noxun Nástroje"), takže ich **staré samostatné inštalácie sa odstránia samé** — raz inštalátorom a raz pri prvom štarte pluginu. Staré toolbary zmiznú z okna až po reštarte; ak sa niektorý súbor nedá zmazať (SketchUp beží), skript to povie s cestou a plugin to skúsi znova pri ďalšom štarte.
 - **Testy:** `ruby tests/run_all.rb` (headless) · JS sady po jednej — bash: `for f in tests/js/test_*.js; do node "$f" || exit 1; done` (glob priamo za `node` spustí len prvý súbor) · `scripts\run_su_tests.ps1` (in-SketchUp)
-- **Workflow:** vetva → PR → Codex review → merge (podrobne v [AGENTS.md](AGENTS.md))
+- **Workflow:** vetva → PR → Codex review → merge (v skratke [AGENTS.md](AGENTS.md); podrobne [SYSTEM/pravidla/roly/ORCHESTRATOR.md](SYSTEM/pravidla/roly/ORCHESTRATOR.md) a skill `codex-po-pr`)

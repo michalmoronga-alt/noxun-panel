@@ -10,7 +10,8 @@
   orchestrátor po bránach).
 - **Režimy:** *dávka* · *oprava* (pokračovanie tej istej dávky po predrecenzii či review: opraví nálezy vo svojej vetve, zopakuje testy,
   pushne a ku každému nálezu uvedie hash opravy) · *shadow* (zadanie začína slovom SHADOW: benchmark bez PR, nikdy sa nemerguje).
-- **Nesmie:** commit do `main` · merge · spúšťať ďalších agentov (predrecenziu spúšťa orchestrátor) · testovať mimo `_dev\ENGINEtests.skp`.
+- **Nesmie:** commit do `main` · merge · spúšťať ďalších agentov (predrecenziu spúšťa orchestrátor) · testovať mimo `_dev\ENGINEtests.skp`
+  (alebo neuloženého Untitled okna BEZ existujúcich NOXUN korpusov).
 - **Zastaví sa** a vráti otázku alebo report: nejasnosť alebo rozpor v zadaní · trieda Ľ/S so skutočným diffom kódu pluginu nad 300
   riadkov ([DEFINICIE § D3](../DEFINICIE.md#d3)) · povinná predrecenzia ([§ D4](../DEFINICIE.md#d4)) → po pushi STOP pred PR · červený
   main, riziko pre zákazku, zaseknutý SketchUp alebo PC, potreba hesla či tokenu.
@@ -26,7 +27,8 @@ nepridáva text na koniec súboru. Nový modul = nový odsek v správnom súbore
 ## Verzia a uzáver dávky
 
 - `VERSION` žije na 2 miestach: `noxun_engine.rb` (autorita) + `noxun_engine/main.rb` (fallback) — synchro stráži guard test.
-- **Každý PR meniaci kód pluginu = bump patch** (0.5.0 → 0.5.1); **minor = výhradne uzáver bloku z `SYSTEM/PLAN.md`** (0.5.x → 0.6.0).
+- **Každý PR meniaci kód pluginu = bump patch** (0.5.0 → 0.5.1); **minor = výhradne uzáver bloku z `SYSTEM/PLAN.md`** (0.5.x → 0.6.0);
+  postup uzáveru bloku (keď ho skladá subagent): [ORCHESTRATOR.md, Uzáver bloku](ORCHESTRATOR.md#uzaver-bloku).
 - **Každé zvýšenie VERSION = prepis `SYSTEM/STAV.md`** (aj pri malom fixe; okrem triedy D — [DEFINICIE § D3](../DEFINICIE.md#d3)).
   **Dokumentačné PR, ktoré mení stav bloku, smoke alebo poradie prác** (štart či uzáver bloku, smoke PASS, Michalovo rozhodnutie
   o poradí), **aktualizuje faktický stav v sekcii „Stav"** (napr. „smoke čaká" → „smoke PASS"; **verzia a čísla testov sa nemenia**)

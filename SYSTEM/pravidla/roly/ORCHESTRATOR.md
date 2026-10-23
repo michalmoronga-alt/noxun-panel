@@ -121,6 +121,8 @@ typu „predplatné v cudzom programe" (bany) · orchestrátor beží **interakt
   z repa** (PLAN, KRONIKA, DOGFOODING, PR); orchestrátor ho skontroluje a zmerguje. Čo subagent v repe nenájde, žilo len v chate.
 - **Chat nie je úložisko:** rozhodnutia, checklisty a zadania idú hneď do repa alebo pamäte — po kompresii kontextu z chatu miznú.
 
+<a id="uzaver-bloku"></a>
+
 ## Uzáver bloku
 
 Vetva `release/<blok>`: minor bump + `?v=` → hotový blok z `SYSTEM/PLAN.md` plným textom do `SYSTEM/archiv/ROADMAP_hotove_etapy.md`

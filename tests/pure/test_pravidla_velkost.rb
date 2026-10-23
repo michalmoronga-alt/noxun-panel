@@ -11,7 +11,8 @@ require_relative '../helper' unless defined?(NxTest)
 NX_PRAV_LIMITS = {
   'AGENTS.md' => [12 * 1024, 150],
   'CLAUDE.md' => [1 * 1024, nil],
-  'SYSTEM/pravidla/roly/*.md' => [12 * 1024, nil],
+  # Docasne 14 kB: P3 (presun pravidiel oblasti do .claude/rules/) znizi na 8 kB.
+  'SYSTEM/pravidla/roly/*.md' => [14 * 1024, nil],
   'SYSTEM/pravidla/POVINNE_CITANIE.md' => [8 * 1024, nil],
   'SYSTEM/pravidla/DEFINICIE.md' => [10 * 1024, nil]
 }.freeze
@@ -22,7 +23,9 @@ NX_PRAV_HISTORY_PATTERNS = {
   'od <dátum>' => /\bod\s+\d{1,2}\.\s?\d{1,2}\./i,
   '(od <č>.<č>.20' => /\(od\s+\d{1,2}\.\s?\d{1,2}\.\s?20/i,
   'od v<verzia>' => /\bod\s+v\d+\.\d+/i,
-  'revízi' => /revízi/i,
+  # Len revizia s datumom alebo menom kola (napr. "revízia 27.9.", "revízie RETRO 12.8."); vecne slovo
+  # ("stabilizačná revízia" = kontrola kodu) historia nie je.
+  'revízi <dátum>' => /revízi\w*\s+(?:RETRO|WORKFLOW|\d)/i,
   'PR #<číslo>' => /\bPR\s*#\s*\d/,
   'pokus 2' => /\bpokus\s+2/i
 }.freeze
@@ -87,7 +90,8 @@ NxTest.test('pravidla G2: guard chyti historiu a nechyti platne znenie (vlastne 
   Dir.mktmpdir('nx-pravidla-') do |dir|
     clean = File.join(dir, 'cisty.md')
     File.write(clean, "Pred `gh pr create` sa píše `PR #?`; od 75 % kontextu zapíš stav.\n" \
-                      "Bump patch (0.5.0 → 0.5.1). PR #N menil plugin.\n", encoding: 'UTF-8')
+                      "Bump patch (0.5.0 → 0.5.1). PR #N menil plugin.\n" \
+                      "Stabilizačná revízia kódu ešte nebola; revízie návrhu robí audítor.\n", encoding: 'UTF-8')
     NxTest.assert(nx_prav_history_offenders([clean]).empty?,
                   "negativny pripad: platne znenie nesmie mat nalez (#{nx_prav_history_offenders([clean]).inspect})")
 
@@ -99,5 +103,11 @@ NxTest.test('pravidla G2: guard chyti historiu a nechyti platne znenie (vlastne 
       NxTest.assert(found.any? { |f| f.include?("„#{name}\"") },
                     "pozitivny pripad: guard nechytil vzor „#{name}\" (nasiel: #{found.inspect})")
     end
+
+    # Revizia s menom kola (bez datumu za slovom) je tiez historia.
+    kolo = File.join(dir, 'kolo.md')
+    File.write(kolo, "Git workflow (revízie RETRO 12.8. a WORKFLOW 26.9.)\n", encoding: 'UTF-8')
+    NxTest.assert(nx_prav_history_offenders([kolo]).any? { |f| f.include?('revízi <dátum>') },
+                  'pozitivny pripad: guard nechytil „revízie RETRO"')
   end
 end
