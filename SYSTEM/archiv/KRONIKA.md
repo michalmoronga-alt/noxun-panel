@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **STRÁŽ `agy` V PRIEČINKU BEHU (23.10.2026, PR #?, trieda Ľ — skripty, skill a agent, kód pluginu a VERSION bez zmeny).** Globálny deny zoznam v `~/.gemini/config/config.json` (PR #475) je zdieľaný s Antigravity IDE
+- **STRÁŽ `agy` V PRIEČINKU BEHU (23.10.2026, PR #476, trieda Ľ — skripty, skill a agent, kód pluginu a VERSION bez zmeny).** Globálny deny zoznam v `~/.gemini/config/config.json` (PR #475) je zdieľaný s Antigravity IDE
   a zakázal by jeho agentovi terminál aj súbory, preto sa z configu odstránil. Náhrada: `scripts/agy/hooks.json` + `len_web.ps1` — hook PreToolUse z `.agents/` v priečinku behu pustí len `search_web` a `read_url_content`,
   ostatné zamietne (overené orchestrátorom 23.10., agy 1.4.5: zamietnutý `run_command` aj `read_file`, výstup 862 B so zdrojom). Agent `agy-reserser` a beh na pozadí v skille stráž kopírujú do `$R/.agents/`,
   agent hlási zamietnuté nástroje z `len_web.log`; pasca „prázdny výstup s exit 0" prepísaná. Zároveň opravený zápis `printf '%s\n\n'` v agentovi (v #475 sa rozpadol na skutočné nové riadky).
