@@ -293,27 +293,11 @@ nepridáva text na koniec súboru. Nový modul = nový odsek v správnom súbore
   0xC0000374 až PO zapísaní výsledku — verdikt to nemení (detail v hlavičke runnera). **Paralelné behy sa vylučujú**
   (`%TEMP%\noxun_su_tests\deploy.lock` + sentinel `last_run.txt`): `exit 2` = iný beh práve beží (počkaj a spusti znova) alebo visiaca
   inštancia ešte testuje (zavri ju alebo počkaj na dobeh); výsledky a kópia modelu sú per-beh v `run_*` priečinku.
-- **Fotenie okien (UI dávky):** `powershell -NoProfile -File scripts\ui_foto.ps1` nafotí Inspector (bez výberu + kontexty Korpus, Zóny,
-  Čelá, Kovanie) a všetkých 14 sekcií Štúdia z **nahrávky reálnych dát pluginu** prehranej v aktuálnom UI checkoutu (headless Chrome,
-  aj pri zamknutej obrazovke) + verzie na celú výšku + kontaktný hárok `index.html`. **Každá UI dávka:** po zmene JS/CSS/HTML `-Shoot`
-  (predvolený, nad poslednou **úspešnou** nahrávkou — so značkou `NAHRAVKA_OK.txt`; staršie nahrávky bez značky len cez
-  `-Rec <priečinok>`; keď úspešná nahrávka ešte nie je, začni `-Record`); po zmene **tvaru dát z Ruby** (payload okna) `-Record` — nová
-  nahrávka v SketchUpe overenou slučkou runnera nad kópiou ENGINEtests.skp, zdieľa jeho zámok (`exit 2` = iný beh beží), inštancia sa
-  zavrie sama — a hneď fotí. `-Only studio_cut,panel_cela` = podmnožina. Fotky idú do `%TEMP%\noxun_ui_foto\shots_<čas>_<PID>\` →
-  **report orchestrátorovi → Michal; do gitu nie**. **Hranice:** statický stav (bez modálov, hoveru a rozbalených ponúk), Chrome nie CEF
-  (písmo a rozbaľovačky sa môžu líšiť), svetlá téma; fotka s červeným pásom = prehranie nahrávky v novom UI zlyhalo (karta v hárku
-  CHYBA) — nová nahrávka alebo oprava UI, nie tichá fotka.
-- **Export test (výrobné dávky exportov):** `powershell -NoProfile -File scripts\export_test.ps1 [-Base <ref>] [-Model <.skp>] [-KeepWork]`
-  sám urobí 4 exporty Štúdia (VEPO, CSV kovania, XLSX rozpočtu, XLSX ponuky) nad kópiou testovacej zákazky **raz na `-Base` (K,
-  predvolene `origin/main`) a raz na aktuálnom checkoute (P)** a vypíše `EXPORT-TEST: P == K` / `P != K` + zoznam rozdielov a porovnanie
-  viet statusu; exit 0 = zhodné, 1 = rozdiel alebo chyba behu, 2 = zamok (iný beh). Model predvolene `_dev\export_test\zakazka.skp`
-  (gitignorované; názov zákazky sa odvodí z mena súboru, preto ho nemeň). Beží pod zámkom `deploy.lock` ako runner a foto okien (nesmie
-  kolidovať), profil `%APPDATA%\NOXUN` sa len skopíruje (K aj P dostanú rovnakú čerstvú kópiu, reálny sa nemení), SketchUp sa ukončí sám
-  (proces sa nezabíja), na konci ostane nasadený P. **Brána mergu:** dávka, ktorá mení VEPO, CSV kovania, XLSX rozpočtu či ponuky alebo
-  ich cestu (`ExportPrep`, `do_*`, zapisovače, `Bom`/rozpočet vo vstupe exportov), musí dať `P == K`, resp. len **vedomé rozdiely uvedené
-  v PR**. Povolené rozdiely: riadky `Verzia:`/`Dátum:` vo VEPO LOGu, čas v 1. riadku CSV kovania, dátum v názve; všetko ostatné (aj XLSX
-  bajt po bajte po rozbalení) je rozdiel. **Nahrádza ručné exporty R9** — Michal ich už nerobí. Sonda `tests/sketchup/su_export_probe.rb`
-  volá `ProductionCore.do_*`; nový export dostane riadok v `ExportPrep::KINDS` aj v sonde (guard `test_export_compare.rb`).
+- **Fotenie okien** (každá UI dávka — po zmene JS/CSS/HTML alebo tvaru dát z Ruby): `scripts\ui_foto.ps1` — príkaz, režimy
+  a hranice v [NASTROJE_TESTOV.md](../NASTROJE_TESTOV.md#foto).
+- **Export test** (brána mergu dávky, ktorá mení VEPO, CSV kovania, XLSX rozpočtu či ponuky alebo ich cestu: `P == K`, resp. len
+  vedomé rozdiely uvedené v PR): `scripts\export_test.ps1` — príkaz, povolené rozdiely a podrobnosti v
+  [NASTROJE_TESTOV.md](../NASTROJE_TESTOV.md#export).
 - **Lokálne hooky (`.claude/settings.json`):** PostToolUse po každom Edit/Write spustí `.claude/hooks/post_edit_check.ps1` — kontrola
   editovaného súboru: `ruby -c` syntax (.rb) + encoding guard (.rb/.js/.html/.css/.md/.ps1: BOM, UTF-8, mojibake, C0/C1/NUL, cyrilické
   homoglyfy, charset) — **jediná implementácia `scripts/encoding_guard.rb`**, ktorú volá aj CI test `tests/pure/test_encoding_guard.rb`
@@ -323,9 +307,7 @@ nepridáva text na koniec súboru. Nový modul = nový odsek v správnom súbore
 - Interaktívny kanál: MCP `mcp__vbo-sketchup__execute_ruby` (SketchUp 2026 + VBO SkAgent, port 7891); fallback file-bridge
   (`vbo_sk_agent\bridge\command.rb` → `result.json`, pozor na mtime pascu); overená slučka `-RubyStartup skript + kópia modelu` (vzor
   v `scripts\run_su_tests.ps1`). Deploy: `INSTALL_noxun_engine.ps1`.
-- **Diagnostika MCP:** pri visiacom/zamrznutom porte 7891 spusti `scripts\skagent_doctor.ps1` — zistí držiteľa portu a `/health`, `-Kill`
-  odstráni zamrznutý bridge (živú zákazku ani cez `-Force` nezabije). Dump stavu enginu pre bugcatch: `Noxun::Engine::Debug.report` cez
-  `execute_ruby` (model + výber + stav panela ako read-only JSON, nikdy nezapisuje).
+- **Diagnostika MCP** (visiaci port 7891, dump stavu enginu): [NASTROJE_TESTOV.md](../NASTROJE_TESTOV.md#mcp).
 - **Testuje sa VÝHRADNE v testovacom projekte `_dev\ENGINEtests.skp`** (alebo neuloženom Untitled okne BEZ existujúcich NOXUN korpusov)
   — v ňom môžu agenti tvoriť/mazať čokoľvek. `_dev/` je gitignorované, preto ho **vo worktree nie je** — skripty (`run_su_tests.ps1`,
   `ui_foto.ps1`, `export_test.ps1`) model aj zákazku berú z `_dev` aktuálneho checkoutu a keď tam nie je, z **hlavného checkoutu**

@@ -14,7 +14,9 @@ NX_PRAV_LIMITS = {
   # Docasne 14 kB: P3 (presun pravidiel oblasti do .claude/rules/) znizi na 8 kB.
   'SYSTEM/pravidla/roly/*.md' => [14 * 1024, nil],
   'SYSTEM/pravidla/POVINNE_CITANIE.md' => [8 * 1024, nil],
-  'SYSTEM/pravidla/DEFINICIE.md' => [10 * 1024, nil]
+  'SYSTEM/pravidla/DEFINICIE.md' => [10 * 1024, nil],
+  # Davka P2: podrobnosti nastrojov testov (foto okien, export test, diagnostika MCP) vybrane z IMPLEMENTATOR.md.
+  'SYSTEM/pravidla/NASTROJE_TESTOV.md' => [8 * 1024, nil]
 }.freeze
 
 # G2 — subory bez historie a vzory historie.

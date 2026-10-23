@@ -41,6 +41,7 @@ a [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md) — **len Gre
 | [pravidla/roly/](pravidla/roly/) | karty rolí — pravidlá jednej roly: ORCHESTRATOR (merge, review, kvóty, autonómne bloky, uzáver bloku) · IMPLEMENTATOR (postup, verzia, uzáver dávky, testovanie) · RECENZENT · AUDITOR · RESERSER · ANALYTIK; jadro pre všetkých je [../AGENTS.md](../AGENTS.md) | definície (DEFINICIE.md) ani postupy (skilly) |
 | [pravidla/typy/](pravidla/typy/) | zdroje Claude typov agentov (frontmatter, hlavička, zoznam vložených súborov); `.claude/agents/` z nich generuje `scripts/generuj_typy_agentov.rb` | pravidlá rolí (tie sú v kartách) |
 | [pravidla/POVINNE_CITANIE.md](pravidla/POVINNE_CITANIE.md) | povinné čítanie podľa typu práce + rozpočet čítania | pravidlá práce (jadro a roly) |
+| [pravidla/NASTROJE_TESTOV.md](pravidla/NASTROJE_TESTOV.md) | podrobnosti nástrojov testov: fotenie okien, export test, diagnostika MCP | kedy nástroj platí (IMPLEMENTATOR.md, Testovanie) |
 | [retro/](retro/README.md) | pokus retro (27.9.–11.10.2026): formát záznamov po behoch v [retro/README.md](retro/README.md); inbox `retro/inbox/` je **lokálny, git ho ignoruje** (pravidlá pokusu: WORKFLOW.md, časť 9) | záväzné pravidlo (retro len navrhuje, rozhoduje Michal) ani archív (spracované vyhodnotenia sú v `archiv/retro/`) |
 
 ## Vrstvy

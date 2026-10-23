@@ -65,7 +65,10 @@ len to, čo potrebuje vedieť o svojich hraniciach: „merge robí orchestrátor
 1. **Postup implementátora** sa presunul z tiel typov do IMPLEMENTATOR.md (karta, Postup, Oprava a shadow, Report) — rovnaký pre Claude aj
    Codex/Grok implementátora; tri profily sa líšia len hlavičkou (trieda) a frontmatterom.
 2. **Pripomienka po mergi** (`po_merge.js`, podrobný popis) sa presunula z IMPLEMENTATOR.md § Testovanie do ORCHESTRATOR.md § Inštalácia mainu
-   — týka sa hlavného okna; IMPLEMENTATOR.md na ňu odkazuje. Dôvod aj strop G1 (IMPLEMENTATOR.md 14 333 B pri strope 14 336 B).
+   — týka sa hlavného okna; IMPLEMENTATOR.md na ňu odkazuje.
+   **Po predrecenzii:** podrobnosti fotenia okien, export testu a diagnostiky MCP sa presunuli doslova do `SYSTEM/pravidla/NASTROJE_TESTOV.md`
+   (IMPLEMENTATOR.md má 1-riadkové odkazy s podmienkou, kedy čítať; pri exporte ostala brána `P == K`) — IMPLEMENTATOR.md pod 12 kB.
+   Typy ho nevkladajú, implementátor a recenzent ho čítajú podľa potreby.
 3. **Checklist dokumentačného PR** v IMPLEMENTATOR.md odkazuje na odsek o dokumentačnom PR v tej istej sekcii namiesto zopakovania
    (duplicita z P1b, význam rovnaký).
 4. **Kolónky šablóny bez doterajšieho pravidla** (ROLY § 1 ich vyžaduje) — doplnené len opisom súčasného stavu alebo z rozhodnutí Michala:
