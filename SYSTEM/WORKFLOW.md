@@ -19,13 +19,13 @@ Pravidlá hovoria o **rolách**, nie o modeloch — model aj nástroj každej ro
 | **orchestrátor** | hlavné okno: drží kontext bloku, píše zadania, spúšťa audity a subagentov, triedi postrehy do D-čísel, merguje, inštaluje main, píše report a handoff | závažnosť nálezov, výnimku 3. kola, merge po bránach |
 | **implementátor** | subagent vo worktree: dávka podľa zadania vrátane testov, docs a PR (pri povinnej predrecenzii až na pokyn orchestrátora); opravy z review vo svojej dávke | nič — vráti vetvu, SHA a report |
 | **slepý recenzent** | subagent bez kontextu orchestrátora: predrecenzia pred PR, kontrola opravy (delta), overenie checklistu voči kódu | nič — vráti nálezy P1–P3 a verdikt |
-| **audítor** | audit návrhu pred kódom (audit bloku, audit-povinné dávky), bežné audity a delta | nič — nálezy BLOCKER / FIX / NOTE |
+| **audítor** | audit návrhu pred kódom (audit bloku, audit-povinné dávky) a bežné audity; kontrolu opráv (delta) robí vždy recenzent | nič — nálezy BLOCKER / FIX / NOTE |
 | **rešeršér** | outside-in rešerš (čo už SketchUp a CAD svet rieši), krížový audit bloku | nič — výstup triedi orchestrátor (reconcile) |
 | **analytik** | subagent len na čítanie: výťahy z veľkých súborov, prieskum sessions, vyhodnotenie retro | nič — zistenia s dôkazmi, najviac 3 návrhy |
 | **review PR** | review každého PR: 1. kolo samo, ďalšie na vyžiadanie | nič — nálezy P0–P3 v review threadoch |
 | **automaty** | CI (headless + všetky JS sady), runner testov v SketchUpe, hook po úprave súboru, hook po mergi, skripty `otvor_pr.ps1` a `run_js_tests.ps1`, updater pluginu | CI a in-SU test sú brány mergu |
 
-**Nástroje a ich rola (N14):** Codex — audítor (audit návrhu, delta), review PR a náhradný implementátor bežných dávok · Grok — rešerš
+**Nástroje a ich rola (N14):** Codex — audítor (audit návrhu), náhradný recenzent (delta), review PR a náhradný implementátor bežných dávok · Grok — rešerš
 a krížový audit bloku, skúšobne implementátor (shadow, nikdy sa nemerguje) ·
 Antigravity — outside-in rešerš (nie v nočných behoch bez obsluhy) · slepý subagent — predrecenzia, kontrola opráv a nezávislý hlas.
 

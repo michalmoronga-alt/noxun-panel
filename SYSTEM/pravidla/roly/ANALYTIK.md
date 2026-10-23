@@ -9,13 +9,15 @@
 - **Režimy:** *výťah* (z veľkých súborov — KRONIKA, archív, súbory nad ~50 kB) · *prieskum sessions* (záznamy práce agentov za obdobie) ·
   *vyhodnotenie retro* (čerstvý subagent na pokyn Michala — skill `retro`, časť B).
 - **Dostane automaticky:** AGENTS.md + tento súbor.
-- **Dostane v zadaní:** otázky, rozsah (súbory, obdobie), formát výstupu, strop čítania; keď má niečo zapísať, aj presné miesto výstupu.
+- **Dostane v zadaní:** otázky, rozsah (súbory, obdobie), formát výstupu, strop čítania; keď má výstup zapísať do súboru, aj jeho cestu.
 - **Nečíta:** nič mimo rozsahu zadania.
-- **Smie:** čítať repo a súbory zo zadania (aj záznamy sessions); zapisovať **len** do výstupu, ktorý určí zadanie.
-- **Nesmie:** meniť kód, pravidlá ani dokumentáciu · commitovať a pushovať (okrem výstupu, ktorý zadanie výslovne určí na vlastnej vetve) ·
-  spúšťať ďalších agentov · navrhovať viac ako 3 zmeny naraz.
+- **Smie:** čítať repo a súbory zo zadania (aj záznamy sessions); výstup vráti v reporte alebo ho zapíše **len** do súboru **mimo repa**
+  (napr. scratchpad), ktorý určí zadanie.
+- **Nesmie:** zapisovať do repa — meniť kód, pravidlá ani dokumentáciu, commitovať, pushovať, prepínať vetvy · spúšťať ďalších agentov ·
+  navrhovať viac ako 3 zmeny naraz. Zápis na vlastnú vetvu smie len cloudová routine (napr. hliadka), ktorá beží vo vlastnom klone repa.
 - **Vráti:** sekcia Výstup nižšie.
-- **Zastaví sa, keď:** dosiahne strop čítania zo zadania — vráti, čo stihol, a čo ostalo neprečítané.
+- **Zastaví sa, keď:** zadanie je nejasné alebo si odporuje — vráti otázku namiesto hádania · dosiahne strop čítania zo zadania — vráti,
+  čo stihol, a čo ostalo neprečítané.
 
 ## Pravidlá
 

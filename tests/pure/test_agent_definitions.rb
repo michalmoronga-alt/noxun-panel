@@ -136,6 +136,12 @@ NxTest.test('agenti G4: ziadny typ nenesie text ORCHESTRATOR.md') do
                 "ORCHESTRATOR.md uz nema podpisovu vetu „#{NX_ORCH_SIGNATURE}\" — uprav NX_ORCH_SIGNATURE")
   bad = nx_agent_files.select { |p| File.read(p, encoding: 'UTF-8').include?(NX_ORCH_SIGNATURE) }
   NxTest.assert(bad.empty?, "Typy s pravidlami orchestratora: #{bad.map { |p| File.basename(p) }.join(', ')}")
+  # Aj ziadny zdroj typu nevklada ORCHESTRATOR.md (ani jeho sekciu) — podpisova veta by nechytila vlozenu sekciu bez nej.
+  vklada = NxTypyAgentov.source_paths.select do |path|
+    rel = path.sub("#{NxTest::ROOT}/", '')
+    NxTypyAgentov.parse_source(NxTypyAgentov.read_lf(path), rel)[:zdroje].any? { |z| z.split('#').first.end_with?('ORCHESTRATOR.md') }
+  end
+  NxTest.assert(vklada.empty?, "Zdroje typov vkladaju ORCHESTRATOR.md: #{vklada.map { |p| File.basename(p) }.join(', ')}")
 end
 
 NxTest.test('agenti G4: kazdy zdroj typu ma typ a naopak (generator nic neprehliadne)') do

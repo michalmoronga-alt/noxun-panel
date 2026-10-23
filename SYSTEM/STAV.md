@@ -37,7 +37,8 @@ a P2 (karty všetkých rolí, typy agentov generované z kariet bez dedenia `CLA
 
 ## Ďalší krok
 
-**Blok PRAVIDLA:** po P2 smoke typov v novej session (typ `analytik` pozná poslednú vetu AGENTS.md, nie prvú vetu ORCHESTRATOR.md), potom
+**Blok PRAVIDLA:** po P2 smoke typov v novej session (typ `analytik` len z kontextu: pozná poslednú vetu AGENTS.md, nie ORCHESTRATOR.md
+ani `~/.claude/CLAUDE.md`; MEMORY.md zapísať — PACKAGE_P2 § 3 bod 5), potom
 dávka P3 — pravidlá oblastí (podľa [PLAN.md](PLAN.md)). **Michal:** smoke bloku 9 podľa [HARDENING_ZAVER_2026-10-11.md](archiv/HARDENING_ZAVER_2026-10-11.md)** — skupiny A Exporty a čísla (28) · B Inspector (25) · C Štúdio (20) · D Ochrana dát a dve okná (10) ·
 E SketchUp a štart (11, vrátane Koniec SketchUpu na 2026.2). Pred ním aktualizovať plugin na oboch PC a zavrieť všetky okná SketchUpu. Nálezy zo smoke = opravy x.y.z (dočasná skupina
 v [DOGFOODING.md](DOGFOODING.md)). Potom nový blok podľa výberu Michala. **Test na reálnej zákazke po V1.**

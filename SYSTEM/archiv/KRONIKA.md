@@ -39,8 +39,12 @@
   ručné zdroje `pravidla/typy/` namiesto generovaných typov (DEFINICIE v nich je zámerne doslova). Nové karty v G1 a v limite riadka
   `test_docs_navigacia.rb`; AGENTS.md, POVINNE_CITANIE, README, WORKFLOW (Z9, retro), skilly `predrecenzia`, `codex-audit`, `retro`
   odkazujú na karty. Kto čo dostal predtým a teraz: [P2_KTO_CO_DOSTANE.md](../zdroje/bloky/PRAVIDLA/P2_KTO_CO_DOSTANE.md). Obsadenie sa
-  nepresúva (mod usage-bar ho číta z WORKFLOW § 2) — `OBSADENIE.md` prechádza do P5. **Smoke po mergi** (orchestrátor, nová session): typ
-  `analytik` pozná poslednú vetu AGENTS.md, nie prvú vetu ORCHESTRATOR.md.
+  nepresúva (mod usage-bar ho číta z WORKFLOW § 2) — `OBSADENIE.md` prechádza do P5. **Smoke po mergi** (orchestrátor, nová session; typ `analytik`
+  odpovedá len z úvodného kontextu, bez nástrojov): pozná poslednú vetu AGENTS.md, nepozná prvú vetu ORCHESTRATOR.md ani `~/.claude/CLAUDE.md`;
+  či vidí `MEMORY.md` auto-pamäte, sa zapíše (docs tvrdia nie, v session implementátora P2 ju mal — známe obmedzenie, pamäť drží len odkazy
+  a fakty). **Predrecenzia** (Claude + Codex sol): P1 ručná záloha PR bez kvótovej brány · P2 auto-pamäť, retro cez typ `analytik` · P3
+  (smoke, karty RECENZENT/ANALYTIK/RESERSER, G4 aj nad `zdroje:`, audítor bez delty, záložný orchestrátor s HANDOFF) — opravené;
+  podrobnosti fotenia okien, export testu a diagnostiky MCP presunuté do `SYSTEM/pravidla/NASTROJE_TESTOV.md` (IMPLEMENTATOR.md pod 12 kB).
 
 - **P1b · JADRO AGENTS.md, MOST CLAUDE.md, SÚBORY ORCHESTRÁTORA A IMPLEMENTÁTORA (23.10.2026, PR #480, blok 10 · PRAVIDLA, trieda Ť — len pravidlá a testy;
   kód pluginu, VERSION ani `?v=` bez zmeny).** `CLAUDE.md` (32 kB, ktorý Claude Code čítal celý v každom okne aj subagentovi a Codex ho nečítal vôbec) sa

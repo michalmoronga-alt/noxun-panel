@@ -206,7 +206,8 @@ Slepá predrecenzia pred PR (skill `predrecenzia`) je **povinná** pri dávke:
   `gh pr view`, `gh pr diff`, `gh api` (GET). Nič iné nespúšťaj.
 - **Nesmie:** nič upravovať, commitovať, pushovať, prepínať vetvy ani meniť pracovný strom či stash.
 - **Vráti:** sekcia Výstup nižšie.
-- **Zastaví sa, keď:** by kontrola vyžadovala čokoľvek mimo čítania — nález vráti, nič neopravuje.
+- **Zastaví sa, keď:** diff je prázdny alebo nesedí so zadaním — vráti to namiesto nálezov; kontrola by vyžadovala čokoľvek mimo
+  čítania — nález vráti, nič neopravuje.
 
 ## Rozsah a čítanie
 

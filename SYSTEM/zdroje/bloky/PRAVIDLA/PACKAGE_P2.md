@@ -52,8 +52,11 @@ Každý typ subagenta dostane **len pravidlá svojej roly** (Z-4) a typy sa nero
    pravidlá orchestrátora (merge, kvóty, autonómne bloky). Tabuľku pripraví implementátor ako `SYSTEM/zdroje/bloky/PRAVIDLA/P2_KTO_CO_DOSTANE.md`.
 3. Skilly a WORKFLOW, ktoré opisujú telá typov („v definícii typu je…"), sedia s generovaným stavom (Grep).
 4. KRONIKA odsek navrch; PLAN riadok P2 `✅ … — PR #?` (číslo doplní `otvor_pr.ps1`); STAV „Robí sa / Ďalší krok".
-5. **Smoke po mergi (orchestrátor, nová session):** spustiť jeden typ (napr. `analytik` s otázkou na posledný riadok AGENTS.md a na prvú vetu
-   ORCHESTRATOR.md) — prvú musí poznať, druhú nie.
+5. **Smoke po mergi (orchestrátor, nová session — typy sa načítajú len pri štarte):** spustiť typ `analytik` s pokynom **odpovedať len
+   z úvodného kontextu, žiadny nástroj nepoužiť a nič nečítať** (typ s nástrojmi na čítanie by odpoveď inak našiel v súbore) a so štyrmi
+   otázkami: (a) posledná veta AGENTS.md — **musí poznať**; (b) prvá veta ORCHESTRATOR.md — **nesmie**; (c) obsah `~/.claude/CLAUDE.md`
+   (Michalove globálne pokyny) — **nesmie**; (d) obsah `MEMORY.md` auto-pamäte projektu — **zapísať výsledok** (známe obmedzenie,
+   [P2_KTO_CO_DOSTANE.md](P2_KTO_CO_DOSTANE.md)). Výsledok do KRONIKY.
 
 ## 4 · Brány
 

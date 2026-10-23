@@ -46,12 +46,12 @@ Všetky typy majú `omitClaudeMd: true` → nič z tabuľky vyššie. Telo typu 
 
 | Typ | Predtým telo | Teraz telo (vložené) | Veľkosť tela | Nedostane |
 |---|---|---|---|---|
-| `implementator` (Ť) | postup, shadow, opravy, report (4,8 kB) + čítal sám AGENTS, DEFINICIE, IMPLEMENTATOR | hlavička profilu Ť + **AGENTS.md** + **DEFINICIE.md** + **IMPLEMENTATOR.md** celý (karta, postup, oprava a shadow, report, architektúra na mieste, verzia a uzáver, testovanie) | 29 346 | ORCHESTRATOR.md, mapa workspace, globálne pokyny |
-| `implementator-stredny` (S) | to isté + reklasifikácia, opravy len P2/P3 (5,3 kB) | hlavička profilu S + to isté ako Ť (pravidlo reklasifikácie a opráv profilu Ľ/S je v IMPLEMENTATOR.md) | 29 134 | to isté |
-| `implementator-lahky` (D, Ľ) | to isté + výnimka triedy D (5,4 kB) | hlavička profilu Ľ + to isté (výnimka triedy D je v checkliste IMPLEMENTATOR.md) | 29 086 | to isté |
-| `slepy-recenzent` | pravidlá, závažnosť, výstup (3,0 kB) + čítal sám AGENTS, DEFINICIE, sekcie IMPLEMENTATOR | hlavička + **AGENTS.md** + **DEFINICIE.md** + **RECENZENT.md** + IMPLEMENTATOR.md **sekcie Verzia a uzáver dávky a Testovanie** (`#verzia`, `#testovanie`) | 27 718 | ORCHESTRATOR.md, karta, postup a report implementátora |
-| `reserser` | pravidlá a výstup (1,8 kB) | hlavička + **RESERSER.md** (bez jadra — rozhodnutie Michala 22.10., ROLY ❓2) | 3 545 | AGENTS.md, DEFINICIE.md, ORCHESTRATOR.md |
-| `analytik` (nový) | — | hlavička + **AGENTS.md** + **ANALYTIK.md** (ROLY § 6: bez DEFINICIE) | 10 008 | DEFINICIE.md (len odkazom z AGENTS), ORCHESTRATOR.md |
+| `implementator` (Ť) | postup, shadow, opravy, report (4,8 kB) + čítal sám AGENTS, DEFINICIE, IMPLEMENTATOR | hlavička profilu Ť + **AGENTS.md** + **DEFINICIE.md** + **IMPLEMENTATOR.md** celý (karta, postup, oprava a shadow, report, architektúra na mieste, verzia a uzáver, testovanie) | 26 908 | ORCHESTRATOR.md, mapa workspace, globálne pokyny |
+| `implementator-stredny` (S) | to isté + reklasifikácia, opravy len P2/P3 (5,3 kB) | hlavička profilu S + to isté ako Ť (pravidlo reklasifikácie a opráv profilu Ľ/S je v IMPLEMENTATOR.md) | 26 696 | to isté |
+| `implementator-lahky` (D, Ľ) | to isté + výnimka triedy D (5,4 kB) | hlavička profilu Ľ + to isté (výnimka triedy D je v checkliste IMPLEMENTATOR.md) | 26 648 | to isté |
+| `slepy-recenzent` | pravidlá, závažnosť, výstup (3,0 kB) + čítal sám AGENTS, DEFINICIE, sekcie IMPLEMENTATOR | hlavička + **AGENTS.md** + **DEFINICIE.md** + **RECENZENT.md** + IMPLEMENTATOR.md **sekcie Verzia a uzáver dávky a Testovanie** (`#verzia`, `#testovanie`) | 25 358 | ORCHESTRATOR.md, karta, postup a report implementátora |
+| `reserser` | pravidlá a výstup (1,8 kB) | hlavička + **RESERSER.md** (bez jadra — rozhodnutie Michala 22.10., ROLY ❓2) | 3 679 | AGENTS.md, DEFINICIE.md, ORCHESTRATOR.md |
+| `analytik` (nový) | — | hlavička + **AGENTS.md** + **ANALYTIK.md** (ROLY § 6: bez DEFINICIE) | 10 246 | DEFINICIE.md (len odkazom z AGENTS), ORCHESTRATOR.md |
 | `agy-reserser` (obal) | telo obalu (5,0 kB) | to isté telo bez zmeny (obal nie je rola) | 5 144 | všetky pravidlá — obal len spúšťa `agy` |
 
 ## Overenie: nič potrebné nechýba, nič orchestrátorovo nepribudlo
@@ -86,7 +86,9 @@ len to, čo potrebuje vedieť o svojich hraniciach: „merge robí orchestrátor
 4. **Kolónky šablóny bez doterajšieho pravidla** (ROLY § 1 ich vyžaduje) — doplnené len opisom súčasného stavu alebo z rozhodnutí Michala:
    „Dostane automaticky / v zadaní" (fakt po P2) · ORCHESTRATOR režim *záložný* (NAVRH § 9 bod 1, Michal 19.10.) · AUDITOR „Zastaví sa:
    široké zadanie" (ROLY ❓4, Michal 22.10.) · RESERSER „Nečíta repo okrem súborov zo zadania" (ROLY § 3.5) · RECENZENT „Zastaví sa:
-   potrebuje viac než čítanie". ANALYTIK je nová rola — karta podľa ROLY § 3.6 (bez režimu *hliadka* — príde s pilotom hliadky).
+   diff je prázdny alebo nesedí so zadaním" (ROLY § 3.3) · RESERSER „Zastaví sa" = neoverený fakt označí a pokračuje. ANALYTIK je nová
+   rola — karta podľa ROLY § 3.6 (bez režimu *hliadka* — príde s pilotom hliadky); lokálne do repa nezapisuje (výstup v reporte alebo
+   v súbore mimo repa), zápis na vlastnú vetvu len cloudová routine vo vlastnom klone; zastaví sa aj pri nejasnom zadaní.
 5. **Neprenesené** (prídu v P4/P5 podľa PACKAGE_P2 § 1): hodnotenie po úlohe, karta priebehu, režim *prevzatie*, cloudový beh orchestrátora.
 6. **Strata globálnych pokynov Michala** (`~/.claude/CLAUDE.md`) v subagentoch: slovenčinu a funkčný report nesú AGENTS.md (Jazyk) a karty
    (Report/Výstup); tykanie a štýl sa týkajú rozhovoru s Michalom, ktorý vedie len orchestrátor.
