@@ -25,7 +25,8 @@ Dávka, ktorá mení **rozmery alebo počty dielov, hrany, kusovník, VEPO, nák
 Dávka, ktorá mení **dátový kontrakt, schému, migráciu, observer/undo lifecycle** alebo pridáva **nový modul**. Rozhoduje obsah zásahu, nie
 žáner dávky (aj „fix" observera je audit-povinný). **Zmena schémy = každé zvýšenie `CONFIG_SCHEMA`, BuildPlan `SCHEMA` alebo STD** (a všetkých schém so stĺpcom „Schéma" = áno
 v [STANDARD §13](../STANDARD.md)).
-Nová plocha SketchUp API sama osebe audit-povinná nie je — spúšťa outside-in rešerš (skill `antigravity-outside-in`).
+Nová plocha SketchUp API sama osebe audit-povinná nie je — spúšťa outside-in rešerš (skill `antigravity-outside-in`; kedy rešerš nebeží —
+fix dávka, beh bez obsluhy — a čo vtedy, určuje ten skill).
 
 Pre audit-povinnú dávku je **pred implementáciou povinný audit návrhu** (skill `codex-audit`); pred odoslaním orchestrátor overí kľúčové
 tvrdenia package krátkou sondou na kóde bez zápisu do modelu a výsledok zapíše do package (skill `codex-audit`, krok 0). Keď Codex nie je
