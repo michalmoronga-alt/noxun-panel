@@ -25,7 +25,8 @@
   (karta roly, architektúra na mieste, verzia a checklisty uzáveru, testovanie, hooky, MCP, ENGINEtests) · `SYSTEM/pravidla/POVINNE_CITANIE.md` (povinné čítanie
   podľa typu práce doslova, v tvare zoznamu kvôli limitu riadka). `CLAUDE.md` je už len most (`@AGENTS.md` + `@SYSTEM/pravidla/roly/ORCHESTRATOR.md`, 0,3 kB).
   Mapa presunu sekcia po sekcii: [P1b_MAPA_PRESUNU.md](../zdroje/bloky/PRAVIDLA/P1b_MAPA_PRESUNU.md). Typy `implementator*` a `slepy-recenzent` čítajú
-  AGENTS.md + DEFINICIE (+ IMPLEMENTATOR.md, resp. POVINNE_CITANIE.md) namiesto CLAUDE.md; odkazy „CLAUDE.md, sekcia X" v WORKFLOW, README, STAV, PLAN,
+  AGENTS.md + DEFINICIE + POVINNE_CITANIE.md (implementátor celý IMPLEMENTATOR.md, recenzent jeho sekcie Verzia a uzáver a Testovanie — aj prompt
+  druhého recenzenta v skille `predrecenzia`) namiesto CLAUDE.md; povinné čítanie platí pre každú rolu podľa druhu práce; odkazy „CLAUDE.md, sekcia X" v WORKFLOW, README, STAV, PLAN,
   STANDARD, DEFINICIE, docs, skilloch, hooku, skriptoch a testoch prepnuté na nové miesta. Nový guard `tests/pure/test_pravidla_velkost.rb`: **G1** stropy
   (AGENTS.md ≤ 12 kB a 150 riadkov, CLAUDE.md ≤ 1 kB, roly ≤ 14 kB (dočasne, P3 zníži na 8 kB), POVINNE_CITANIE ≤ 8 kB, DEFINICIE ≤ 10 kB; jedna konštanta) a **G2** bez histórie
   (dátumy „od …", revízie s dátumom alebo kolom, „PR #číslo", „pokus 2…" v AGENTS.md, CLAUDE.md a `SYSTEM/pravidla/`; test vlastného správania). `test_docs_navigacia.rb`:

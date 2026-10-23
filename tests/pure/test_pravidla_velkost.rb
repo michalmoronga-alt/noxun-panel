@@ -25,7 +25,8 @@ NX_PRAV_HISTORY_PATTERNS = {
   'od v<verzia>' => /\bod\s+v\d+\.\d+/i,
   # Len revizia s datumom alebo menom kola (napr. "revízia 27.9.", "revízie RETRO 12.8."); vecne slovo
   # ("stabilizačná revízia" = kontrola kodu) historia nie je.
-  'revízi <dátum>' => /revízi\w*\s+(?:RETRO|WORKFLOW|\d)/i,
+  # Meno kola len verzalkami (RETRO, WORKFLOW) — malé „workflow" vo vecnom texte historia nie je.
+  'revízi <dátum>' => /revízi\w*\s+(?:(?-i:RETRO|WORKFLOW)|\d)/i,
   'PR #<číslo>' => /\bPR\s*#\s*\d/,
   'pokus 2' => /\bpokus\s+2/i
 }.freeze
@@ -91,7 +92,8 @@ NxTest.test('pravidla G2: guard chyti historiu a nechyti platne znenie (vlastne 
     clean = File.join(dir, 'cisty.md')
     File.write(clean, "Pred `gh pr create` sa píše `PR #?`; od 75 % kontextu zapíš stav.\n" \
                       "Bump patch (0.5.0 → 0.5.1). PR #N menil plugin.\n" \
-                      "Stabilizačná revízia kódu ešte nebola; revízie návrhu robí audítor.\n", encoding: 'UTF-8')
+                      "Stabilizačná revízia kódu ešte nebola; revízie návrhu robí audítor.\n" \
+                      "Revízie workflowu robí orchestrátor.\n", encoding: 'UTF-8')
     NxTest.assert(nx_prav_history_offenders([clean]).empty?,
                   "negativny pripad: platne znenie nesmie mat nalez (#{nx_prav_history_offenders([clean]).inspect})")
 
