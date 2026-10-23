@@ -9,9 +9,10 @@ GitHub: https://github.com/michalmoronga-alt/noxun-panel
 
 | Ideš robiť… | Pred prácou POVINNE prečítaj |
 |---|---|
+| **každú prácu** (platí vždy, pre každú rolu) | [SYSTEM/pravidla/DEFINICIE.md](SYSTEM/pravidla/DEFINICIE.md) — jediné znenie definícií, podľa ktorých sa rozhoduje o bránach: výrobná/cenová dávka (D1), audit-povinná dávka (D2), triedy dávok (D3), povinná predrecenzia (D4), nový ovládací prvok v UI (D5), in-SU test ako brána mergu (D6) |
 | **novú dávku · plánovanie · zadanie** | [SYSTEM/STAV.md](SYSTEM/STAV.md) (kde projekt je) → [SYSTEM/PLAN.md](SYSTEM/PLAN.md) (blok, do ktorého dávka patrí) → skupinu toho bloku v [SYSTEM/DOGFOODING.md](SYSTEM/DOGFOODING.md) (plné znenia **otvorených** D-čísel) → zadanie dávky v priečinku bloku `SYSTEM/zdroje/bloky/<BLOK>/` + Matica výberu v [SYSTEM/WORKFLOW.md](SYSTEM/WORKFLOW.md) § 2 (výber profilu implementátora). **Podobná funkcia už bola** → priečinok jej bloku `SYSTEM/archiv/bloky/<BLOK>/` (`ROZHODNUTIA_*`, `FAKTY_Z_KODU_*`, `PACKAGE_*`) a záver `SYSTEM/archiv/<BLOK>_ZAVER_*`; bloky spred tejto konvencie (napr. KOVANIE, GHOST, UI 2.0, M-R) → plný text v `SYSTEM/archiv/ROADMAP_hotove_etapy.md`, KRONIKA Grepom podľa ID dávky a staršie podklady v `SYSTEM/zdroje/next_sessions/` (`KOVANIE_*`, `GHOST_*`, `MR_*`…) a `SYSTEM/zdroje/ui20/`. Keď nevieš, ktorý dokument je autorita na čo: [SYSTEM/README.md](SYSTEM/README.md) |
 | **zmenu Ruby kódu — core / modules** | rozcestník [docs/ARCHITEKTURA.md](docs/ARCHITEKTURA.md) → odseky **dotknutých modulov** v `docs/architecture/` (Grep `^### <súbor>`; súbory mapy majú 47–257 kB, celé sa nečítajú) + dotknuté § [SYSTEM/STANDARD.md](SYSTEM/STANDARD.md) (Grep `^## <číslo>.` / `^### <číslo>`; celý má 170 kB) |
-| **buildery · observery · undo · geometriu** | odseky `construction`, `cabinet_builder`, `board_builder`, `zone_tree`, `scale_observer` v [docs/architecture/construction.md](docs/architecture/construction.md) (Grep `^### <modul>`; celý má 174 kB) + [docs/SKETCHUP_PRAVIDLA.md](docs/SKETCHUP_PRAVIDLA.md) + STANDARD §3, §4, §9. **In-SU test je tu brána mergu** (spúšťače a runner: sekcia **Testovanie**) — headless sada geometriu ani undo neoverí |
+| **buildery · observery · undo · geometriu** | odseky `construction`, `cabinet_builder`, `board_builder`, `zone_tree`, `scale_observer` v [docs/architecture/construction.md](docs/architecture/construction.md) (Grep `^### <modul>`; celý má 174 kB) + [docs/SKETCHUP_PRAVIDLA.md](docs/SKETCHUP_PRAVIDLA.md) + STANDARD §3, §4, §9. **In-SU test je tu brána mergu** (spúšťače: [DEFINICIE § D6](SYSTEM/pravidla/DEFINICIE.md#d6); runner: sekcia **Testovanie**) |
 | **UI — Inspector, Štúdio, HTML, JS, CSS** | [docs/UI_DIZAJN.md](docs/UI_DIZAJN.md) **§1–§3** (norma, pri KAŽDEJ UI práci; pri ikone či komponente aj dotknutý §4 / §5.x) + **odsek dotknutej UI sekcie alebo modulu** v [docs/architecture/ui-lifecycle.md](docs/architecture/ui-lifecycle.md) (Grep podľa nadpisu; celý má ~257 kB) — napr. sekcia Štúdia `^### Sekcia ROZPOČET`, kontext Inspectora `^### Kontext Čelá`, `^### Satelitné okná` a súbor dialógu (`^### <súbor>_dialog.rb`), `^### D-15 modal`, `^### Paleta a téma`, `^### Veľkosť okna pri otvorení` + pri zmene stĺpcov alebo sekcií Štúdia **záväzný kontrakt Kusovníka** [SYSTEM/zdroje/ui20/UI20_KONTRAKT.md](SYSTEM/zdroje/ui20/UI20_KONTRAKT.md) (Š2 stĺpce) + **cache-bust pravidlo** nižšie (`?v=` = presne VERSION) + trvalé pravidlo **„vertikálny priestor panela je vzácny"** (autorita UI_DIZAJN §1). Po zmene UI nafoť okná (`scripts\ui_foto.ps1`, sekcia **Testovanie**) |
 | **materiály · ABS · katalóg · Demos** | odseky `materials`, `materials_*` split, `materials_migration`, `materials_health`, `abs_rules`, `demos/` v [docs/architecture/materials.md](docs/architecture/materials.md) (Grep `^### <modul>`; celý má 72 kB) + [SYSTEM/STANDARD.md](SYSTEM/STANDARD.md) **§7 Materiály a ABS** |
 | **kovanie — pravidlá, sety, katalóg** | odseky `hardware_rules`, `hardware_catalog`, `hardware_sets` v [docs/architecture/hardware.md](docs/architecture/hardware.md) (Grep `^### <modul>`; celý má 208 kB) + [SYSTEM/STANDARD.md](SYSTEM/STANDARD.md) **§6 Kovanie** (42 kB — dotknuté §6.x) |
@@ -32,15 +33,10 @@ Keď zásah spadá do viacerých riadkov, platia VŠETKY. **Súbor nad ~50 kB sa
   tabuľke **„Obsadenie rolí"** vo WORKFLOW.md — mení ju Michal; inde sa model ani príkaz volania neopakuje. Výnimka: **typy subagentov**
   v `.claude/agents/` nesú model a effort svojej roly — menia sa spolu s tabuľkou v tom istom PR. Pravidlá sa píšu nezávisle
   od nástroja (možný budúci prechod mimo Claude Code).
-- **Výber profilu implementátora (od 7.10.2026, schválil Michal):** orchestrátor pri KAŽDEJ dávke určí **triedu** a spustí **profil**
-  (typ agenta) podľa nej. **Ľ ľahká** = docs, texty, preklady, ikony, rozloženie, mechanické presuny, testy, presné zadanie bez vlastného
-  rozhodovania · **S stredná** = bežná kódová dávka bez zmeny kontraktu (nová logika, bugfix mimo výroby, nový ovládací prvok UI) do ~300 riadkov
-  kódu pluginu · **Ť ťažká** = audit-povinná dávka (trieda `codex-audit`), výrobná/cenová, nad 300 riadkov kódu pluginu, oprava P0/P1.
-  **Prednosť Ť > S > Ľ:** platí najvyššia trieda, do ktorej dávka spadá; hranica 300 riadkov pri zadaní je odhad — implementátor Ľ/S pred
-  návratom zmeria skutočný diff kódu pluginu a keď je nad 300, **ohlási to** a dávka sa reklasifikuje na Ť. **Eskalácia:** P1 alebo zmena konceptu v dávke profilu Ľ/S → opravu
-  robí profil Ť s novým zadaním (nie pokračovanie). Tabuľka profilov, shadow a povýšenie: [SYSTEM/WORKFLOW.md](SYSTEM/WORKFLOW.md) § 2
-  „Matica výberu“; **zmenu matice či model mimo nej navrhuje orchestrátor len na potvrdenie Michala**. Model sa tu neopakuje (len v tabuľke
-  Obsadenie rolí).
+- **Výber profilu implementátora (od 7.10.2026, schválil Michal):** orchestrátor pri KAŽDEJ dávke určí **triedu** (definície tried, prednosť,
+  reklasifikácia a eskalácia: [DEFINICIE § D3](SYSTEM/pravidla/DEFINICIE.md#d3)) a spustí **profil** (typ agenta) podľa nej. Mapovanie trieda →
+  profil, shadow a povýšenie: [SYSTEM/WORKFLOW.md](SYSTEM/WORKFLOW.md) § 2 „Matica výberu“; **zmenu matice či model mimo nej navrhuje
+  orchestrátor len na potvrdenie Michala**. Model sa tu neopakuje (len v tabuľke Obsadenie rolí).
 
 ## Git workflow (záväzné od 16.7.2026, revízie RETRO 12.8., WORKFLOW 26.9. a retro bloku 7 27.9.2026)
 
@@ -53,42 +49,20 @@ Keď zásah spadá do viacerých riadkov, platia VŠETKY. **Súbor nad ~50 kB sa
   splnení OBOCH brán **pre aktuálnu hlavu vetvy**: **CI zelené** + **review kolo uzavreté**. Nikdy nemergovať hneď po pushi opráv len
   preto, že CI zbehlo skôr než review. Po mergi **návrat na čerstvý `main`** (`git checkout main && git pull`) a **inštalácia mainu**
   (sekcia Verzia a uzáver) — ďalšia dávka štartuje odtiaľ. Vetvy na GitHube maže repo automaticky. Postup: skill `codex-po-pr`.
-- **Review kolá (delta-verifikácia):** kolo 1 = vždy plné GH Codex review. Ak vráti **LEN P2/P3**, nové GH kolo sa nevyžaduje: fix push
-  + reply s hashom v threadoch + **interná delta** (nový slepý subagent overí výhradne fix commity) → merge. Platí **aj pre audit-povinné
-  a výrobné/cenové dávky, ak prešli predrecenziou**. Nové PLNÉ GH kolo (`@codex review`) len pri **P0/P1** alebo oprave, ktorá **mení
-  koncept** — a pri audit-povinnej či výrobnej/cenovej dávke bez predrecenzie.
-- **Opravy z review:** opravu robí **pôvodný implementátor** (pokračovanie toho istého subagenta — pozná kód aj dôvody), kontrolu opravy
-  **nový slepý subagent**. Pri P0/P1 alebo zmene konceptu **nový subagent s novým zadaním** (a pravidlo 3 kôl b). Označenie implementátora
-  sa zapíše do handoffu skôr, než sa kontext orchestrátora skomprimuje.
-- **Pravidlo 3 kôl:** počítajú sa GH kolá review, ktoré vrátili nálezy. Keď nálezy vráti aj **3. kolo**: **(a) len P2/P3 bez zmeny
-  konceptu** → **vedomá výnimka** (oprava na mieste + slepá delta fix commitov, **bez 4. GH kola**, zápis do PR a KRONIKY); **(b) P0/P1
-  alebo oprava mení koncept** (dátový kontrakt, tok, návrh riešenia) → PR bol zle narezaný — **zavrieť a rozdeliť**, nie iterovať; platí
-  aj vtedy, keď to nájde slepá delta. Detail a precedensy: skill `codex-po-pr`.
-- **Výrobná/cenová dávka (jediná definícia):** dávka, ktorá mení **rozmery alebo počty dielov, hrany, kusovník, VEPO, nákupné zoznamy,
-  kovanie alebo ceny**. **Hranice s príkladmi (od 1.10.2026):**
-  - výrobná/cenová **áno:** zmena vzorca, rozmeru, počtu, hrany; zmena zoskupenia riadkov kusovníka (`row_key`) alebo obsahu či stĺpcov exportu (VEPO,
-    CSV/XLSX kusovníka, nákup, ponuka); zmena ceny, sadzby alebo **čísla, podľa ktorého sa v okne objednáva či cenotvorí** (množstvo, počet platní, cena
-    položky) — aj keď sa výpočet nemení a mení sa len to, čo okno ukazuje, a **aj v novom čítacom stĺpci**;
-  - výrobná/cenová **nie:** nový **popisný** čítací stĺpec alebo popis v okne, ktorého hodnoty sa nepoužívajú na výrobu, objednávanie ani cenu, bez
-    zmeny `row_key`, zoskupenia a exportov (precedens `rows_with_roles`); preklad nadpisov a popiskov bez zmeny čísel a CSV; farba, ikona, rozloženie;
-  - **nový ovládací prvok v UI** (hranica predrecenzie nižšie) **áno:** nové tlačidlo, prepínač, pole, rozbaľovačka alebo položka menu, ktorá niečo
-    **spúšťa alebo zapisuje** (model, súbor, nastavenia, katalóg); **nie:** ďalšia voľba v existujúcom zozname s rovnakým správaním ako susedné (napr.
-    ďalší stĺpec v menu „Stĺpce"), presun existujúceho tlačidla alebo jeho zmena na ikonu bez zmeny akcie.
-- **Audit návrhu PRED implementáciou (skill `codex-audit`, risk-based od 12.8.):** povinný **LEN** pre dávky meniace **dátový kontrakt,
-  schému, migráciu, observer/undo lifecycle** alebo pridávajúce **nový modul** — rozhoduje OBSAH zásahu, nie žáner dávky (aj „fix"
-  observera je audit-povinný). **Zmena schémy = každé zvýšenie `CONFIG_SCHEMA`, BuildPlan `SCHEMA` alebo STD.** Ostatné fix, docs a UI
-  dávky idú rovno do implementácie (v prostredí bez Codex CLI krok neblokuje — ohlás a pokračuj). Skill `codex-po-pr` po odoslaní PR je
-  povinný **bez výnimky**. Skilly sú v `.claude/skills/`. **Sonda pred auditom (od 27.9.2026):** kľúčové tvrdenia package (správanie
-  pri nulových hodnotách, minimá, rozsahy, parsovanie vstupov) orchestrátor pred odoslaním do auditu overí **krátkou sondou na kóde** bez
-  zápisu do modelu a výsledok zapíše do package — postup: skill `codex-audit`, krok 0.
-- **Slepá predrecenzia PRED PR (skill `predrecenzia`):** **povinná** pri dávke **audit-povinnej** (tá istá trieda ako `codex-audit`),
-  **výrobnej/cenovej** a **aj pri bežnej dávke nad 300 zmenených riadkov kódu pluginu** (bez testov a dokumentácie) **alebo s novým
-  ovládacím prvkom v UI** (príklady hraníc pri definícii výrobnej/cenovej dávky vyššie) **a pri každej dávke náhradného implementátora** (tabuľka Náhradníci vo WORKFLOW § 2); pri docs-only nie. Slepý recenzent dostane len zadanie a `git diff main...HEAD`; jeho P1/P2 sa opravia ešte
-  pred PR a výsledok ide do PR popisu (sekcia „Predrecenzia"). Nenahrádza `codex-audit` ani `codex-po-pr`.
+- **Review kolá, opravy z review a pravidlo 3 kôl** — jediný domov: skill `codex-po-pr` (delta-verifikácia, kto opravuje a kto kontroluje,
+  vedomá výnimka 3. kola). V skratke: kolo 1 je vždy plné GH review; po nálezoch len P2/P3 stačí oprava pôvodným implementátorom a interná
+  delta, nové plné kolo pri P0/P1 alebo oprave meniacej koncept; keď ani 3. kolo nie je čisté a ide o P0/P1 či zmenu konceptu, PR sa zavrie a rozdelí.
+- **Výrobná/cenová dávka** a **nový ovládací prvok v UI** — jediné znenie s hranicami a príkladmi: [DEFINICIE § D1](SYSTEM/pravidla/DEFINICIE.md#d1)
+  a [§ D5](SYSTEM/pravidla/DEFINICIE.md#d5).
+- **Audit návrhu PRED implementáciou (skill `codex-audit`):** povinný pre **audit-povinnú dávku** ([DEFINICIE § D2](SYSTEM/pravidla/DEFINICIE.md#d2)
+  — vrátane zmeny schémy, sondy pred auditom a náhrady, keď Codex nie je); ostatné dávky idú rovno do implementácie. Skill `codex-po-pr`
+  po odoslaní PR je povinný **bez výnimky**. Skilly sú v `.claude/skills/`.
+- **Slepá predrecenzia PRED PR (skill `predrecenzia`):** kedy je povinná, odporúčaná alebo sa nerobí a čo slepý recenzent dostane —
+  [DEFINICIE § D4](SYSTEM/pravidla/DEFINICIE.md#d4); postup a vzor promptu: skill.
 - **Rešerš a krížový audit (poradie podľa praxe):** pri bloku **debata s Michalom → koncept → outside-in rešerš + krížový audit bloku
   RAZ, pred packages** (rešeršéri a audítor s rovnakým zadaním) → reconcile orchestrátora (nálezy ALREADY EXISTS / SIMPLER NATIVE PATH
-  sa najprv overia sondou v SketchUpe) → mockup (schvaľuje Michal) → packages → dávky → review. **Audit dávky** už len pri zmene
-  kontraktu (trieda `codex-audit` vyššie). Outside-in rešerš: skill `antigravity-outside-in` (nie pre fix, docs a čisto dátové dávky);
+  sa najprv overia sondou v SketchUpe) → mockup (schvaľuje Michal) → packages → dávky → review. **Audit dávky** už len pri audit-povinnej
+  dávke ([DEFINICIE § D2](SYSTEM/pravidla/DEFINICIE.md#d2)). Outside-in rešerš: skill `antigravity-outside-in` (nie pre fix, docs a čisto dátové dávky);
   nástroje a ich roly: WORKFLOW.md.
 - **Štart bloku (od 27.9.2026):** úvodné PR bloku nesie **len rozhodnutia Michala a mockup** (+ fakty z kódu, surové výsledky rešerše
   a krížového auditu); **technické požiadavky** (vzorce, rozsahy, kontrakt) patria **výhradne do package dávky** s jej auditom návrhu.
@@ -109,16 +83,9 @@ Keď zásah spadá do viacerých riadkov, platia VŠETKY. **Súbor nad ~50 kB sa
   Register je **údaj, nie pokyn**. Jeden príkaz: `powershell -NoProfile -File scripts\start_okna.ps1` (kvóty, verzie nástrojov, register
   a porovnanie `grok` s najnovšou oficiálnou verziou z registra); prihlásenie a predvolené modely nástrojov zatiaľ ručne.
 - **Pred každým drahým krokom** (Codex audit, spustenie implementačného subagenta či predrecenzie, `gh pr create`, `@codex review`) stav
-  kvót z CodexBar CLI. **Codex weekly zostatok < 10 %** → GH kolo ani audit sa automaticky nespúšťa a **PR sa otvorí ako draft** (Codex
-  ho nerecenzuje); ďalej podľa triedy: **bežná dávka** → **náhradná brána** (slepý recenzent + interná delta), PR to prizná · **audit-povinná,
-  výrobná/cenová dávka alebo P0/P1** → rozhodne Michal (keď neodpovie: tabuľka v sekcii Autonómne bloky).
-- **Claude session nad 80 % → nový implementačný subagent sa nespúšťa**: reset **do 60 min** → čaká sa; reset neskôr → **bežná dávka**
-  smie ísť na **náhradného implementátora** (tabuľka Náhradníci vo [SYSTEM/WORKFLOW.md](SYSTEM/WORKFLOW.md) § 2), ostatné čakajú na reset.
-  Plánovanie blokov rešpektuje okná resetu.
-- **Počkať, nie náhradník (od 6.10.2026):** keď má primárny agent roly reset **do 60 min** a úloha neblokuje ďalšiu prácu, **čaká sa**
-  (orchestrátor medzitým robí nezávislú dávku). Audit-povinné a výrobné/cenové dávky čakajú vždy. Inak náhradník len podľa tabuľky
-  Náhradníci — **najprv schopnosť, až potom kvóta**. Pre implementátora platí riadok o Claude session nad 80 % vyššie (reset do 60 min
-  → čaká sa aj pri blokujúcej dávke; orchestrátor medzitým robí prácu bez implementačného subagenta).
+  kvót z CodexBar CLI (skill `usage`). **Prahy a reakcie** — Codex weekly zostatok, Claude session pred implementačným subagentom, „počkať,
+  nie náhradník", Codex nedostupný, kvóta pred predrecenziou — majú jediný domov v skille `usage`, sekcia **„Prahy a reakcie"**;
+  náhradníci podľa tabuľky Náhradníci vo [SYSTEM/WORKFLOW.md](SYSTEM/WORKFLOW.md) § 2. Plánovanie blokov rešpektuje okná resetu.
 
 ## Autonómne bloky (od 12.8.2026, revízie 26.9. a 27.9.2026)
 
@@ -132,9 +99,9 @@ Keď zásah spadá do viacerých riadkov, platia VŠETKY. **Súbor nad ~50 kB sa
 
 | Situácia | Reakcia |
 |---|---|
-| P0/P1 v review | oprava + nové plné GH kolo; ak oprava mení koncept → PR zavrieť a rozdeliť |
+| P0/P1 v review | oprava + nové plné GH kolo; ak oprava mení koncept → PR zavrieť a rozdeliť (postup: skill `codex-po-pr`) |
 | in-SU test zlyhá | nemergovať; najviac 2 pokusy o opravu, potom dávka čaká a ide do reportu; test nikdy neobchádzať |
-| Codex weekly zostatok < 10 % | bežná dávka → náhradná brána (slepý subagent + delta); audit-povinná/výrobná/cenová alebo oprava P0/P1 → otázka Michalovi, kým neodpovie, dávka čaká a pokračuje sa ďalšou nezávislou |
+| Codex kvóta pod prahom | podľa skillu `usage`, sekcia „Prahy a reakcie" (kým Michal neodpovie, dávka, o ktorej rozhoduje, čaká a pokračuje sa ďalšou nezávislou) |
 | nejasnosť v zadaní | otázka do chatu; kým neodpovie, bezpečnejšia vratná voľba len ak nemení dáta ani výrobné/cenové čísla — označiť v PR aj reporte; inak dávka čaká |
 | červený main · riziko pre zákazku · zaseknutý SketchUp/PC · potreba hesla | zastaviť celý beh a čakať na Michala |
 
@@ -196,12 +163,9 @@ Keď zásah spadá do viacerých riadkov, platia VŠETKY. **Súbor nad ~50 kB sa
   vyžaduje standalone Ruby v `C:\Ruby32-x64`) + **JS sady** — spúšťať KAŽDÚ zvlášť, bash: `for f in tests/js/test_*.js; do node "$f" || exit 1; done`
   (POZOR: `node tests/js/test_*.js` spustí len PRVÝ súbor, zvyšok sú preň argumenty; CI ich spúšťa všetky — lokálne tiež všetky, nie len
   test_expr). **Počty testov sa sem nepíšu** — patria do PR a KRONIKY; STAV drží jeden riadok posledného behu.
-- **In-SU test je brána mergu**, keď dávka mení **buildery, observery, undo a operácie, geometriu alebo akcie panela zapisujúce do
-  modelu** (jediný zoznam spúšťačov; headless sada geometriu ani undo neoverí). Runner `scripts\run_su_tests.ps1`: deploy → inštancia nad
-  kópiou ENGINEtests.skp → poll → výsledok; overuje geometriu plán↔model a undo scenáre; výsledkový grep až PO dobehu (output sa dopisuje).
-  **Finálna hlava (od 27.9.2026):** nový beh netreba, keď commity po poslednom behu **nemenia Ruby kód spúšťačov** (buildery, observery,
-  undo a operácie, geometria, akcie panela na strane Ruby) — len JS, texty, dokumentáciu alebo testy (JS zmeny kryjú JS sady); **PR uvedie,
-  na ktorej hlave in-SU bežal** a čo sa zmenilo potom. Pri akejkoľvek zmene Ruby spúšťača beh znova.
+- **In-SU test je brána mergu** — kedy (spúšťače) a kedy ho na finálnej hlave netreba opakovať: [DEFINICIE § D6](SYSTEM/pravidla/DEFINICIE.md#d6).
+  Runner `scripts\run_su_tests.ps1`: deploy → inštancia nad kópiou ENGINEtests.skp → poll → výsledok; overuje geometriu plán↔model a undo
+  scenáre; výsledkový grep až PO dobehu (output sa dopisuje).
 - **Agent spúšťa runner VŽDY s `-CloseWhenDone`** (bez neho len Michalovo ručné spustenie): inštancia po koncovom markeri sama uloží
   run-kópiu modelu a ukončí sa; runner počká na zánik procesu (max 120 s) a nikdy nezabíja. Teardown po celej sade končí kódom
   0xC0000374 až PO zapísaní výsledku — verdikt to nemení (detail v hlavičke runnera). **Paralelné behy sa vylučujú**

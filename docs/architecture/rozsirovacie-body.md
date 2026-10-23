@@ -15,8 +15,8 @@
 
 **Spoločné pravidlá všetkých scenárov:**
 
-- **Trieda dávky** sa určuje podľa CLAUDE.md (výrobná/cenová, audit, predrecenzia — hranice s príkladmi tam). Každé zvýšenie schémy
-  alebo STD (tabuľka STANDARD §13) robí dávku **audit-povinnou**.
+- **Trieda dávky** sa určuje podľa [SYSTEM/pravidla/DEFINICIE.md](../../SYSTEM/pravidla/DEFINICIE.md) (výrobná/cenová, audit-povinná,
+  predrecenzia — hranice s príkladmi tam; konštanty schémy a STD sú v tabuľke STANDARD §13).
 - **Jedna vlastnosť na miesto:** kód sa pýta vlastnosti (visí, stojí na podlahe, má korpus, je čelo), nie mena typu či roly. Nové
   porovnanie mena typu (`== 'upper'`, `when 'dishwasher'`) v Ruby ani v JS guardy H12 nepustia.
 - **Seed sa do existujúcich inštalácií dostane len zvýšením jeho verzie** (`SEED_VERSION` + `merge_seed`); projekty si nesú vlastný
@@ -95,7 +95,7 @@ hrany novej roly — inak sa na existujúcich PC postaví **bez pásky**). Dávk
 ## 3 · Nový stĺpec Kusovníka
 
 Kontrakt stĺpcov je **UI20_KONTRAKT Š2** ([../../SYSTEM/zdroje/ui20/UI20_KONTRAKT.md](../../SYSTEM/zdroje/ui20/UI20_KONTRAKT.md)).
-Trieda dávky podľa CLAUDE.md: **popisný čítací stĺpec** bez zmeny `row_key`, zoskupenia a exportov (vzor stĺpca Rola cez
+Trieda dávky podľa [DEFINICIE § D1 a § D5](../../SYSTEM/pravidla/DEFINICIE.md#d1): **popisný čítací stĺpec** bez zmeny `row_key`, zoskupenia a exportov (vzor stĺpca Rola cez
 `rows_with_roles`) **nie je výrobný**; stĺpec s číslom, podľa ktorého sa objednáva alebo cenotvorí, zmena `row_key`, zoskupenia či obsahu
 exportu **je výrobný/cenový**. Voľba stĺpca je per počítač (`localStorage`), ďalší stĺpec v menu „Stĺpce" nie je nový ovládací prvok.
 

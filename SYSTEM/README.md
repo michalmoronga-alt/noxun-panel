@@ -4,7 +4,8 @@
 > orientovať bez čítania všetkého, má **každý živý dokument práve JEDNU rolu**. Tu je
 > napísané, ktorý súbor je autorita na čo, v akom poradí sa číta a čo sa kam zapisuje.
 > Pravidlá práce v repe (workflow, verzie, checklist uzáveru dávky, testovanie) žijú
-> v [../CLAUDE.md](../CLAUDE.md) — tento súbor ich nenahrádza, len ukazuje na dokumenty.
+> v [../CLAUDE.md](../CLAUDE.md), definície brán a tried v [pravidla/DEFINICIE.md](pravidla/DEFINICIE.md) — tento súbor ich nenahrádza,
+> len ukazuje na dokumenty.
 > Mapa workflowu (roly a ich obsadenie, diagramy blok · dávka · review, brány) je v [WORKFLOW.md](WORKFLOW.md).
 
 ## Poradie čítania
@@ -35,12 +36,13 @@ a [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md) — **len Gre
 | [VEPO_KONTRAKT.md](VEPO_KONTRAKT.md) | formát výstupu do VEPO | ostatné výstupy |
 | [POJMY.md](POJMY.md) | glosár + trvalé fakty stolárskej domény | plán ani stav |
 | [V1_VIZIA.md](V1_VIZIA.md) | definícia „V1 hotové" + nemenné princípy | plán (ten je v PLAN.md) |
-| [WORKFLOW.md](WORKFLOW.md) | mapa workflowu: roly a **obsadenie rolí** (mení Michal), diagramy blok · dávka · review, brány, hranice | záväzné znenie pravidiel (to je v ../CLAUDE.md a skilloch) |
+| [WORKFLOW.md](WORKFLOW.md) | mapa workflowu: roly a **obsadenie rolí** (mení Michal), diagramy blok · dávka · review, brány, hranice | záväzné znenie pravidiel (to je v ../CLAUDE.md, pravidla/DEFINICIE.md a skilloch) |
+| [pravidla/DEFINICIE.md](pravidla/DEFINICIE.md) | **definície brán a tried** (jediné znenie): výrobná/cenová, audit-povinná, triedy D/Ľ/S/Ť, predrecenzia, nový prvok UI, in-SU — kópie stráži guard `test_definicie.rb` | postup (skilly), kvótové prahy (`usage`), review kolá (`codex-po-pr`) ani obsadenie rolí (WORKFLOW) |
 | [retro/](retro/README.md) | pokus retro (27.9.–11.10.2026): formát záznamov po behoch v [retro/README.md](retro/README.md); inbox `retro/inbox/` je **lokálny, git ho ignoruje** (pravidlá pokusu: WORKFLOW.md, časť 9) | záväzné pravidlo (retro len navrhuje, rozhoduje Michal) ani archív (spracované vyhodnotenia sú v `archiv/retro/`) |
 
 ## Vrstvy
 
-- **Živé docs** (`SYSTEM/*.md` a počas pokusu `SYSTEM/retro/README.md`) — platia teraz, čítajú sa podľa tabuľky vyššie.
+- **Živé docs** (`SYSTEM/*.md`, `SYSTEM/pravidla/` a počas pokusu `SYSTEM/retro/README.md`) — platia teraz, čítajú sa podľa tabuľky vyššie.
 - **[zdroje/](zdroje/)** — **nezáväzné** koncepty, rešerše, prieskumy dodávateľov, mockupy,
   seed podklady. **Nečítať automaticky** — otvárajú sa, len keď na ne živý dokument
   výslovne pošle. Koncepty v [zdroje/next_sessions/](zdroje/next_sessions/) nesú status
@@ -72,7 +74,7 @@ a [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md) — **len Gre
   indexu v DOGFOODING_vyriesene.md, hotový blok plným textom do ROADMAP_hotove_etapy.md
   a pri uzávere bloku jeho celý priečinok (debata, mockup, zadania, briefy, smoke checklist) do `archiv/bloky/<BLOK>/`.
   [archiv/retro/](archiv/retro/) drží **spracované retro vyhodnotenia** (`VYHODNOTENIE_<dátum>.md` — postrehy, návrhy a rozhodnutia
-  Michala; záznam „prečo" pri zmenách workflowu, nie autorita — tou sú CLAUDE.md, skilly a WORKFLOW.md).
+  Michala; záznam „prečo" pri zmenách workflowu, nie autorita — tou sú CLAUDE.md, pravidla/DEFINICIE.md, skilly a WORKFLOW.md).
   Jediná výnimka z neprepisovania: záznam **práve prebiehajúcej dávky** sa smie dorovnávať
   až do jej mergu (napr. keď review zmení výsledný stav, ktorý záznam opisuje).
 

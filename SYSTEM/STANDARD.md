@@ -1782,9 +1782,9 @@ Tabuľky stráži `tests/pure/test_h13_rozsirovacie_body.rb`: hodnota v stĺpci 
 konštanta verzie v `noxun_engine/` (meno obsahuje `SCHEMA`, `STD`, `SEED` alebo `VERSION`) musí byť v niektorej tabuľke — aj nemenné kroky
 histórie `SCHEMA_*` katalógov (§13.3; test navyše overí, že sú v module jedinečné a `SCHEMA_CURRENT` ukazuje na najvyšší).
 
-**Zmena schémy (CLAUDE.md, audit návrhu):** každé zvýšenie `CONFIG_SCHEMA`, BuildPlan `SCHEMA` alebo akéhokoľvek `STD` — v tabuľke stĺpec
-„Schéma" = **áno**. Seed (`SEED_VERSION`, `SEED_SET_VERSION`) schéma nie je, ale mení predvolené kovanie, ABS alebo ceny, takže taká dávka
-je spravidla **výrobná/cenová** (predrecenzia). Čísla sa prideľujú **sekvenčne podľa poradia mergov**; dôvod bumpu patrí do komentára
+**Zmena schémy:** stĺpec „Schéma" = **áno** označuje konštanty, ktorých zvýšenie je zmenou schémy podľa
+[DEFINICIE § D2](pravidla/DEFINICIE.md#d2) (audit návrhu). Seed (`SEED_VERSION`, `SEED_SET_VERSION`) schéma nie je; kedy je zmena seedu
+výrobná/cenová dávka, určuje [DEFINICIE § D1](pravidla/DEFINICIE.md#d1). Čísla sa prideľujú **sekvenčne podľa poradia mergov**; dôvod bumpu patrí do komentára
 `HISTORIA` pri konštante. **História zmien sa tu neprepisuje** — dôvody jednotlivých čísel sú v komentári pri konštante, pri configu skrinky
 v §2.5, pri ABS seede v §7.5 a v [archiv/KRONIKA.md](archiv/KRONIKA.md) (Grep podľa mena konštanty).
 
