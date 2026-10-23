@@ -1,5 +1,5 @@
-Strážca pravidiel · 2026-10-20 · main a9e8c79d
-Nálezov: 5 (0 priamych rozporov, 0 mŕtvych odkazov, 3 duplicity, 1 sebaprotirečenie „model sa neopakuje", 1 história v pravidle).
-Najškodlivejšie: CLAUDE.md (načítaný každou rolou) má 34,8 kB / 236 r. (cieľ 12 kB) a väčšinu duplikuje WORKFLOW + skilly.
-Rast veľkosti: prvá správa — základ (CLAUDE.md 34844 B, WORKFLOW.md 36804 B).
-Správa: hliadka/pravidla/2026-10-20.md
+Strážca pravidiel · 2026-10-23 · main ea581edb
+Nálezov: 3 nové (1 rozpor, 1 duplicita, 1 história); 5 z 20.10. ostáva otvorených.
+Najškodlivejšie: agy-reserser.md tvrdí, že `--mode plan` zakazuje shell, ale skill (po oprave 22.10.) hovorí, že nie.
+Rast veľkosti: antigravity-outside-in/SKILL.md +1,5 kB (8,1 kB), agy-reserser.md +0,8 kB; CLAUDE.md stále 34,8 kB (cieľ 12).
+Správa: hliadka/pravidla/2026-10-23.md
