@@ -130,6 +130,9 @@ NxTest.test('p4a: nx_paths — model z aktualneho checkoutu, z hlavneho checkout
     # (a) hlavny checkout sam
     out = call.call(main)
     NxTest.assert(NxP4a.same_path?(out[/MODEL=(.*)$/, 1].to_s, File.join(main, '_dev', 'ENGINEtests.skp')), 'hlavny checkout: vlastny model')
+    msg = out[/CHYBA:.*/m].to_s
+    NxTest.assert_equal(1, msg.scan('ENGINEtests.skp').length, "v hlavnom checkoute sa cesta nevypisuje dvakrat (#{msg})")
+    NxTest.assert_equal(2, call.call(wt)[/CHYBA:.*/m].to_s.scan('ENGINEtests.skp').length, 'vo worktree su dve rozne cesty')
     # (c) worktree s vlastnym _dev ma prednost
     NxP4a.write(wt, '_dev/ENGINEtests.skp', 'wt-skp')
     out = call.call(wt)
@@ -233,10 +236,18 @@ NX_P4A_USAGE_STUB = "param([string]$Label, [string]$Phase, [string]$Gate)\nWrite
 NX_P4A_GH_STUB = <<~'PS'
   if ($env:NX_STUB_LOG) { Add-Content -LiteralPath $env:NX_STUB_LOG -Value ($args -join ' ') }
   if ($args[0] -eq 'pr' -and $args[1] -eq 'view') {
-    if ($env:NX_STUB_EXISTING) { Write-Output $env:NX_STUB_EXISTING; exit 0 }
+    if ($env:NX_STUB_EXISTING) {
+      Write-Output $env:NX_STUB_EXISTING
+      if ($env:NX_STUB_STATE) { Write-Output $env:NX_STUB_STATE } else { Write-Output 'OPEN' }
+      exit 0
+    }
     exit 1
   }
-  if ($args[0] -eq 'pr' -and $args[1] -eq 'create') { Write-Output 'https://github.com/o/r/pull/42'; exit 0 }
+  if ($args[0] -eq 'pr' -and $args[1] -eq 'create') {
+    if ($env:NX_STUB_CREATE_FAIL) { exit 1 }
+    Write-Output 'https://github.com/o/r/pull/42'
+    exit 0
+  }
   exit 1
 PS
 
@@ -320,8 +331,11 @@ NxTest.test('p4a: otvor_pr.ps1 — brana exit 3 = --draft; existujuci PR, zly Co
     # existujuci PR
     out, st = nx_p4a_otvor(repo, stubs, 0, [], 'NX_STUB_EXISTING' => '7')
     NxTest.refute(st.success?, 'existujuci PR = chyba')
-    NxTest.assert(out.include?('uz existuje: #7'), "hlaska o existujucom PR (#{out})")
+    NxTest.assert(out.include?('uz existuje (otvoreny): #7'), "hlaska o existujucom PR (#{out})")
     NxTest.refute(heads.call.include?('feat/p4a-test'), 'existujuci PR: nic sa nepushlo')
+    # existujuci ZATVORENY / zmergovany PR novemu PR nebrani (P3-6)
+    out, st = nx_p4a_otvor(repo, stubs, 0, ['-WhatIf'], 'NX_STUB_EXISTING' => '7', 'NX_STUB_STATE' => 'CLOSED')
+    NxTest.assert(st.success?, "WhatIf s existujucim zatvorenym PR (#{out})")
     # zly CoAuthor
     args = ['-Title', 't', '-BodyFile', stubs[:body], '-CoAuthor', 'Claude bez-emailu', '-RepoRoot', repo, '-Gh', stubs[:gh], '-UsageScript', stubs[:usage]]
     out, st = NxP4a.ps_file(File.join(NxP4a::SCRIPTS, 'otvor_pr.ps1'), *args)
@@ -342,5 +356,105 @@ NxTest.test('p4a: otvor_pr.ps1 — brana exit 3 = --draft; existujuci PR, zly Co
     NxTest.assert(st.success?, "ostry beh s branou exit 3 (#{out})")
     NxTest.assert(out.include?('DRAFT: ano'), "vypis draft (#{out})")
     NxTest.assert(File.read(stubs[:log]).include?('--draft'), 'gh pr create dostal --draft')
+  end
+end
+
+NxTest.test('p4a: otvor_pr.ps1 — zatvoreny PR vetvy nebrani; neznamy stav kvoty (exit 2) = draft s dôvodom, -NoDraftOnUnknownQuota to vypne') do
+  NxP4a.need_pwsh!
+  Dir.mktmpdir('p4a-quota-') do |root|
+    repo = nx_p4a_prepare(root)
+    stubs = nx_p4a_stubs(root)
+    # exit 2 / 4 = stav kvoty nedostupny -> draft + vypis preco (WhatIf nic nezapise)
+    [2, 4].each do |code|
+      out, st = nx_p4a_otvor(repo, stubs, code, ['-WhatIf'])
+      NxTest.assert(st.success?, "WhatIf exit #{code} (#{out})")
+      NxTest.assert(out.include?("KVOTA: exit #{code} - stav kvoty nedostupny: PR sa otvori ako DRAFT") && out.include?('--draft'), "exit #{code} = draft (#{out})")
+    end
+    out, st = nx_p4a_otvor(repo, stubs, 2, ['-WhatIf', '-NoDraftOnUnknownQuota'])
+    NxTest.assert(st.success? && out.include?('-NoDraftOnUnknownQuota: PR sa otvori normalne') && !out.include?('--draft'), "-NoDraftOnUnknownQuota (#{out})")
+    # chybajuci skript brany = neznamy stav = draft
+    args = ['-Title', 't', '-BodyFile', stubs[:body], '-CoAuthor', 'Claude Test 1.0 <noreply@anthropic.com>', '-RepoRoot', repo, '-Gh', stubs[:gh],
+            '-UsageScript', File.join(root, 'neexistuje.ps1'), '-WhatIf']
+    out, st = NxP4a.ps_file(File.join(NxP4a::SCRIPTS, 'otvor_pr.ps1'), *args)
+    NxTest.assert(st.success? && out.include?('skript brany nenajdeny') && out.include?('--draft'), "bez skriptu brany = draft (#{out})")
+    # ostry beh s exit 2 -> gh pr create dostane --draft; zatvoreny existujuci PR nevadi
+    out, st = nx_p4a_otvor(repo, stubs, 2, [], 'NX_STUB_EXISTING' => '7', 'NX_STUB_STATE' => 'MERGED')
+    NxTest.assert(st.success?, "ostry beh po zmergovanom PR vetvy (#{out})")
+    NxTest.assert(out.include?('DRAFT: ano'), 'exit 2 = draft aj v ostrom behu')
+    NxTest.assert(File.read(stubs[:log]).include?('--draft'), 'gh pr create dostal --draft')
+  end
+end
+
+NxTest.test('p4a: otvor_pr.ps1 — zlyhanie gh pr create (HEAD nezmeneny, PR #? ostava) a zlyhanie pushu commitu s cislom (hlaska, ze PR je vytvoreny)') do
+  NxP4a.need_pwsh!
+  Dir.mktmpdir('p4a-fail-') do |root|
+    repo = nx_p4a_prepare(root)
+    stubs = nx_p4a_stubs(root)
+    head = NxP4a.git(repo, 'rev-parse', 'HEAD')
+    # gh pr create zlyha -> exit 1, ziadny commit, PR #? ostava
+    out, st = nx_p4a_otvor(repo, stubs, 0, [], 'NX_STUB_CREATE_FAIL' => '1')
+    NxTest.refute(st.success?, "zlyhany gh pr create = exit != 0 (#{out})")
+    NxTest.assert(out.include?('gh pr create zlyhal - PR sa nevytvoril'), "hlaska (#{out})")
+    NxTest.assert_equal(head, NxP4a.git(repo, 'rev-parse', 'HEAD'), 'HEAD sa nezmenil')
+    NxTest.assert_equal('', NxP4a.git(repo, 'status', '--porcelain'), 'strom bez zmien')
+    NxTest.assert(NxP4a.read(repo, 'SYSTEM/PLAN.md').include?('P4a drobnosti - PR #?.'), 'PR #? ostalo')
+    # push commitu s cislom zlyha (pre-receive hook odmietne commit "docs: doplnit cislo")
+    hook = File.join(root, 'origin.git', 'hooks', 'pre-receive')
+    File.write(hook, <<~'SH')
+      #!/bin/sh
+      while read old new ref; do
+        subj=$(git log -1 --format=%s "$new")
+        case "$subj" in "docs: doplnit cislo"*) echo "odmietnute testom" >&2; exit 1;; esac
+      done
+      exit 0
+    SH
+    File.chmod(0o755, hook)
+    out, st = nx_p4a_otvor(repo, stubs, 0)
+    NxTest.refute(st.success?, "zlyhany push commitu s cislom = exit != 0 (#{out})")
+    NxTest.assert(out.include?('git push commitu s cislom zlyhal'), "hlaska o pushi (#{out})")
+    NxTest.assert(out.include?('PR #42 JE VYTVORENY'), "hlaska, ze PR je vytvoreny (#{out})")
+    NxTest.assert(out.include?('https://github.com/o/r/pull/42'), 'hlaska nesie URL PR')
+    NxTest.assert(NxP4a.git(repo, 'rev-parse', 'HEAD') != head, 'commit s cislom je lokalne')
+    NxTest.assert(NxP4a.read(repo, 'SYSTEM/PLAN.md').include?('P4a drobnosti - PR #42.'), 'cislo je v subore lokalne')
+  end
+end
+
+NxTest.test('p4a: INSTALL_noxun_engine.ps1 zapise znacku nasadenia (vetva, SHA, clean, cas) — len pri skutocnom nasadeni alebo s NOXUN_DEPLOY_MARKER') do
+  NxP4a.need_pwsh!
+  Dir.mktmpdir('p4a-marker-') do |root|
+    repo = NxP4a.make_repo(root, 'noxun_engine.rb' => "# loader\n", 'noxun_engine/main.rb' => "# main\n")
+    FileUtils.cp(File.join(NxP4a::ROOT, 'INSTALL_noxun_engine.ps1'), File.join(repo, 'INSTALL_noxun_engine.ps1'))
+    NxP4a.git(repo, 'add', '-A')
+    NxP4a.git(repo, 'commit', '-q', '-m', 'installer')
+    NxP4a.git(repo, 'checkout', '-q', '-b', 'feat/znacka')
+    sha = NxP4a.git(repo, 'rev-parse', 'HEAD')
+    dest = File.join(root, 'plugins')
+    marker = File.join(root, 'znacka.txt')
+    tmpdir = File.join(root, 'tmp')
+    FileUtils.mkdir_p(tmpdir)
+    tmp_env = { 'TEMP' => tmpdir, 'TMP' => tmpdir, 'TMPDIR' => tmpdir, 'NOXUN_INSTALL_DEST' => dest }
+    script = File.join(repo, 'INSTALL_noxun_engine.ps1')
+    # testovaci rezim (NOXUN_INSTALL_DEST) bez NOXUN_DEPLOY_MARKER: znacka sa nezapisuje (ani do TEMP)
+    out, st = NxP4a.ps_file(script, env: tmp_env)
+    NxTest.assert(st.success?, "installer: #{out}")
+    NxTest.refute(File.exist?(File.join(tmpdir, 'noxun_nasadene.txt')), 'testovaci rezim nezapisuje znacku do TEMP')
+    # s NOXUN_DEPLOY_MARKER: znacka z cisteho stromu
+    out, st = NxP4a.ps_file(script, env: tmp_env.merge('NOXUN_DEPLOY_MARKER' => marker))
+    NxTest.assert(st.success?, "installer: #{out}")
+    raw = File.binread(marker)
+    NxTest.refute(raw.start_with?("\xEF\xBB\xBF".b), 'znacka bez BOM')
+    kv = raw.force_encoding('UTF-8').lines.map { |l| l.chomp.split('=', 2) }.to_h
+    NxTest.assert_equal('feat/znacka', kv['branch'], "vetva (#{raw})")
+    NxTest.assert_equal(sha, kv['sha'], 'plny SHA HEAD')
+    NxTest.assert_equal('yes', kv['clean'], 'cisty strom')
+    NxTest.assert(kv['time'] =~ /\A\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\z/, "cas ISO (#{kv['time']})")
+    NxTest.assert_equal('INSTALL_noxun_engine.ps1', kv['by'], 'kto')
+    # spinavy strom (necommitnuty subor pluginu) -> clean=no
+    File.write(File.join(repo, 'noxun_engine', 'main.rb'), "# main zmena\n")
+    out, st = NxP4a.ps_file(script, env: tmp_env.merge('NOXUN_DEPLOY_MARKER' => marker))
+    NxTest.assert(st.success?, "installer: #{out}")
+    kv = File.binread(marker).force_encoding('UTF-8').lines.map { |l| l.chomp.split('=', 2) }.to_h
+    NxTest.assert_equal('no', kv['clean'], 'spinavy strom = clean=no')
+    # skutocne nasadenie (bez NOXUN_INSTALL_DEST) sa tu nerobi: cielom by bol zivy SketchUp
   end
 end

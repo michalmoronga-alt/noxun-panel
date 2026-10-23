@@ -40,6 +40,9 @@ function Invoke-NxJsSuite([string]$file) {
   $psi.UseShellExecute = $false
   $psi.RedirectStandardOutput = $true
   $psi.RedirectStandardError = $true
+  # node pise UTF-8 - bez toho by sa diakritika vo vypise padnutej sady rozbila (konzolova kodova stranka).
+  $psi.StandardOutputEncoding = [System.Text.Encoding]::UTF8
+  $psi.StandardErrorEncoding = [System.Text.Encoding]::UTF8
   $psi.CreateNoWindow = $true
   $p = New-Object System.Diagnostics.Process
   $p.StartInfo = $psi

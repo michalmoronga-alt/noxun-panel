@@ -5,11 +5,13 @@
 #
 # Co spravi (v tomto poradi):
 #   1. kontrola: vetva nie je main/master, strom bez necommitnutych zmien v sledovanych suboroch,
-#      PR pre vetvu este neexistuje, popis existuje;
-#   2. `git push origin HEAD` (vetva musi byt na GitHube);
-#   3. kvotova brana `.claude\skills\usage\usage.ps1 -Gate codex` - exit 3 = PR sa otvori ako
+#      neexistuje OTVORENY PR pre vetvu (zatvoreny/zmergovany nevadi), popis existuje;
+#   2. kvotova brana `.claude\skills\usage\usage.ps1 -Gate codex` - exit 3 = PR sa otvori ako
 #      DRAFT (Codex draft nerecenzuje; dalej podla triedy davky: skill `usage`, sekcia
-#      "Prahy a reakcie"); exit 2/4 (stav kvoty nedostupny) NEBLOKUJE, skript to vypise;
+#      "Prahy a reakcie"); exit 2/4 (stav kvoty nedostupny) = tiez DRAFT s vypisom preco (draft sa
+#      da neskor prepnut gh pr ready, bezici review kolo sa zastavit neda);
+#      -NoDraftOnUnknownQuota to pri neznamom stave vypne;
+#   3. `git push origin HEAD` (vetva musi byt na GitHube);
 #   4. `gh pr create` (--base, --title, --body-file, pri brane alebo -Draft aj --draft);
 #   5. v suboroch zmenenych vetvou voci base nahradi `PR #?` cislom PR - len v SYSTEM/PLAN.md,
 #      SYSTEM/STAV.md, SYSTEM/archiv/KRONIKA.md, SYSTEM/archiv/DOGFOODING_vyriesene.md a len
@@ -34,6 +36,7 @@ param(
   [Parameter(Mandatory = $true)][string]$CoAuthor,
   [string]$Base = 'main',
   [switch]$Draft,
+  [switch]$NoDraftOnUnknownQuota,
   [string]$RepoRoot = '',
   [string]$Gh = 'gh',
   [string]$UsageScript = ''
@@ -92,10 +95,20 @@ if (Test-Path -LiteralPath $UsageScript) {
   } elseif ($gateExit -eq 0) {
     $gateText = 'exit 0 - brana presla'
   } else {
-    $gateText = "exit $gateExit - stav kvoty nedostupny, NEBLOKUJE (PR sa otvori normalne; chces draft? spusti znova s -Draft)"
+    if ($NoDraftOnUnknownQuota) {
+      $gateText = "exit $gateExit - stav kvoty nedostupny; -NoDraftOnUnknownQuota: PR sa otvori normalne"
+    } else {
+      $isDraft = $true
+      $gateText = "exit $gateExit - stav kvoty nedostupny: PR sa otvori ako DRAFT (kolo Codexu, ktore bezi samo po otvoreni, sa zastavit neda; po overeni kvoty prepni gh pr ready, alebo spusti s -NoDraftOnUnknownQuota); skill usage, sekcia Prahy a reakcie"
+    }
   }
 } else {
-  $gateText = "skript brany nenajdeny ($UsageScript) - brana preskocena"
+  if ($NoDraftOnUnknownQuota) {
+    $gateText = "skript brany nenajdeny ($UsageScript); -NoDraftOnUnknownQuota: PR sa otvori normalne"
+  } else {
+    $isDraft = $true
+    $gateText = "skript brany nenajdeny ($UsageScript) - stav kvoty neznamy: PR sa otvori ako DRAFT (po overeni kvoty gh pr ready, alebo -NoDraftOnUnknownQuota)"
+  }
 }
 Write-Host ('KVOTA: ' + $gateText)
 if ($Draft) { Write-Host 'DRAFT: vyziadany parametrom -Draft' }
@@ -115,10 +128,13 @@ if ($WhatIfPreference) {
 # --- 1b. PR pre vetvu uz nesmie existovat -----------------------------------
 Push-Location $repo
 try {
-  $r = Invoke-NxNative $Gh @('pr', 'view', $branch, '--json', 'number', '--jq', '.number') -Quiet
+  $r = Invoke-NxNative $Gh @('pr', 'view', $branch, '--json', 'number,state', '--jq', '.number,.state') -Quiet
 } finally { Pop-Location }
-if ($r.code -eq 0 -and (([string]($r.out | Select-Object -First 1)).Trim() -match '^\d+$')) {
-  Stop-Nx ("PR pre vetvu '$branch' uz existuje: #" + ([string]($r.out | Select-Object -First 1)).Trim() + ' - doplnenie cisla PR urob rucne.')
+# gh pr view vypise dva riadky (cislo, stav). Odmietne sa LEN otvoreny PR - zatvoreny alebo
+# zmergovany PR pre rovnaku vetvu (napr. znovuotvorenie po zavreti) novemu PR nebrani.
+$existing = @($r.out | ForEach-Object { ([string]$_).Trim() } | Where-Object { $_ })
+if ($r.code -eq 0 -and $existing.Count -ge 2 -and $existing[0] -match '^\d+$' -and $existing[1] -eq 'OPEN') {
+  Stop-Nx ("PR pre vetvu '$branch' uz existuje (otvoreny): #" + $existing[0] + ' - doplnenie cisla PR urob rucne.')
 }
 
 # --- 2. push vetvy ----------------------------------------------------------

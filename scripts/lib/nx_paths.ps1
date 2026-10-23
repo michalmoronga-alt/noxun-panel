@@ -43,6 +43,14 @@ function Resolve-NxTestModel([string]$Repo) {
 # Hlaska pre chybajuci subor: menuje OBE skusane cesty.
 function Get-NxMissingDevMessage([string]$What, [string]$Repo, [string[]]$Segments) {
   $c = Get-NxDevCandidates $Repo $Segments
+  $same = $false
+  if ($c[1]) {
+    $cmp = [System.StringComparison]::Ordinal
+    if ([System.IO.Path]::DirectorySeparatorChar -eq '\') { $cmp = [System.StringComparison]::OrdinalIgnoreCase }
+    $same = [string]::Equals([System.IO.Path]::GetFullPath($c[0]), [System.IO.Path]::GetFullPath($c[1]), $cmp)
+  }
+  # V hlavnom checkoute su obe cesty rovnake - vypise sa len jedna.
+  if ($same) { return "CHYBA: $What chyba. Skusena cesta (hlavny checkout):`n  $($c[0])" }
   $m = "CHYBA: $What chyba. Skusene cesty:`n  1. $($c[0])  (aktualny checkout)"
   if ($c[1]) { $m += "`n  2. $($c[1])  (hlavny checkout - vo worktree je _dev len tam)" }
   else { $m += "`n  2. (hlavny checkout sa nepodarilo zistit cez git)" }
