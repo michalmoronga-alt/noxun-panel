@@ -16,7 +16,8 @@
 **Spoločné pravidlá všetkých scenárov:**
 
 - **Trieda dávky** sa určuje podľa [SYSTEM/pravidla/DEFINICIE.md](../../SYSTEM/pravidla/DEFINICIE.md) (výrobná/cenová, audit-povinná,
-  predrecenzia — hranice s príkladmi tam; konštanty schémy a STD sú v tabuľke STANDARD §13).
+  predrecenzia — hranice s príkladmi tam). Zvýšenie schémy alebo STD (tabuľka STANDARD §13) robí dávku **audit-povinnou** —
+  [DEFINICIE § D2](../../SYSTEM/pravidla/DEFINICIE.md#d2).
 - **Jedna vlastnosť na miesto:** kód sa pýta vlastnosti (visí, stojí na podlahe, má korpus, je čelo), nie mena typu či roly. Nové
   porovnanie mena typu (`== 'upper'`, `when 'dishwasher'`) v Ruby ani v JS guardy H12 nepustia.
 - **Seed sa do existujúcich inštalácií dostane len zvýšením jeho verzie** (`SEED_VERSION` + `merge_seed`); projekty si nesú vlastný
