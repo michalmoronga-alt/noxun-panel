@@ -47,8 +47,8 @@ Keď zásah spadá do viacerých riadkov, platia VŠETKY. **Súbor nad ~50 kB sa
   kontext bloku, rozhodnutia a merge (dôvod: kompresia kontextu).
 - **Merge robí orchestrátor** (`gh pr merge <N> --merge --match-head-commit <SHA>` — pripnutá presne tá hlava, ktorá prešla bránami) po
   splnení OBOCH brán **pre aktuálnu hlavu vetvy**: **CI zelené** + **review kolo uzavreté**. Nikdy nemergovať hneď po pushi opráv len
-  preto, že CI zbehlo skôr než review. Po mergi **návrat na čerstvý `main`** (`git checkout main && git pull`) a **inštalácia mainu**
-  (sekcia Verzia a uzáver) — ďalšia dávka štartuje odtiaľ. Vetvy na GitHube maže repo automaticky. Postup: skill `codex-po-pr`.
+  preto, že CI zbehlo skôr než review. Po mergi **návrat na čerstvý `main`** (`git checkout main && git pull`) a — **keď PR menil
+  plugin alebo je nasadené niečo iné než main** — **inštalácia mainu** (sekcia Verzia a uzáver; hook po mergi to konštatuje) — ďalšia dávka štartuje odtiaľ. Vetvy na GitHube maže repo automaticky. Postup: skill `codex-po-pr`.
 - **Review kolá, opravy z review a pravidlo 3 kôl** — jediný domov: skill `codex-po-pr`.
 - **Výrobná/cenová dávka** a **nový ovládací prvok v UI** — jediné znenie s hranicami a príkladmi: [DEFINICIE § D1](SYSTEM/pravidla/DEFINICIE.md#d1)
   a [§ D5](SYSTEM/pravidla/DEFINICIE.md#d5).
@@ -132,8 +132,10 @@ Keď zásah spadá do viacerých riadkov, platia VŠETKY. **Súbor nad ~50 kB sa
 - **Checklist dokumentačného PR:** odsek navrch „Záznamy dávok" v KRONIKE **áno**; keď PR mení stav bloku, smoke alebo poradie prác, STAV
   **aktualizuje faktický stav v sekcii „Stav"** (verzia a čísla testov sa nemenia) **a prepíše „Robí sa" a „Ďalší krok"**; VERSION ani `?v=` **nie**.
 - **Číslo PR** (všade, kde ho dávka píše — PLAN, KRONIKA, STAV, `DOGFOODING_vyriesene`): pred `gh pr create` sa píše `PR #?`; hneď po
-  vytvorení PR ho doplní samostatný commit, ktorý mení len číslo. Ten **pred mergom skontroluje orchestrátor** (pri čistom kole 1 inak
-  žiadna delta nebeží; keď delta beží, patrí do nej).
+  vytvorení PR ho doplní samostatný commit, ktorý mení len číslo — **skriptom `scripts\otvor_pr.ps1`**, ktorý PR aj ten commit urobí jedným
+  príkazom (kvótová brána, `gh pr create`, nahradenie len na riadkoch pridaných vetvou, commit s `-CoAuthor`, push; `-WhatIf` = suchý beh;
+  použitie v hlavičke skriptu). Ručný postup (`gh pr create`, potom samostatný commit s číslom) ostáva ako záloha. Ten commit **pred mergom
+  skontroluje orchestrátor** (pri čistom kole 1 inak žiadna delta nebeží; keď delta beží, patrí do nej).
 - **Uzáver bloku (vetva `release/<blok>`):** minor bump + `?v=` → hotový blok z `SYSTEM/PLAN.md` plným textom do
   `SYSTEM/archiv/ROADMAP_hotove_etapy.md` (v PLAN ostávajú len nehotové bloky a trvalé pravidlá) → **celý priečinok bloku** do
   `SYSTEM/archiv/bloky/<BLOK>/` + kontrola odkazov → V1_VIZIA, README, STAV, KRONIKA. Skupina „smoke po uzávere" v DOGFOODING je
@@ -141,8 +143,11 @@ Keď zásah spadá do viacerých riadkov, platia VŠETKY. **Súbor nad ~50 kB sa
 - **Priečinok bloku je v repe od štartu bloku:** debata, mockup, packages, briefy a smoke checklist v `SYSTEM/zdroje/bloky/<BLOK>/` — nie
   v `_dev/` ani v chate; počas bloku sú autoritou. Po uzávere sa **celý priečinok fyzicky presúva** do `SYSTEM/archiv/bloky/<BLOK>/`
   s kontrolou odkazov. Existujúce mockupy v `SYSTEM/zdroje/ui20/` sa nepresúvajú.
-- **Po KAŽDOM mergi nainštalovať main** do SketchUpu (`INSTALL_noxun_engine.ps1` z čerstvého `main`) — in-SU runner nasadzuje
-  rozpracovanú vetvu a updater pri rovnakom čísle verzie nič neponúkne.
+- **Po mergi nainštalovať main** do SketchUpu (`INSTALL_noxun_engine.ps1` z čerstvého `main`), **keď PR menil plugin** (`noxun_engine/`, `noxun_engine.rb`)
+  **alebo keď je nasadené niečo iné než main** — in-SU runner, foto okien (`ui_foto.ps1 -Record`) a export test nasadzujú rozpracovanú vetvu a po sebe ju
+  nevracajú, a updater pri rovnakom čísle verzie nič neponúkne. Čo je nasadené, zapisuje `INSTALL_noxun_engine.ps1` do značky `%TEMP%\noxun_nasadene.txt`
+  (vetva, SHA, či bol strom čistý, čas). Pri PR bez zmeny pluginu a s nasadeným mainom (docs, skripty, hooky, testy) inštalácia netreba. Hook
+  `.claude/hooks/po_merge.js` po `gh pr merge` obe podmienky konštatuje („inštalácia mainu je potrebná / nie je potrebná"; pri neznámom stave radšej „potrebná").
 
 ## Špecifikácia a kontext (všetko v tomto repe)
 
@@ -158,9 +163,10 @@ Keď zásah spadá do viacerých riadkov, platia VŠETKY. **Súbor nad ~50 kB sa
 ## Testovanie (záväzné pravidlá)
 
 - **Automatické testy:** headless sada `ruby tests/run_all.rb` beží v GitHub Actions na každý push/PR (lokálne `scripts\run_tests.ps1`,
-  vyžaduje standalone Ruby v `C:\Ruby32-x64`) + **JS sady** — spúšťať KAŽDÚ zvlášť, bash: `for f in tests/js/test_*.js; do node "$f" || exit 1; done`
-  (POZOR: `node tests/js/test_*.js` spustí len PRVÝ súbor, zvyšok sú preň argumenty; CI ich spúšťa všetky — lokálne tiež všetky, nie len
-  test_expr). **Počty testov sa sem nepíšu** — patria do PR a KRONIKY; STAV drží jeden riadok posledného behu.
+  vyžaduje standalone Ruby v `C:\Ruby32-x64`) + **JS sady** — všetky jedným príkazom `powershell -NoProfile -File scripts\run_js_tests.ps1`
+  (spustí každý `tests/js/test_*.js` zvlášť, vypíše `JS: N sad, M PASS, K FAIL`, exit 1 pri zlyhaní; `-FailFast` skončí po prvom pade).
+  POZOR: `node tests/js/test_*.js` spustí len PRVÝ súbor, zvyšok sú preň argumenty — preto skript (CI robí to isté bash slučkou
+  `for f in tests/js/test_*.js; do node "$f" || exit 1; done`). **Počty testov sa sem nepíšu** — patria do PR a KRONIKY; STAV drží jeden riadok posledného behu.
 - **In-SU test je brána mergu** — kedy (spúšťače) a kedy ho na finálnej hlave netreba opakovať: [DEFINICIE § D6](SYSTEM/pravidla/DEFINICIE.md#d6).
   Runner `scripts\run_su_tests.ps1`: deploy → inštancia nad kópiou ENGINEtests.skp → poll → výsledok; overuje geometriu plán↔model a undo
   scenáre; výsledkový grep až PO dobehu (output sa dopisuje).
@@ -192,7 +198,13 @@ Keď zásah spadá do viacerých riadkov, platia VŠETKY. **Súbor nad ~50 kB sa
   **Ukazovateľ kontextu** (od 26.9.2026, `.claude/hooks/context_meter.js`): hlavnému agentovi vloží riadok `Kontext orchestrátora: 612k z 1M (61 %).` pri každej správe Michala
   a po nástroji len pri prechode do vyššieho pásma (50–95 %); subagentov nechá na pokoji. **Od 75 %** zapísať rozpracovaný stav do repa/pamäte a čítanie delegovať
   subagentom; **od 90 %** navrhnúť Michalovi `/compact` na hranici dávky.
+  **Pripomienka po mergi** (od 23.10.2026, `.claude/hooks/po_merge.js`, PostToolUse na Bash s filtrom `gh pr merge`): po `gh pr merge <N>` vloží hlavnému
+  agentovi vecné konštatovanie v dvoch riadkoch: „PR #N menil plugin: áno/nie" (z `gh pr view`) a „Nasadený je <vetva> <sha> (<čas>) → inštalácia mainu
+  je potrebná / nie je potrebná" (zo značky nasadenia a porovnania pluginu s `origin/main`; chýbajúca značka alebo neznámy stav = „potrebná"). Sama nič nespúšťa,
+  pri chybe mlčí a príkaz nikdy neblokuje. Filtruje si príkaz sám (v settings je len matcher Bash, bez poľa `if`); živé spustenie z Claude Code sa overí pri prvom reálnom merge.
 - Interaktívny kanál: MCP `mcp__vbo-sketchup__execute_ruby` (SketchUp 2026 + VBO SkAgent, port 7891); fallback file-bridge (`vbo_sk_agent\bridge\command.rb` → `result.json`, pozor na mtime pascu); overená slučka `-RubyStartup skript + kópia modelu` (vzor v `scripts\run_su_tests.ps1`). Deploy: `INSTALL_noxun_engine.ps1`.
 - **Diagnostika MCP (V0.4.7+):** pri visiacom/zamrznutom porte 7891 spusti `scripts\skagent_doctor.ps1` — zistí držiteľa portu a `/health`, `-Kill` odstráni zamrznutý bridge (živú zákazku ani cez `-Force` nezabije). Dump stavu enginu pre bugcatch: `Noxun::Engine::Debug.report` cez `execute_ruby` (model + výber + stav panela ako read-only JSON, nikdy nezapisuje).
-- **Testuje sa VÝHRADNE v testovacom projekte `_dev\ENGINEtests.skp`** (alebo neuloženom Untitled okne BEZ existujúcich NOXUN korpusov) — v ňom môžu agenti tvoriť/mazať čokoľvek. `_dev/` je gitignorované.
+- **Testuje sa VÝHRADNE v testovacom projekte `_dev\ENGINEtests.skp`** (alebo neuloženom Untitled okne BEZ existujúcich NOXUN korpusov) — v ňom môžu agenti tvoriť/mazať čokoľvek. `_dev/` je gitignorované, preto ho **vo worktree nie je** — skripty (`run_su_tests.ps1`, `ui_foto.ps1`,
+  `export_test.ps1`) model aj zákazku berú z `_dev` aktuálneho checkoutu a keď tam nie je, z **hlavného checkoutu** (`scripts\lib\nx_paths.ps1`); keď chýba aj tam, hláška
+  menuje obe skúšané cesty. `run_su_tests.ps1 -DryRun` len vyhľadá SketchUp a model (nič nespustí).
 - **NIKDY netestovať v okne so zákazkou** — pred testami vždy overiť `model.path`/titul okna (bridge vykonáva príkazy v každom okne, kde je zapnutý — bridge zapínať len v testovacom okne).

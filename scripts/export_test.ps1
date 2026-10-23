@@ -20,7 +20,8 @@
 # exit 2 = iny beh prave bezi (pockaj a spusti znova).
 #
 # Pouzitie: powershell -NoProfile -File scripts\export_test.ps1 [-Base <ref>] [-Model <.skp>] [-KeepWork]
-#   -Model predvolene <repo>\_dev\export_test\zakazka.skp (_dev je gitignorovany).
+#   -Model predvolene <repo>\_dev\export_test\zakazka.skp (_dev je gitignorovany; vo worktree
+#   sa zakazka hlada aj v hlavnom checkoute - scripts\lib\nx_paths.ps1).
 # Vystup: `EXPORT-TEST: P == K` / `EXPORT-TEST: P != K` + zoznam rozdielov + porovnanie
 # viet statusu. Exit 0 = zhodne, 1 = rozdiel alebo chyba behu, 2 = zamok.
 param(
@@ -30,12 +31,17 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
+. (Join-Path (Join-Path $PSScriptRoot 'lib') 'nx_paths.ps1')
 $su = 'C:\Program Files\SketchUp\SketchUp 2026\SketchUp\SketchUp.exe'
 if (-not (Test-Path $su)) { Write-Host "CHYBA: SketchUp nenajdeny: $su"; exit 1 }
 
-if (-not $Model) { $Model = Join-Path $repo '_dev\export_test\zakazka.skp' }
-if (-not (Test-Path -LiteralPath $Model)) {
-  Write-Host "CHYBA: model testovacej zakazky chyba: $Model"
+# Zakazka: _dev\export_test\zakazka.skp tohto checkoutu, vo worktree z hlavneho checkoutu
+# (_dev je gitignorovany - scripts\lib\nx_paths.ps1).
+$zakSeg = @('_dev', 'export_test', 'zakazka.skp')
+if (-not $Model) { $Model = Resolve-NxDevFile $repo $zakSeg }
+if (-not $Model -or -not (Test-Path -LiteralPath $Model)) {
+  if ($Model) { Write-Host "CHYBA: model testovacej zakazky chyba: $Model" }
+  else { Write-Host (Get-NxMissingDevMessage 'model testovacej zakazky' $repo $zakSeg) }
   Write-Host '  Skopiruj tam .skp zakazky, na ktorej sa maju exporty porovnat (priecinok _dev je gitignorovany),'
   Write-Host '  alebo ho zadaj cez -Model <cesta>. Pouzije sa jeho KOPIA, original sa nemeni.'
   exit 1
