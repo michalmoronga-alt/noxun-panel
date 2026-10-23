@@ -18,7 +18,7 @@ packages** — rešeršéri (Antigravity, Grok) a audítor dostanú rovnaké zad
 kanál, súbory, sieť) · UX vzor, pre ktorý existuje CAD precedens (kótovanie, knižnice kovania, nesting, symboly otvárania) · pred
 schválením mockupu.
 **Kedy nie:** fix dávky, docs, čisto dátové dávky bez novej mechaniky (typ A1) · **nikdy v nočných ani iných behoch bez obsluhy**
-(riziko automatickej blokácie Google účtu — rozhodnutie Z8, 26.9.2026); v autonómnom behu bez Michala sa `agy` nespúšťa.
+(riziko automatickej blokácie Google účtu — rozhodnutie Z8, 26.9.2026); v autonómnom behu bez Michala sa `agy` nespúšťa — rešerš vtedy urobí náhradník z tabuľky Náhradníci (WORKFLOW § 2), inak počká na Michala.
 
 **Mandát agenta je úzky:** dostane hotový proposal package + non-goals + 3–7 cielených otázok a odpovedá VÝHRADNE kategóriami
 **ALREADY EXISTS · SIMPLER NATIVE PATH · CAD PRECEDENT · MISSED CONSTRAINT · GOOD CUSTOM SOLUTION · RESEARCH GAP · NO ACTION**.

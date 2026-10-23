@@ -30,9 +30,10 @@ NX_PLAN_MAX_BYTES = 40 * 1024
 # Davka "Docs cleanup C" (26.8.2026) doplnila STANDARD.md a POJMY.md — po
 # reflowe uz ziadny zivy dokument v SYSTEM/ nema vynimku.
 # Davka workflowu (PR B, 26.9.2026) doplnila WORKFLOW.md — mapa workflowu je zivy dokument.
+# Davka P1a (blok 10 · PRAVIDLA, 23.10.2026) doplnila pravidla/DEFINICIE.md — jediny domov definicii.
 NX_SYSTEM_LINE_FILES = %w[
   STAV.md PLAN.md DOGFOODING.md README.md V1_VIZIA.md VEPO_KONTRAKT.md AUDIT_REGISTER.md
-  STANDARD.md POJMY.md WORKFLOW.md
+  STANDARD.md POJMY.md WORKFLOW.md pravidla/DEFINICIE.md
 ].freeze
 NX_SYSTEM_MAX_LINE = 400
 
@@ -527,7 +528,7 @@ end
 NxTest.test('docs: relativne odkazy v navigacnych suboroch ukazuju na existujuce subory') do
   broken = []
   names = %w[CLAUDE.md docs/ARCHITEKTURA.md SYSTEM/README.md SYSTEM/STAV.md SYSTEM/PLAN.md
-             SYSTEM/DOGFOODING.md SYSTEM/V1_VIZIA.md SYSTEM/WORKFLOW.md docs/UI_DIZAJN.md] +
+             SYSTEM/DOGFOODING.md SYSTEM/V1_VIZIA.md SYSTEM/WORKFLOW.md SYSTEM/pravidla/DEFINICIE.md docs/UI_DIZAJN.md] +
           NX_ARCH_FILES.map { |n| "docs/architecture/#{n}" }
   names.each do |name|
     path = File.join(NxTest::ROOT, name)
