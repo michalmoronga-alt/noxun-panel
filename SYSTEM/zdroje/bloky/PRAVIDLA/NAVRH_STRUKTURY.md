@@ -246,10 +246,10 @@ a lacným modelom je lacnejší a nemá pokušenie robiť prácu orchestrátora.
 | G4 | typy agentov = generované zo súborov rolí, všetky s `omitClaudeMd: true` | CI test (rozšírenie `test_agent_definitions.rb`) | rola s cudzími pravidlami, rozsynchronizovanie |
 | G5 | commit/push na `main`, `gh pr merge` bez `--match-head-commit`, runner bez `-CloseWhenDone` | hook PreToolUse (odmietne) | „nesmie sa stať ani raz" |
 | G6 | po `gh pr merge`: poznámka „inštalácia mainu a hodnotenie pre PR #N zatiaľ chýbajú" | hook PostToolUse | zabudnuté retro, inštalácia |
-| G7 | `PR #?` v hlave vetvy pri merge | CI test | zabudnuté číslo PR |
+| G7 | `PR #?` v hlave vetvy pri merge | CI test **len pri udalosti PR** (nie pri pushi vetvy pred PR — tam `PR #?` ešte platí) | zabudnuté číslo PR |
 | G8 | ochrana vetvy `main` na GitHube (len cez PR, CI povinné) | nastavenie GitHubu — **urobí Michal** (❓) | posledná poistka, keby hook zlyhal |
 | G9 | `/doctor prompt-audit` + upratanie pri uzávere bloku | krok uzáveru | spory a mŕtve vety |
-| G10 | implementátor hlási „hotovo" až so zeleným CI pushnutej vetvy (`gh run watch`) | krok v IMPLEMENTATOR + kontrola orchestrátora | chyba na Linuxe zistená až v PR (#467) |
+| G10 | implementátor hlási „hotovo" až so zeleným CI pushnutej vetvy (`gh run watch`); guard G7 (`PR #?`) beží len v kontexte PR po doplnení čísla, inak by každá vetva pred PR bola červená | krok v IMPLEMENTATOR + kontrola orchestrátora | chyba na Linuxe zistená až v PR (#467) |
 | G11 | jeden beh Codexu nad 30 % okna → upozornenie | router / usage-bar | široké zadanie zje okno (Astra 16.10.) |
 
 Zásada: hook je rýchla spätná väzba, **CI je posledná brána** (hooky Groka sú fail-open; hook môže spadnúť).

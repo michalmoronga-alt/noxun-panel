@@ -91,7 +91,7 @@ POSTUP
    - hliadka/POSLEDNE_VYROBA.md — prepíš, 3–8 riadkov: dátum, oblasť, počet nálezov a podozrení, najdôležitejší nález jednou vetou,
      cesta k správe.
    Keď nič nenájdeš, správa „bez nálezov" + čo si skontroloval je tiež platný výsledok.
-6. git add hliadka/ && git commit -m "hliadka výroby <YYYY-MM-DD> <oblasť>: N nálezov" && git push origin claude/hliadka
+6. git add hliadka/ && git commit -m "hliadka výroby <YYYY-MM-DD> <oblasť>: N nálezov" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>" && git push origin claude/hliadka
    (push odmietnutý → git pull --rebase origin claude/hliadka a push znova, najviac 2 pokusy).
 7. Záverečná správa = obsah POSLEDNE_VYROBA.md.
 ```
@@ -115,7 +115,8 @@ ZÁVÄZNÉ PRAVIDLÁ
 
 ROZSAH
 CLAUDE.md, AGENTS.md, SYSTEM/WORKFLOW.md, .claude/agents/*.md, .claude/skills/*/SKILL.md, .claude/settings.json, .claude/hooks/*,
-docs/SKETCHUP_PRAVIDLA.md, docs/DC_PRAVIDLA.md, docs/UI_DIZAJN.md (len §1–§3).
+docs/SKETCHUP_PRAVIDLA.md, docs/DC_PRAVIDLA.md, docs/UI_DIZAJN.md (len §1–§3), SYSTEM/pravidla/** a .claude/rules/** (keď existujú — nové
+zdroje pravidiel z bloku PRAVIDLA).
 
 POSTUP
 1. Vetva: git fetch origin. Ak existuje origin/claude/hliadka: git checkout -B claude/hliadka origin/claude/hliadka && git merge --no-edit
@@ -145,7 +146,7 @@ POSTUP
    - hliadka/NAHLASENE.md — tabuľka (vytvor, ak chýba: | dátum | id | oblasť | kde | veta | stav |); riadok za každý nález so stavom
      „nové", oblasť „pravidlá". Existujúce riadky nemeň.
    - hliadka/POSLEDNE_PRAVIDLA.md — prepíš, 3–8 riadkov: dátum, počet nálezov, najškodlivejší jednou vetou, rast veľkosti, cesta k správe.
-4. git add hliadka/ && git commit -m "strážca pravidiel <YYYY-MM-DD>: N nálezov" && git push origin claude/hliadka
+4. git add hliadka/ && git commit -m "strážca pravidiel <YYYY-MM-DD>: N nálezov" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>" && git push origin claude/hliadka
    (push odmietnutý → git pull --rebase origin claude/hliadka a push znova, najviac 2 pokusy).
 5. Záverečná správa = obsah POSLEDNE_PRAVIDLA.md.
 ```

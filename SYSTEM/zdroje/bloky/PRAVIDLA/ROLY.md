@@ -206,7 +206,8 @@ kód Codexu nekontroluje len Codex · trailer commitu = skutočný model.
 | review PR | ✅ (Codex sám) | ❌ | — | ❌ | ❌ | ❌ | v jadre |
 
 Claude typy agentov štartujú bez CLAUDE.md (`omitClaudeMd`); ich telo skladá skript zo zdrojov v tabuľke (P2). Codex a Grok čítajú AGENTS.md
-sami a kartu roly im orchestrátor menuje v zadaní.
+sami; načítanie pravidiel oblasti podľa ciest (`.claude/rules/`) je len v Claude Code, preto im orchestrátor v zadaní **výslovne menuje**
+kartu roly, `DEFINICIE.md` a súbory pravidiel oblastí, ktorých sa dávka dotkne (rovnako ako NAVRH_STRUKTURY § 2.2).
 
 ## 7 · Router
 
