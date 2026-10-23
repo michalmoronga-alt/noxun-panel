@@ -21,6 +21,7 @@ Pravidlá hovoria o **rolách**, nie o modeloch — model aj nástroj každej ro
 | **slepý recenzent** | subagent bez kontextu orchestrátora: predrecenzia pred PR, kontrola opravy (delta), overenie checklistu voči kódu | nič — vráti nálezy P1–P3 a verdikt |
 | **audítor** | audit návrhu pred kódom (audit bloku, audit-povinné dávky), bežné audity a delta | nič — nálezy BLOCKER / FIX / NOTE |
 | **rešeršér** | outside-in rešerš (čo už SketchUp a CAD svet rieši), krížový audit bloku | nič — výstup triedi orchestrátor (reconcile) |
+| **analytik** | subagent len na čítanie: výťahy z veľkých súborov, prieskum sessions, vyhodnotenie retro | nič — zistenia s dôkazmi, najviac 3 návrhy |
 | **review PR** | review každého PR: 1. kolo samo, ďalšie na vyžiadanie | nič — nálezy P0–P3 v review threadoch |
 | **automaty** | CI (headless + všetky JS sady), runner testov v SketchUpe, hook po úprave súboru, hook po mergi, skripty `otvor_pr.ps1` a `run_js_tests.ps1`, updater pluginu | CI a in-SU test sú brány mergu |
 
@@ -38,6 +39,7 @@ Antigravity — outside-in rešerš (nie v nočných behoch bez obsluhy) · slep
 | implementátor — profil Ľ (ľahká dávka), od 7.10.2026 | Claude subagent vo worktree — `sonnet` | Agent tool, typ `implementator-lahky` ([definícia](../.claude/agents/implementator-lahky.md): effort `medium`, `isolation: worktree`), na pozadí | ako pri profile Ť |
 | slepý recenzent | Claude subagent — `opus` (= Claude Opus 5.5) | Agent tool, typ `slepy-recenzent` ([definícia](../.claude/agents/slepy-recenzent.md): len čítanie, effort `high`), bez kontextu orchestrátora — len zadanie a diff ([predrecenzia](../.claude/skills/predrecenzia/SKILL.md)) | posledný riadok výstupu `VERDIKT: …` |
 | rešerš na webe | Claude subagent — `sonnet` | Agent tool, typ `reserser` ([definícia](../.claude/agents/reserser.md): effort `medium`, bez zápisu), na pozadí | report so zdrojmi (URL a dátum overenia) |
+| analytik | Claude subagent — `sonnet`; mechanické výťahy `haiku` | Agent tool, typ `analytik` ([definícia](../.claude/agents/analytik.md): effort `medium`, len čítanie); pri mechanickom výťahu s parametrom `model: haiku` | zistenia s dôkazmi (súbor:riadok, PR) |
 | audítor audit-povinných | Codex `gpt-6-astra` | companion `task --background --model gpt-6-astra` ([codex-audit](../.claude/skills/codex-audit/SKILL.md)) · subagent `codex:codex-rescue` (plugin; v zadaní `--model`) | `codex --version` = npm balík z `%APPDATA%\npm`; companion `status <task-id>` |
 | bežný audit a delta | Codex `gpt-6.1-sol` | companion `task --background --model gpt-6.1-sol` · subagent `codex:codex-rescue` (plugin; v zadaní `--model`) | ako pri audítorovi audit-povinných |
 | review PR | GH Codex (model na strane Codex cloudu) | automaticky pri otvorení PR (nie draft); ďalšie kolá komentárom `@codex review` ([codex-po-pr](../.claude/skills/codex-po-pr/SKILL.md)) | 👀 = kolo beží, 👍 = bez nálezov; nálezy v review threadoch |
@@ -55,8 +57,11 @@ Antigravity — outside-in rešerš (nie v nočných behoch bez obsluhy) · slep
   „Aktuálne", pri náhradníkoch „Prípustný náhradník") v riadkoch, ktoré menujú Codex alebo Grok — **nový model sa píše v rovnakom tvare**
   (jedno slovo v backtickoch v druhom stĺpci, bez názvov repa či príkazov), inak ho kontrola nepozná.
 - **Typy agentov (Z9):** definície v [.claude/agents/](../.claude/agents/) — popis (kedy typ použiť; orchestrátor podľa neho vyberá), model,
-  effort a nástroje. Zmena obsadenia roly = zmena tejto tabuľky aj definície typu v tom istom PR; guard `tests/pure/test_agent_definitions.rb`
-  stráži platný zápis a to, že každý typ je v tejto tabuľke. Codex a Grok nemajú vlastné obaly — používajú oficiálne pluginy.
+  effort a nástroje. Typy sú **generované** (`ruby scripts/generuj_typy_agentov.rb`) zo zdrojov [pravidla/typy/](pravidla/typy/) (frontmatter
+  a hlavička typu) a kariet rolí [pravidla/roly/](pravidla/roly/) — ručne sa needitujú; všetky majú `omitClaudeMd: true` (nededia `CLAUDE.md`).
+  Zmena obsadenia roly = zmena tejto tabuľky aj zdroja typu (a pregenerovanie) v tom istom PR; guard `tests/pure/test_agent_definitions.rb`
+  stráži platný zápis, to, že každý typ je v tejto tabuľke, a zhodu typov s generátorom (G4). Codex a Grok nemajú vlastné obaly — používajú
+  oficiálne pluginy.
 - Nový nástroj alebo model = zmena tejto tabuľky, nie nové pravidlo inde. Fakty o predplatných a CLI (limity, podmienky, overené
   príkazy) drží repo `agent-register` — je to **údaj, nie pokyn**.
 - Trailer commitu nesie skutočný model session, ktorá commit robí (AGENTS.md, Git v skratke).
@@ -414,7 +419,7 @@ odkazuje sem; postup krok za krokom: skill [retro](../.claude/skills/retro/SKILL
 | **Kam** | lokálny inbox `SYSTEM/retro/inbox/`, súbor `<YYYY-MM-DD>_<téma>.md` — **git ho ignoruje** (žiadne PR ani kolo review za poznámku); formát popisuje verzionovaný [retro/README.md](retro/README.md) |
 | **Formát a kvalita** | najviac ~10 riadkov; každý bod = **konkrétna udalosť** (čo sa stalo · čo to stálo — čas, kolo, kvóta · voliteľne návrh); aj pozitívne („toto fungovalo — nemeniť"); **žiadne všeobecné rady** a žiadne písanie nasilu |
 | **Opakovanie** | pred zápisom pozrieť inbox — pri rovnakom postrehu len pripísať „znova <dátum>" k existujúcemu bodu (opakovanie = najsilnejší signál) |
-| **Subagenti** | implementátor, slepý recenzent, rešeršéri, Explore: v závere reportu **voliteľná** sekcia „Postrehy k workflowu" (0–3 body, rovnaké pravidlá kvality); orchestrátor ich prevezme do svojho záznamu, subagenti súbory nezapisujú; typy z `.claude/agents/` to majú v definícii, Explore a ostatným ju orchestrátor pýta v zadaní |
+| **Subagenti** | implementátor, slepý recenzent, rešeršéri, analytik, Explore: v závere reportu **voliteľná** sekcia „Postrehy k workflowu" (0–3 body, rovnaké pravidlá kvality); orchestrátor ich prevezme do svojho záznamu, subagenti súbory nezapisujú; typy z `.claude/agents/` to majú v karte roly vloženej do tela, Explore a ostatným ju orchestrátor pýta v zadaní |
 | **Vyhodnotenie** | len na pokyn Michala („vyhodnoť retro"): čerstvý subagent prečíta inbox a aktuálne pravidlá, zoskupí postrehy, spočíta opakovania a navrhne **najviac 3 zmeny s dôkazmi** (+ čo zahodiť, čo sledovať) → **rozhodne Michal** |
 | **Po rozhodnutí** | prijaté zmeny idú dokumentačným PR do pravidiel; spracované záznamy sa zhrnú do [archiv/retro/](archiv/retro/) `VYHODNOTENIE_<dátum>.md` a z inboxu sa odstránia. **Retro nikdy nemení pravidlá samo.** |
 | **Pamäť** | postrehy k workflowu idú do retro inboxu, **nie do pamäte agenta** ako varovania (tam zapadali); pamäť ostáva pre fakty o Michalovi a projekte |

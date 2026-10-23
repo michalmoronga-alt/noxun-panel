@@ -64,8 +64,8 @@ NxTest.test('pravidla G1: AGENTS.md, CLAUDE.md, roly, POVINNE_CITANIE a DEFINICI
                 'Pravidlo patri na jedno miesto (rola, skill, .claude/rules/), historia do KRONIKY — nie dalsi text sem.')
 end
 
-NxTest.test('pravidla G1: roly su v SYSTEM/pravidla/roly/ (orchestrator aj implementator)') do
-  %w[ORCHESTRATOR.md IMPLEMENTATOR.md].each do |name|
+NxTest.test('pravidla G1: roly su v SYSTEM/pravidla/roly/ (vsetky karty roli)') do
+  %w[ORCHESTRATOR.md IMPLEMENTATOR.md RECENZENT.md AUDITOR.md RESERSER.md ANALYTIK.md].each do |name|
     path = File.join(NxTest::ROOT, 'SYSTEM', 'pravidla', 'roly', name)
     NxTest.assert(File.exist?(path), "SYSTEM/pravidla/roly/#{name} chyba")
   end

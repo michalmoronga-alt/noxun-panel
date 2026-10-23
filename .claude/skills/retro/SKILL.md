@@ -42,5 +42,5 @@ Pravidlá pokusu: `SYSTEM/WORKFLOW.md` (časť 9 · Retro); formát záznamu: `S
 
 Pri vyhodnotení k 11.10.2026 subagent navyše zhrnie samotný pokus: koľko záznamov vzniklo, koľko návrhov Michal prijal, koľko to stálo
 (čas orchestrátora, kvóta subagentov) a či niektorý prijatý návrh už ušetril kolo či čas. Michal rozhodne: **ponechať, upraviť alebo zrušiť**.
-Pri zrušení sa pravidlá pokusu (WORKFLOW.md časť 9, veta v ORCHESTRATOR.md, sekcia v typoch agentov, tento skill) odstránia dokumentačným PR;
+Pri zrušení sa pravidlá pokusu (WORKFLOW.md časť 9, veta v ORCHESTRATOR.md, sekcia v kartách rolí `SYSTEM/pravidla/roly/` (vložená do typov agentov), tento skill) odstránia dokumentačným PR;
 archív vyhodnotení ostáva.

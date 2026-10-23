@@ -3,8 +3,8 @@
 > Platí pre každú rolu podľa druhu práce (rozcestník: [AGENTS.md](../../AGENTS.md)). Cesty v zátvorkách sú od koreňa repa.
 
 **Nájdi riadok svojho zásahu a uvedené dokumenty si prečítaj PRED prácou.** Je to povinnosť, nie odporúčanie: automaticky sa načíta
-len AGENTS.md (Claude Code cez most `CLAUDE.md` aj ORCHESTRATOR.md); súbor svojej roly čítaj podľa typu agenta alebo zadania —
-architektúra, štandard ani pravidlá kódu sa nenačítajú. Neprečítaný riadok = zásah naslepo.
+len AGENTS.md (hlavné okno Claude Code cez most `CLAUDE.md` aj ORCHESTRATOR.md; typy agentov majú jadro a súbor svojej roly vložené
+v tele, Codexu a Groku ich menuje zadanie) — architektúra, štandard ani pravidlá kódu sa nenačítajú. Neprečítaný riadok = zásah naslepo.
 
 Riadok = **Ideš robiť…** → **Pred prácou POVINNE prečítaj**:
 

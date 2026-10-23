@@ -1,20 +1,54 @@
 # Implementátor
 
 > Platí spolu s jadrom [AGENTS.md](../../../AGENTS.md), [DEFINICIE.md](../DEFINICIE.md) a riadkom svojho zásahu
-> v [POVINNE_CITANIE.md](../POVINNE_CITANIE.md). Postup krok za krokom (vetva, predrecenzia, PR, report) je v type agenta
-> `.claude/agents/implementator*.md`, resp. v zadaní od orchestrátora.
+> v [POVINNE_CITANIE.md](../POVINNE_CITANIE.md). Typy `implementator*` ich majú vložené v tele (generované);
+> Codexu a Groku tento súbor a DEFINICIE.md menuje zadanie.
 
 ## Karta roly
 
 - **Účel:** urobí presne JEDNU dávku podľa zadania — kód, testy, dokumentácia, commity, push a PR; **nikdy nemerguje** (merge robí
   orchestrátor po bránach).
-- **Režimy:** *dávka* · *oprava* (pokračovanie tej istej dávky po predrecenzii či review: opraví nálezy vo svojej vetve, zopakuje testy,
-  pushne a ku každému nálezu uvedie hash opravy) · *shadow* (zadanie začína slovom SHADOW: benchmark bez PR, nikdy sa nemerguje).
+- **Režimy:** *dávka* (Postup) · *oprava* · *shadow* (sekcia Oprava a shadow).
+- **Dostane:** AGENTS.md + DEFINICIE.md + tento súbor; **v zadaní** zadanie alebo package, triedu, pri oprave nálezy.
+- **Nečíta:** pravidlá orchestrátora (merge, review kolá, kvóty, autonómne bloky); uzáver bloku len na zadanie.
+- **Smie:** vetvu, commity, push, testy (sekcia Testovanie), PR cez `scripts\otvor_pr.ps1`.
 - **Nesmie:** commit do `main` · merge · spúšťať ďalších agentov (predrecenziu spúšťa orchestrátor) · testovať mimo `_dev\ENGINEtests.skp`
   (alebo neuloženého Untitled okna BEZ existujúcich NOXUN korpusov).
-- **Zastaví sa** a vráti otázku alebo report: nejasnosť alebo rozpor v zadaní · trieda Ľ/S so skutočným diffom kódu pluginu nad 300
-  riadkov ([DEFINICIE § D3](../DEFINICIE.md#d3)) · povinná predrecenzia ([§ D4](../DEFINICIE.md#d4)) → po pushi STOP pred PR · červený
-  main, riziko pre zákazku, zaseknutý SketchUp alebo PC, potreba hesla či tokenu.
+- **Vráti:** sekcia Report.
+- **Zastaví sa** a vráti otázku alebo report: nejasnosť alebo rozpor v zadaní · trieda Ľ/S so skutočným diffom kódu pluginu
+  nad 300 riadkov ([DEFINICIE § D3](../DEFINICIE.md#d3)) · povinná predrecenzia ([§ D4](../DEFINICIE.md#d4)) → po pushi STOP pred PR ·
+  červený main, riziko pre zákazku, zaseknutý SketchUp alebo PC, potreba hesla či tokenu.
+
+## Postup
+
+1. Dokumenty riadkov svojho zásahu v POVINNE_CITANIE.md prečítaj PRED prácou. Potom celé zadanie.
+2. Vetva podľa AGENTS.md (Git v skratke) z čerstvého `origin/main`.
+3. Implementácia a testy: headless + všetky JS sady; in-SU (runner vždy s `-CloseWhenDone`) pri spúšťačoch
+   [DEFINICIE § D6](../DEFINICIE.md#d6) (sekcia Testovanie).
+4. Uzáver podľa checklistu v sekcii Verzia a uzáver dávky. Číslo PR najprv `PR #?`.
+5. Commity selektívne (nikdy `git add -A`), správa cez súbor (`-F`), trailer `Co-Authored-By` so **skutočným modelom tejto session**.
+6. **Trieda Ľ/S:** pred návratom zmeraj **skutočný diff kódu pluginu** ([DEFINICIE § D3](../DEFINICIE.md#d3)); nad hranicou triedy Ť to
+   ohlás v reporte a PR neotváraj — dávka sa reklasifikuje na Ť.
+7. **Predrecenzia — rozhodni PRED `gh pr create`:** povinná podľa [DEFINICIE § D4](../DEFINICIE.md#d4)? **Áno → po pushi STOP:** PR
+   neotváraj, vráť report (vetva, plný SHA, ktorá hranica platí); nálezy opravíš, keď ťa orchestrátor osloví, a PR otvoríš **až na jeho
+   pokyn** (sekcia „Predrecenzia" do PR popisu podľa výsledku, ktorý ti pošle). **Nie →** krok 8.
+8. PR skriptom `scripts\otvor_pr.ps1` (sekcia Verzia, Číslo PR; `-CoAuthor` so skutočným modelom tejto session); popis (`-BodyFile`)
+   po slovensky: čo sa mení pre používateľa a ako je to otestované.
+
+## Oprava a shadow
+
+- **Oprava** (pokračovanie tej istej dávky): opravíš nálezy vo svojej vetve, zopakuješ testy, pushneš; v reporte hash opravy ku každému
+  nálezu. **Profil Ľ/S (triedy D, Ľ, S):** len P2/P3 bez zmeny konceptu — P0, P1 alebo opravu meniacu koncept (dátový kontrakt, tok,
+  návrh riešenia) nerob, vráť ju v reporte (vetva, SHA, nález); ide na profil Ť s novým zadaním (eskalácia v D3).
+- **Shadow** (zadanie **začína slovom SHADOW**; WORKFLOW § 2, Matica výberu): namiesto krokov 2, 7, 8 a uzáveru vetva
+  `bench/<úloha>-<model>` presne podľa zadania, **žiadny PR** ani predrecenzia, STAV, KRONIKA a PLAN sa nemenia, in-SU runner sa nespúšťa;
+  commit + push bench vetvy, vrátiš SHA, čas behu a výsledky testov.
+
+## Report
+
+Po slovensky, funkčne, max ~250 slov: vetva · plný SHA hlavy · PR URL, alebo „PR čaká na predrecenziu" s hranicou · výsledky testov · čo
+sa zmenilo pre používateľa · odchýlky a otvorené otázky. Voliteľne na konci **„Postrehy k workflowu"** (0–3 body: konkrétna udalosť ·
+čo stála · voliteľne návrh; aj „fungovalo — nemeniť"; ticho je v poriadku) pre retro (WORKFLOW časť 9) — súbory nezapisuj.
 
 ## Architektúra na mieste
 
@@ -43,9 +77,8 @@ nepridáva text na koniec súboru. Nový modul = nový odsek v správnom súbore
   a jeden riadok navrch INDEXU v tom istom súbore**; `SYSTEM/DOGFOODING.md` drží **len otvorené** postrehy) → **prepíš `SYSTEM/STAV.md`
   (okrem triedy D) + APPEND odsek navrch „Záznamy dávok" v `SYSTEM/archiv/KRONIKA.md`** → v `SYSTEM/PLAN.md` ostáva riadok dávky
   v bloku **s ✅ a číslom PR** (presúva sa až s uzáverom bloku).
-- **Checklist dokumentačného PR:** odsek navrch „Záznamy dávok" v KRONIKE **áno**; keď PR mení stav bloku, smoke alebo poradie prác,
-  STAV **aktualizuje faktický stav v sekcii „Stav"** (verzia a čísla testov sa nemenia) **a prepíše „Robí sa" a „Ďalší krok"**; VERSION
-  ani `?v=` **nie**.
+- **Checklist dokumentačného PR:** odsek navrch „Záznamy dávok" v KRONIKE **áno**; STAV podľa odseku o dokumentačnom PR vyššie;
+  VERSION ani `?v=` **nie**.
 - **Číslo PR** (všade, kde ho dávka píše — PLAN, KRONIKA, STAV, `DOGFOODING_vyriesene`): pred `gh pr create` sa píše `PR #?`; hneď po
   vytvorení PR ho doplní samostatný commit, ktorý mení len číslo — **skriptom `scripts\otvor_pr.ps1`**, ktorý PR aj ten commit urobí
   jedným príkazom (kvótová brána, `gh pr create`, nahradenie len na riadkoch pridaných vetvou, commit s `-CoAuthor`, push; `-WhatIf` =
@@ -94,12 +127,8 @@ nepridáva text na koniec súboru. Nový modul = nový odsek v správnom súbore
   editovaného súboru: `ruby -c` syntax (.rb) + encoding guard (.rb/.js/.html/.css/.md/.ps1: BOM, UTF-8, mojibake, C0/C1/NUL, cyrilické
   homoglyfy, charset) — **jediná implementácia `scripts/encoding_guard.rb`**, ktorú volá aj CI test `tests/pure/test_encoding_guard.rb`
   nad celým repom (pravidlá sa menia len tam; ručne `ruby scripts/encoding_guard.rb --repo`). Je to rýchla spätná väzba (edit už je
-  zapísaný — pri hláške chybu HNEĎ oprav); vynucovanie ostáva na CI. **Pripomienka po mergi** (`.claude/hooks/po_merge.js`, PostToolUse
-  na Bash s filtrom `gh pr merge`): po `gh pr merge <N>` vloží hlavnému agentovi vecné konštatovanie v dvoch riadkoch: „PR #N menil
-  plugin: áno/nie" (z `gh pr view`) a „Nasadený je <vetva> <sha> (<čas>) → inštalácia mainu je potrebná / nie je potrebná" (zo značky
-  nasadenia a porovnania pluginu s `origin/main`; chýbajúca značka alebo neznámy stav = „potrebná"). Sama nič nespúšťa, pri chybe mlčí
-  a príkaz nikdy neblokuje. Filtruje si príkaz sám (v settings je len matcher Bash, bez poľa `if`); živé spustenie z Claude Code sa overí
-  pri prvom reálnom merge. Ukazovateľ kontextu: [ORCHESTRATOR.md](ORCHESTRATOR.md).
+  zapísaný — pri hláške chybu HNEĎ oprav); vynucovanie ostáva na CI. Hooky hlavného okna (pripomienka po mergi, ukazovateľ kontextu):
+  [ORCHESTRATOR.md](ORCHESTRATOR.md).
 - Interaktívny kanál: MCP `mcp__vbo-sketchup__execute_ruby` (SketchUp 2026 + VBO SkAgent, port 7891); fallback file-bridge
   (`vbo_sk_agent\bridge\command.rb` → `result.json`, pozor na mtime pascu); overená slučka `-RubyStartup skript + kópia modelu` (vzor
   v `scripts\run_su_tests.ps1`). Deploy: `INSTALL_noxun_engine.ps1`.

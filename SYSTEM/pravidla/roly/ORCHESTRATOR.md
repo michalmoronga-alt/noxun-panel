@@ -8,18 +8,26 @@ Hlavné okno je orchestrátor — hovorí s Michalom, deleguje; kód pluginu a t
 ## Karta roly
 
 - **Účel:** drží kontext bloku, rozhodnutia a merge; prácu deleguje (sekcia Delegovanie a merge).
-- **Vráti Michalovi:** report a otázky (sekcia Autonómne bloky). **Zastaví sa:** podľa tabuľky „Keď Michal neodpovie" nižšie.
+- **Režimy:** *hlavný* (Claude, hlavné okno) · *záložný* (Codex interaktívne, keď Michal pri výpadku alebo limite Claude prejde doň:
+  smie pokračovať v rozpracovaných dávkach Ľ/S a docs a mergovať ich po bránach; **dávky Ť, výrobné/cenové a uzáver bloku nemerguje** —
+  čakajú na Claude, pokiaľ to Michal v konkrétnom prípade výslovne nepovolí).
+- **Dostane automaticky:** most `CLAUDE.md` = AGENTS.md + tento súbor (záložný: AGENTS.md sám, tento súbor na pokyn Michala).
+  **V zadaní:** pokyn Michala.
 - **Povinné čítanie:** pri plánovaní, zadaní a package riadky „novú dávku · plánovanie · zadanie" (aj „podobná funkcia už bola")
   a pri zmene pravidiel „workflow · pravidlá práce · skilly" v [POVINNE_CITANIE.md](../POVINNE_CITANIE.md) + jeho rozpočet čítania
   (keď by bolo viac, výťah alebo presné kotvy do briefu).
+- **Smie:** plánovať, písať zadania a packages, spúšťať ostatné roly, triediť nálezy, mergovať po bránach, inštalovať main.
+- **Nesmie:** písať kód pluginu a testy (deleguje) · mergovať bez brán · meniť obsadenie rolí (mení Michal).
+- **Vráti Michalovi:** report a otázky (sekcia Autonómne bloky). **Zastaví sa:** podľa tabuľky „Keď Michal neodpovie" nižšie.
 
 ## Roly a modely
 
 - Pravidlá v jadre, v súboroch rolí a v skilloch hovoria o **rolách**: **orchestrátor** (hlavné okno), **implementátor**, **slepý
-  recenzent**, **audítor**, **rešeršér** a **review PR**. Čo ktorá rola robí a rozhoduje: [WORKFLOW.md](../../WORKFLOW.md).
+  recenzent**, **audítor**, **rešeršér**, **analytik** a **review PR** (karty v `SYSTEM/pravidla/roly/`). Čo ktorá rola robí a rozhoduje: [WORKFLOW.md](../../WORKFLOW.md).
 - **Ktorý model a nástroj hrá ktorú rolu, určuje Michal** (benchmarky, limity, cena). Aktuálne obsadenie aj príkazy volania sú v JEDINEJ
   tabuľke **„Obsadenie rolí"** vo WORKFLOW.md — mení ju Michal; inde sa model ani príkaz volania neopakuje. Výnimka: **typy subagentov**
-  v `.claude/agents/` nesú model a effort svojej roly — menia sa spolu s tabuľkou v tom istom PR. Pravidlá sa píšu nezávisle
+  v `.claude/agents/` nesú model a effort svojej roly — menia sa spolu s tabuľkou v tom istom PR (zdroj v `SYSTEM/pravidla/typy/`,
+  potom `ruby scripts/generuj_typy_agentov.rb`). Pravidlá sa píšu nezávisle
   od nástroja (možný budúci prechod mimo Claude Code).
 - **Výber profilu implementátora:** orchestrátor pri KAŽDEJ dávke určí **triedu** (definície tried, prednosť, reklasifikácia a eskalácia:
   [DEFINICIE § D3](../DEFINICIE.md#d3)) a spustí **profil** (typ agenta) podľa nej. Mapovanie trieda → profil, shadow a povýšenie:
@@ -46,8 +54,11 @@ Hlavné okno je orchestrátor — hovorí s Michalom, deleguje; kód pluginu a t
 `noxun_engine.rb`) **alebo keď je nasadené niečo iné než main** — in-SU runner, foto okien (`ui_foto.ps1 -Record`) a export test nasadzujú
 rozpracovanú vetvu a po sebe ju nevracajú, a updater pri rovnakom čísle verzie nič neponúkne. Čo je nasadené, zapisuje
 `INSTALL_noxun_engine.ps1` do značky `%TEMP%\noxun_nasadene.txt` (vetva, SHA, či bol strom čistý, čas). Pri PR bez zmeny pluginu
-a s nasadeným mainom (docs, skripty, hooky, testy) inštalácia netreba. Hook `.claude/hooks/po_merge.js` po `gh pr merge` obe podmienky
-konštatuje („inštalácia mainu je potrebná / nie je potrebná"; pri neznámom stave radšej „potrebná").
+a s nasadeným mainom (docs, skripty, hooky, testy) inštalácia netreba. **Pripomienka po mergi** (`.claude/hooks/po_merge.js`, PostToolUse
+na Bash s filtrom `gh pr merge`): po `gh pr merge <N>` vloží hlavnému agentovi vecné konštatovanie v dvoch riadkoch: „PR #N menil plugin:
+áno/nie" (z `gh pr view`) a „Nasadený je <vetva> <sha> (<čas>) → inštalácia mainu je potrebná / nie je potrebná" (zo značky nasadenia
+a porovnania pluginu s `origin/main`; chýbajúca značka alebo neznámy stav = „potrebná"). Sama nič nespúšťa, pri chybe mlčí a príkaz nikdy
+neblokuje. Filtruje si príkaz sám (v settings je len matcher Bash, bez poľa `if`); živé spustenie z Claude Code sa overí pri prvom reálnom merge.
 
 ## Review, audit a predrecenzia
 
@@ -104,7 +115,7 @@ typu „predplatné v cudzom programe" (bany) · orchestrátor beží **interakt
 
 | Situácia | Reakcia |
 |---|---|
-| P0/P1 v review | oprava + nové plné GH kolo; ak oprava mení koncept → PR zavrieť a rozdeliť (postup: skill `codex-po-pr`) |
+| P0/P1 v review | oprava + nové plné GH kolo; pri zmene konceptu opravu robí nový implementátor s novým zadaním; zatvoriť a rozdeliť až podľa pravidla 3 kôl (skill `codex-po-pr`) |
 | in-SU test zlyhá | nemergovať; najviac 2 pokusy o opravu, potom dávka čaká a ide do reportu; test nikdy neobchádzať |
 | Codex kvóta pod prahom | podľa skillu `usage`, sekcia „Prahy a reakcie" (kým Michal neodpovie, dávka, o ktorej rozhoduje, čaká a pokračuje sa ďalšou nezávislou) |
 | nejasnosť v zadaní | otázka do chatu; kým neodpovie, bezpečnejšia vratná voľba len ak nemení dáta ani výrobné/cenové čísla — označiť v PR aj reporte; inak dávka čaká |
