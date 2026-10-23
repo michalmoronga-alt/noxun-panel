@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **P4a · DROBNOSTI WORKFLOWU (23.10.2026, PR #?, blok 10 · PRAVIDLA, trieda S — nové skripty, hook, úpravy pravidiel a testy; kód pluginu, VERSION, `?v=` ani STAV
+- **P4a · DROBNOSTI WORKFLOWU (23.10.2026, PR #479, blok 10 · PRAVIDLA, trieda S — nové skripty, hook, úpravy pravidiel a testy; kód pluginu, VERSION, `?v=` ani STAV
   bez zmeny).** Štyri drobnosti z retro záznamov, ktoré šetria čas každej ďalšej dávke. (1) `scripts\run_js_tests.ps1` spustí všetky JS sady jedným príkazom (každú
   `tests/js/test_*.js` zvlášť, súhrn `JS: N sad, M PASS, K FAIL`, exit 1 pri zlyhaní; predvolene beží do konca, `-FailFast` skončí po prvom páde — CI ostáva pri bash
   slučke). (2) Testovací model a zákazka na export test sa vo worktree berú z hlavného checkoutu: `Resolve-NxTestModel` sa presunul z `ui_foto.ps1` do spoločného
