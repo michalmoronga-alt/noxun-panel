@@ -252,7 +252,9 @@ súbory nezapisuj.
 - **Číslo PR** (všade, kde ho dávka píše — PLAN, KRONIKA, STAV, `DOGFOODING_vyriesene`): pred `gh pr create` sa píše `PR #?`; hneď po
   vytvorení PR ho doplní samostatný commit, ktorý mení len číslo — **skriptom `scripts\otvor_pr.ps1`**, ktorý PR aj ten commit urobí
   jedným príkazom (kvótová brána, `gh pr create`, nahradenie len na riadkoch pridaných vetvou, commit s `-CoAuthor`, push; `-WhatIf` =
-  suchý beh; použitie v hlavičke skriptu). Ručný postup (`gh pr create`, potom samostatný commit s číslom) ostáva ako záloha.
+  suchý beh; použitie v hlavičke skriptu). Ručný postup ostáva ako záloha, s tou istou bránou: najprv
+  `& ".claude\skills\usage\usage.ps1" -Label "<dávka>" -Phase before -Gate codex` — **exit 3 aj neznámy stav kvóty (exit 2/4) = `gh pr create
+  --draft`** (inak bez `--draft`; `--body-file`), potom samostatný commit s číslom PR a push.
 
 > **Vložená sekcia `testovanie` zo súboru `SYSTEM/pravidla/roly/IMPLEMENTATOR.md`** (odkazy v nej sú relatívne k tomu súboru).
 
