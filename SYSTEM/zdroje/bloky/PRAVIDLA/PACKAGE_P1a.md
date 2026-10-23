@@ -51,9 +51,13 @@ Dávka, ktorá mení **rozmery alebo počty dielov, hrany, kusovník, VEPO, nák
 Dávka, ktorá mení **dátový kontrakt, schému, migráciu, observer/undo lifecycle** alebo pridáva **nový modul**. Rozhoduje obsah zásahu, nie
 žáner dávky (aj „fix" observera je audit-povinný). **Zmena schémy = každé zvýšenie `CONFIG_SCHEMA`, BuildPlan `SCHEMA` alebo STD.**
 Nová plocha SketchUp API sama osebe audit-povinná nie je — spúšťa outside-in rešerš (skill `antigravity-outside-in`).
+Pre audit-povinnú dávku je **pred implementáciou povinný audit návrhu** (skill `codex-audit`); pred odoslaním orchestrátor overí kľúčové
+tvrdenia package krátkou sondou na kóde bez zápisu do modelu a výsledok zapíše do package (skill `codex-audit`, krok 0). Keď Codex nie je
+k dispozícii, platia náhradné brány skillu `usage`. Ostatné dávky audit návrhu nevyžadujú.
 
 ## D3 · Triedy dávok
-Triedu určí orchestrátor pri zadaní; platí **najvyššia** trieda, do ktorej dávka spadá (**Ť > S > Ľ > D**).
+Triedu určí orchestrátor pri zadaní; platí **najvyššia** trieda, do ktorej dávka spadá (**Ť > S > Ľ**). **D je užší prípad Ľ:** dávka, ktorá
+spĺňa definíciu D a nespĺňa kritérium S ani Ť, je D (nie Ľ).
 - **D drobnosť:** oprava komentára, vety alebo textu bez zmeny správania a bez zmeny čísel. Profil ľahký · STAV sa neprepisuje (len záznam
   v KRONIKE), aj keď sa kvôli zmene súboru pluginu zvyšuje patch verzia · review len kolo 1.
 - **Ľ ľahká:** docs, texty, preklady, ikony, rozloženie, mechanické presuny, testy, presné zadanie bez vlastného rozhodovania.
@@ -61,7 +65,7 @@ Triedu určí orchestrátor pri zadaní; platí **najvyššia** trieda, do ktore
 - **Ť ťažká:** audit-povinná (D2), výrobná/cenová (D1), nad 300 riadkov kódu pluginu, oprava P0/P1.
 - **Riadky kódu pluginu** sa vždy počítajú **bez testov a dokumentácie**. Hranica pri zadaní je odhad; implementátor Ľ/S pred návratom zmeria
   skutočný diff a keď je nad 300, ohlási to — dávka sa reklasifikuje na Ť.
-- **Eskalácia:** nález P0 alebo P1, alebo oprava meniaca koncept v dávke Ľ/S → opravu robí profil Ť s novým zadaním (nie pokračovanie).
+- **Eskalácia:** nález P0 alebo P1, alebo oprava meniaca koncept v dávke D/Ľ/S → opravu robí profil Ť s novým zadaním (nie pokračovanie).
   Pokračovaním sa opravujú len P2/P3, ktoré nemenia koncept.
 - Profil (typ agenta, model) ku každej triede určuje tabuľka obsadenia — tu sa model nepíše.
 
@@ -72,6 +76,8 @@ Slepá predrecenzia pred PR (skill `predrecenzia`) je **povinná** pri dávke:
 - Pri dávke **Ť** sa pridá druhý slepý recenzent **iného providera než implementátor**.
 - **Odporúčaná** (nie povinná): nová interakcia v UI bez nového ovládacieho prvku (klávesnica, fokus, prepnutie dokumentu).
 - **Nie:** dokumentačná dávka (docs-only) a trieda D.
+- Slepý recenzent dostane len zadanie a `git diff main...HEAD`; jeho P1/P2 sa opravia ešte pred PR a výsledok ide do PR popisu (sekcia
+  „Predrecenzia"). Predrecenzia nenahrádza audit návrhu (`codex-audit`) ani review PR (`codex-po-pr`).
 
 ## D5 · Nový ovládací prvok v UI
 - **Áno:** nové tlačidlo, prepínač, pole, rozbaľovačka alebo položka menu, ktorá niečo **spúšťa alebo zapisuje** (model, súbor, nastavenia, katalóg).
@@ -85,6 +91,11 @@ Slepá predrecenzia pred PR (skill `predrecenzia`) je **povinná** pri dávke:
   dokumentáciu alebo testy; PR uvedie, na ktorej hlave in-SU bežal a čo sa zmenilo potom. Pri akejkoľvek zmene Ruby spúšťača beh znova.
 - Ako sa runner spúšťa (`-CloseWhenDone`, zámok, ENGINEtests): CLAUDE.md, sekcia Testovanie.
 ```
+
+**Audit znenia § 2 (Codex `gpt-6.1-sol`, 23.10.2026, úzke zadanie):** 1 BLOCKER + 5 FIX. Prijaté a zapracované vyššie: B1 (D nedosiahnuteľná pri
+prednosti → D ako užší prípad Ľ), F3 (povinnosť auditu v D2), F4 (slepota a uzavretie predrecenzie v D4), F5 (sonda pred auditom v D2), F6 (eskalácia
+aj z D). **Zamietnuté F2** (druhý recenzent pri Ť a recenzent Claude pri kóde iného providera „bez opory"): audit porovnával len s CLAUDE.md —
+prvé schválil Michal 19.10. (NAVRH § 9, otázka 4a), druhé platí vo WORKFLOW § 2 Náhradníci.
 
 ## 3 · D7 a D8 — jediný domov v skille
 
