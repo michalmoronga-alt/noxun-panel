@@ -17,6 +17,12 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **ŠTART BLOKU 10 · PRAVIDLA (23.10.2026, PR #477, dokumentačné PR — kód pluginu a VERSION bez zmeny).** Michal 17.10. zadal prestavbu pravidiel pre agentov (univerzálne
+  `AGENTS.md`, pravidlá podľa roly, menej kontextu, ochrana proti „pretekaniu", retro, hodnotenie modelov a router). Do repa ide priečinok `SYSTEM/zdroje/bloky/PRAVIDLA/`:
+  zadanie, surová rešerš (Grok, Codex), prieskum 18 sessions, návrh štruktúry (vrstvy pravidiel, roly, stráže G1–G11, dávky P0–P6), karty rolí a typy úloh (`ROLY.md`),
+  súpis kópií definícií s 10 rozpormi (package P1a s auditom znenia je pripravený a ide s PR dávky). Rozhodnutia Michala 19.–23.10. sú v rámčekoch „platí". Blok je v PLAN ako 10, STAV prepísal „Robí sa"
+  a „Ďalší krok"; smoke bloku 9 naďalej čaká. Nahradený text STAV: „Nič — blok 9 je uzavretý, ďalší blok určí Michal".
+
 - **STRÁŽ `agy` V PRIEČINKU BEHU (23.10.2026, PR #476, trieda Ľ — skripty, skill a agent, kód pluginu a VERSION bez zmeny).** Globálny deny zoznam v `~/.gemini/config/config.json` (PR #475) je zdieľaný s Antigravity IDE
   a zakázal by jeho agentovi terminál aj súbory, preto sa z configu odstránil. Náhrada: `scripts/agy/hooks.json` + `len_web.ps1` — hook PreToolUse z `.agents/` v priečinku behu pustí len `search_web` a `read_url_content`,
   ostatné zamietne (overené orchestrátorom 23.10., agy 1.4.5: zamietnutý `run_command` aj `read_file`, výstup 862 B so zdrojom). Agent `agy-reserser` a beh na pozadí v skille stráž kopírujú do `$R/.agents/`,

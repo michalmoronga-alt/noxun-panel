@@ -25,6 +25,22 @@ odkazom v STAV a KRONIKE neprečíslúvajú:
   [výsledok a smoke checklist](archiv/HARDENING_ZAVER_2026-10-11.md), [priečinok](archiv/bloky/HARDENING/); **smoke čaká na Michala**).
 - **4 · V1 DOTIAHNUTIE** a **6 · INFRA** — formálne uzavreté 1.10.2026 dávkou H1 (**V1 hotové**; blok 6 = updater D-52, v0.9.14). Otvorené zvyšky sú v zásobníku nižšie.
 
+### 10 · PRAVIDLA (pravidlá a workflow agentov)
+
+**Cieľ:** univerzálne `AGENTS.md`, každá rola dostane len svoje pravidlá, jedna definícia = jeden domov, čo sa nesmie stať ani raz stráži stroj,
+retro spojené s hodnotením modelov a router. **Kód pluginu sa nemení** — meta-blok beží popri čakajúcom smoke bloku 9 (Michal 22.10.2026: „pokračuj").
+Priečinok [zdroje/bloky/PRAVIDLA/](zdroje/bloky/PRAVIDLA/) — zadanie, návrh štruktúry, karty rolí, súpis kópií definícií, packages.
+
+- ✅ Rešerš agy už nekončí prázdna — oprava postupu (PR #475) a stráž v priečinku behu (PR #476).
+- **P1a** definície na jednom mieste (`SYSTEM/pravidla/DEFINICIE.md` + guard, rozpory R1–R10) — package hotový, audit znenia zapracovaný.
+- **P4a** drobnosti: JS testy jedným príkazom · runner berie ENGINEtests z hlavného checkoutu · `otvor_pr.ps1` (kvóta + PR + číslo PR) · pripomienka po mergi.
+- **P1b** jadro `AGENTS.md` + most `CLAUDE.md` + `ORCHESTRATOR.md` + strop veľkosti.
+- **P2** roly — karty rolí, generované typy agentov, rola analytik, jedna tabuľka obsadenia.
+- **P3** pravidlá oblastí (`.claude/rules/`) + skilly `uzaver-bloku` a `smoke`.
+- **P4** stroje — hooky (commit do main, merge bez pripnutej hlavy, runner bez `-CloseWhenDone`), guardy, `rozpracovane.ps1`, karta priebehu.
+- **P5** hodnotenia po úlohách + karty modelov + router v0 · vyhodnotenie pilotu nočnej hliadky pred 5.11.2026.
+- **P6** uzáver bloku + smoke pravidiel.
+
 ### 3 · STABILITA
 
 **Cieľ:** synchronizácia panela s modelom a okrajové situácie observerov. *(D-101 — panel po Späť/Znova — je vyriešená, PR #162.)*
