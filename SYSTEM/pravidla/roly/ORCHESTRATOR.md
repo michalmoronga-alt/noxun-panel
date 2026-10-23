@@ -131,6 +131,7 @@ typu „predplatné v cudzom programe" (bany) · orchestrátor beží **interakt
 - **Uzáver pri plnom kontexte:** keď má orchestrátor pred uzáverom viac ako ~70 % kontextu, uzáver poskladá **čerstvý subagent len
   z repa** (PLAN, KRONIKA, DOGFOODING, PR); orchestrátor ho skontroluje a zmerguje. Čo subagent v repe nenájde, žilo len v chate.
 - **Chat nie je úložisko:** rozhodnutia, checklisty a zadania idú hneď do repa alebo pamäte — po kompresii kontextu z chatu miznú.
+  **Pamäť (auto-pamäť projektu) drží len odkazy a fakty** o Michalovi a projekte, nie pravidlá rolí — môže sa dostať aj do subagentov.
 
 <a id="uzaver-bloku"></a>
 

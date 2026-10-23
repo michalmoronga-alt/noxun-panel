@@ -11,7 +11,18 @@
 - Čo odstráni: **všetky** úrovne CLAUDE.md — používateľský `~/.claude/CLAUDE.md`, projektový (aj nadradené priečinky) a lokálny. Ostane:
   vlastné telo typu (systémový prompt), zadanie, git status, prednačítané skilly (`skills:`); `CLAUDE.md` podpriečinka a pravidlá
   `.claude/rules/` s `paths:` sa načítajú, až keď subagent pracuje so súbormi tam (repo dnes žiadny vnorený CLAUDE.md nemá).
-  Pamäť hlavného okna (MEMORY.md) subagent nedostával ani predtým.
+
+**Známe obmedzenie — auto-pamäť projektu** (`~/.claude/projects/<projekt>/memory/MEMORY.md`, zdieľaná všetkými worktree repa):
+- Docs tvrdia, že ju non-fork subagent **nedostáva** (code.claude.com/docs/en/sub-agents, „What loads at startup": *Auto memory … isn't
+  loaded*; code.claude.com/docs/en/memory, sekcia o subagentoch) — overené čítaním 23.10.2026.
+- **Pozorovanie v tejto session to vyvracia:** implementátor P2 (typ `implementator` spred P2, bez `omitClaudeMd`, Claude Code 2.1.301
+  v desktop aplikácii) mal v úvodnom kontexte celý `MEMORY.md` projektu (index handoffov a pamätí). Prečo (harness desktop aplikácie
+  alebo nepresné docs), **neoverené**.
+- **Či ju `omitClaudeMd: true` odstráni, NEOVERENÉ** — docs pole opisujú len pre CLAUDE.md. Vlastné pole typu na vypnutie auto-pamäte
+  **neexistuje** (pole `memory` dáva typu jeho *vlastnú* pamäť; vypnúť sa dá len globálne `autoMemoryEnabled: false` alebo
+  `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` — vyplo by to pamäť aj hlavnému oknu).
+- Dôsledok: pamäť musí držať **len odkazy a fakty**, nie pravidlá rolí (veta v ORCHESTRATOR.md, Autonómne bloky). Smoke po mergi
+  (PACKAGE_P2 § 3 bod 5) to overí otázkou na obsah MEMORY.md.
 
 ## Predtým (main po P1b) — spoločné pre všetky typy
 
@@ -23,8 +34,9 @@ Každý Claude typ dedil celú hierarchiu CLAUDE.md, ktorú vidí hlavné okno, 
 | `CLAUDE.md` hlavného checkoutu `C:\APP DEV\RUBY\ENGINE` | nadradený priečinok worktree — **iná vetva, dnes ešte starý 35 kB CLAUDE.md spred P1b** | 35 080 |
 | `C:\APP DEV\RUBY\CLAUDE.md` | mapa workspace (ostatné pluginy) | 5 962 |
 | `~/.claude/CLAUDE.md` | Michalove globálne pokyny (slovenčina, tykanie, funkčné vysvetľovanie) | 1 408 |
+| auto-pamäť `MEMORY.md` projektu | index handoffov a pamätí (pozorované v tejto session, docs tvrdia opak — známe obmedzenie vyššie) | 5 036 |
 
-Spolu ~61 kB pravidiel pred prvým slovom zadania — z toho dve rôzne verzie pravidiel orchestrátora. Typy implementátorov a recenzenta navyše
+Spolu ~61 kB pravidiel (+ 5 kB pamäte) pred prvým slovom zadania — z toho dve rôzne verzie pravidiel orchestrátora. Typy implementátorov a recenzenta navyše
 v kroku 1 **samy čítali** DEFINICIE.md (6,7 kB) a IMPLEMENTATOR.md (12,4 kB).
 
 ## Teraz (po P2) — každý typ zvlášť
