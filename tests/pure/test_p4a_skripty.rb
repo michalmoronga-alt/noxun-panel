@@ -455,6 +455,34 @@ NxTest.test('p4a: INSTALL_noxun_engine.ps1 zapise znacku nasadenia (vetva, SHA, 
     NxTest.assert(st.success?, "installer: #{out}")
     kv = File.binread(marker).force_encoding('UTF-8').lines.map { |l| l.chomp.split('=', 2) }.to_h
     NxTest.assert_equal('no', kv['clean'], 'spinavy strom = clean=no')
+    # zapis znacky zlyha (priecinok znacky neexistuje) -> instalacia prejde, POZOR, exit 0, plugin je nasadeny
+    bad_marker = File.join(root, 'neexistuje', 'dalej', 'znacka.txt')
+    FileUtils.rm_rf(dest)
+    out, st = NxP4a.ps_file(script, env: tmp_env.merge('NOXUN_DEPLOY_MARKER' => bad_marker))
+    NxTest.assert(st.success?, "zlyhany zapis znacky nezhodi instalaciu (#{out})")
+    NxTest.assert(out.include?('POZOR: znacku nasadenia sa nepodarilo zapisat'), "vypis POZOR (#{out})")
+    NxTest.assert(File.exist?(File.join(dest, 'noxun_engine', 'main.rb')), 'plugin je nasadeny aj pri zlyhanej znacke')
+    NxTest.assert(out.include?('HOTOVO'), 'instalacia dobehla')
+    # stara znacka sa zneplatni PRED kopirovanim: polovicne nasadenie (kopirovanie zlyha) nechá "znacka chyba"
+    File.write(marker, "branch=main\nsha=#{sha}\nclean=yes\ntime=2026-01-01T00:00:00\nby=stara\n")
+    dest_file = File.join(root, 'cielovy_subor')
+    File.write(dest_file, 'toto je subor, nie priecinok')
+    out, st = NxP4a.ps_file(script, env: tmp_env.merge('NOXUN_INSTALL_DEST' => dest_file, 'NOXUN_DEPLOY_MARKER' => marker))
+    NxTest.refute(st.success?, "kopirovanie do suboru zlyha (#{out})")
+    NxTest.refute(File.exist?(marker), 'stara znacka je zmazana pred kopirovanim (polovicne nasadenie = znacka chyba)')
+    # zdroj bez gitu (git status skonci chybou 128): znacka sa zapise (sha prazdny, clean=unknown) a $LASTEXITCODE sa obnovi
+    nogit = File.join(root, 'bez_gitu')
+    FileUtils.mkdir_p(File.join(nogit, 'noxun_engine'))
+    File.write(File.join(nogit, 'noxun_engine.rb'), "# loader\n")
+    File.write(File.join(nogit, 'noxun_engine', 'main.rb'), "# main\n")
+    FileUtils.cp(File.join(NxP4a::ROOT, 'INSTALL_noxun_engine.ps1'), File.join(nogit, 'INSTALL_noxun_engine.ps1'))
+    FileUtils.rm_rf(dest)
+    cmd = "$global:LASTEXITCODE = 0; & '#{File.join(nogit, 'INSTALL_noxun_engine.ps1')}' | Out-Null; Write-Output ('LEC=' + $global:LASTEXITCODE)"
+    out, st = Open3.capture2e(tmp_env.merge('NOXUN_DEPLOY_MARKER' => marker), NxP4a.pwsh, '-NoProfile', '-Command', cmd)
+    NxTest.assert(st.success? && out.include?('LEC=0'), "zapis znacky nemeni vysledok instalacie ($LASTEXITCODE zostal 0): #{out}")
+    kv = File.binread(marker).force_encoding('UTF-8').lines.map { |l| l.chomp.split('=', 2) }.to_h
+    NxTest.assert_equal('', kv['sha'].to_s, 'bez gitu: prazdny sha')
+    NxTest.assert_equal('unknown', kv['clean'], 'bez gitu: clean=unknown')
     # skutocne nasadenie (bez NOXUN_INSTALL_DEST) sa tu nerobi: cielom by bol zivy SketchUp
   end
 end

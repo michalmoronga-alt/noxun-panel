@@ -101,11 +101,12 @@ function runPluginDiff(sha, cwd) {
 }
 
 // Druhý riadok: stav nasadenia + záver o inštalácii mainu.
-function deployLine(pluginChanged, marker, pluginDiff) {
+function deployLine(changeReason, marker, pluginDiff) {   // changeReason: null | 'plugin' | 'incomplete'
   const dep = marker
     ? 'Nasadený je ' + (marker.branch || '?') + ' ' + (marker.sha ? marker.sha.slice(0, 7) : '?') + ' (' + (marker.time || '?') + '). '
     : 'Stav nasadenia nie je zaznamenaný (značka ' + MARKER_NAME + ' chýba). ';
-  if (pluginChanged) return dep + 'Inštalácia mainu je potrebná (PR menil plugin).';
+  if (changeReason === 'plugin') return dep + 'Inštalácia mainu je potrebná (PR menil plugin).';
+  if (changeReason === 'incomplete') return dep + 'Inštalácia mainu je potrebná (zoznam súborov PR je neúplný).';
   if (!marker || !marker.sha) return dep + 'Inštalácia mainu je potrebná (stav nasadenia neznámy).';
   if (marker.clean !== 'yes') return dep + 'Inštalácia mainu je potrebná (nasadený strom nebol čistý alebo je to neznáme).';
   const d = pluginDiff(marker.sha);
@@ -126,10 +127,10 @@ function messageFor(number, view, ctx) {
   else if (files.length >= GH_FILES_CAP) first = 'PR #' + number + ' zmergovaný, menil plugin: v prvých ' + files.length + ' súboroch nie, zoznam môže byť neúplný — overiť ručne.';
   else first = 'PR #' + number + ' zmergovaný, menil plugin: nie.';
   // Zoznam súborov možno skrátený = berieme ako možnú zmenu pluginu (radšej inštalovať).
-  const maybeChanged = pluginChanged || files.length >= GH_FILES_CAP;
+  const changeReason = pluginChanged ? 'plugin' : (files.length >= GH_FILES_CAP ? 'incomplete' : null);
   let second;
   try {
-    second = deployLine(maybeChanged, c.marker || null, c.pluginDiff || (() => 'unknown'));
+    second = deployLine(changeReason, c.marker || null, c.pluginDiff || (() => 'unknown'));
   } catch (_) {
     second = 'Inštalácia mainu je potrebná (stav nasadenia neznámy).';
   }

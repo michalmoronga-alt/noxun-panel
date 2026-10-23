@@ -94,6 +94,15 @@ Write-Host ('  Zdroj : ' + $src)
 Write-Host ('  Ciel  : ' + $dest)
 Write-Host ''
 
+# Znacka nasadenia (vysvetlenie nizsie, pri jej zapise): cesta + zneplatnenie PRED kopirovanim.
+$markerPath = $env:NOXUN_DEPLOY_MARKER
+if (-not $markerPath -and -not $resolved.Override) {
+  $markerPath = Join-Path ([System.IO.Path]::GetTempPath()) 'noxun_nasadene.txt'
+}
+if ($markerPath) {
+  try { Remove-Item -LiteralPath $markerPath -Force -ErrorAction SilentlyContinue } catch {}
+}
+
 Copy-Item $loader -Destination $dest -Force
 
 $destPlug = Join-Path $dest 'noxun_engine'
@@ -175,12 +184,15 @@ foreach ($name in $legacyTargets) {
 # NOXUN_DEPLOY_MARKER prepise cestu (testy). V testovacom rezime (NOXUN_INSTALL_DEST) sa znacka
 # NEZAPISUJE, ak nie je zadana aj NOXUN_DEPLOY_MARKER - test nesmie prepisat skutocny stav.
 # Zapis znacky nikdy nezhodi instalaciu (pri chybe sa len vypise POZOR).
-$markerPath = $env:NOXUN_DEPLOY_MARKER
-if (-not $markerPath -and -not $resolved.Override) {
-  $markerPath = Join-Path ([System.IO.Path]::GetTempPath()) 'noxun_nasadene.txt'
-}
+#
+# Cesta ($markerPath) sa urcuje a STARA znacka maze UZ PRED kopirovanim (nizsie pri Copy-Item) -
+# polovicne nasadenie (zlyhanie kopirovania) tak nechá "znacka chyba" a hook povie "potrebna",
+# nie zavadzajuce "main nasadeny". Novu znacku zapise az tento blok po uspesnom nasadeni.
+# Blok nesmie zmenit vysledok instalacie: globalny $LASTEXITCODE sa po nom obnovi (git status
+# moze skoncit napr. 128 pri "dubious ownership" a volajuci by ohlasil "deploy zlyhal").
 if ($markerPath) {
   $savedEap = $ErrorActionPreference
+  $savedExit = $global:LASTEXITCODE
   $ErrorActionPreference = 'Continue'
   try {
     $gBranch = ''
@@ -206,6 +218,7 @@ if ($markerPath) {
     try { Remove-Item -LiteralPath $markerPath -Force -ErrorAction SilentlyContinue } catch {}
   } finally {
     $ErrorActionPreference = $savedEap
+    $global:LASTEXITCODE = $savedExit
   }
 }
 

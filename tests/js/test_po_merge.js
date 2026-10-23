@@ -122,6 +122,8 @@ try {
   const many = Array.from({ length: M.GH_FILES_CAP }, (_, i) => `docs/f${i}.md`);
   msg = run('gh pr merge 130 --merge', view(many), { markerPath: marker({}), pluginDiff: diffStub('same') });
   ok(msg.includes('môže byť neúplný') && msg.includes('overiť ručne') && msg.includes('je potrebná'), `velky zoznam bez pluginu = neuplny, potrebna (${msg})`);
+  ok(msg.includes('Inštalácia mainu je potrebná (zoznam súborov PR je neúplný).') && !msg.includes('(PR menil plugin)'),
+    `dovod v 2. riadku je neuplny zoznam, nie zmena pluginu (${msg})`);
   msg = run('gh pr merge 131 --merge', view(many.concat(['noxun_engine/main.rb'])), { markerPath: marker({}), pluginDiff: diffStub('same') });
   ok(msg.includes('menil plugin: áno'), 'velky zoznam s pluginom = ano');
 

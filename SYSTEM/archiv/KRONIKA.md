@@ -30,7 +30,7 @@
   timeout 15 s) po `gh pr merge <N>` zistí cez `gh pr view` (`files,mergedAt,state`), či PR menil plugin (`noxun_engine/`, `noxun_engine.rb`), prečíta značku nasadenia a vloží vecné
   konštatovanie v dvoch riadkoch („PR #N menil plugin: áno/nie" a „Nasadený je <vetva> <sha> (<čas>) → inštalácia mainu je potrebná / nie je potrebná"); pri chybe, nezmergovanom PR
   alebo subagentovi mlčí. **Značka nasadenia** `%TEMP%\noxun_nasadene.txt` (vetva, plný SHA, strom čistý áno/nie, čas) sa zapisuje v `INSTALL_noxun_engine.ps1` — jedinom mieste nasadenia, ktoré volajú
-  runner, foto okien aj export test (predrecenzia P2-1: tie nasadzujú kód vetvy a po sebe ho nevracajú). „Nie je potrebná" len pri nezmenenom plugine, čistej značke a pluginu v nasadenom SHA zhodnom
+  runner, foto okien aj export test (predrecenzia P2-1: tie nasadzujú kód vetvy a po sebe ho nevracajú); stará značka sa maže pred kopírovaním (polovičné nasadenie = „značka chýba"), zápis značky nemení `$LASTEXITCODE` ani výsledok inštalácie (delta). „Nie je potrebná" len pri nezmenenom plugine, čistej značke a pluginu v nasadenom SHA zhodnom
   s `origin/main` po mergi (`git fetch` + `git diff`); chýbajúca značka alebo neistota = „potrebná (stav nasadenia neznámy)". Pravidlo „po každom mergi inštalovať main" sa zúžilo na „po mergi,
   keď PR menil plugin alebo je nasadené niečo iné než main" (CLAUDE.md, WORKFLOW, `codex-po-pr`, PLAN). Pravidlá (CLAUDE.md Testovanie a Verzia a uzáver, typy implementátorov,
   skilly `codex-po-pr` a `predrecenzia`, WORKFLOW) odkazujú na nové príkazy; ručný postup čísla PR ostal ako záloha. Overenie hooku na Claude Code 2.1.301 podľa
