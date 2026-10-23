@@ -36,7 +36,7 @@ precedens nesie **licenciu** (GPL = vzory áno, kód nie; proprietárny produkt 
    (jednorazový sweep architektúry). Prompt drž pod ~30 kB; agent NEMÁ čítať repo — obsah ide inline (headless view_file je nespoľahlivé).
 2. **Beh (Bash tool, nie PowerShell — diakritika a newliny):**
    ```
-   R="$TEMP/agy_research"; mkdir -p "$R"; cd "$R"
+   R="$TEMP/agy_research"; S="<repo>/scripts/agy"; mkdir -p "$R/.agents"; cp "$S/hooks.json" "$S/len_web.ps1" "$R/.agents/"; rm -f "$R/.agents/len_web.log"; cd "$R"
    ( agy -p "$(cat <prompt.md>)" --model <model rešeršéra> --mode plan --print-timeout 30m > "$R/<x>_packet.md" 2> "$R/<x>_err.txt"; echo "exit=$?" > "$R/<x>.done" ) > /dev/null 2>&1 &
    ```
    potom `Monitor` s `until [ -f "$R/<x>.done" ]`. `--mode plan` chráni repo pred úpravami, ale nezabráni modelu siahnuť po termináli či súboroch (to končí prázdnym behom, viď Pasce); cwd = scratch, nikdy repo.
@@ -63,14 +63,15 @@ precedens nesie **licenciu** (GPL = vzory áno, kód nie; proprietárny produkt 
 
 - Halucinované API: bez URL + verzie + snippetu sa nález neberie. `UNVERIFIED` = nič viac než hypotéza.
 - Agent tvrdí, že má aj `run_command`/`write_to_file` — preto `--mode plan` a scratch cwd, nikdy beh v repe.
-- **Prázdny výstup s exit 0 (overené 22.10.2026, agy 1.4.5):** `agy -p` nevie požiadať o povolenie; keď model siahne po nástroji mimo povolených
+- **Prázdny výstup s exit 0 (overené 22.–23.10.2026, agy 1.4.5):** `agy -p` nevie požiadať o povolenie; keď model siahne po nástroji mimo povolených
   (terminál = akcia `command`, čítanie súborov = `read_file`), CLI ho „mäkko zamietne" a celý beh skončí prázdny s exit 0 (`--mode plan` tomu
-  nezabráni). Lieky: (1) výslovný zákaz v `~/.gemini/config/config.json` → `userSettings.globalPermissionGrants.deny` =
-  `["command(*)", "read_file(*)", "write_file(*)"]` — model dostane „zablokované" a pokračuje cez web; (2) blok OBMEDZENIE NÁSTROJOV na začiatku
-  promptu. Platné akcie v zoznamoch: `command`, `read_file`, `write_file`, `read_url`, `mcp`, `execute_url`, `unsandboxed`, tvar `akcia(cieľ)`;
-  neplatné záznamy agy ignoruje („ignoring invalid … entry"). Súbor je „shared config", môže sa týkať aj Antigravity IDE. **Úspech posudzuj podľa
-  veľkosti packetu, nie podľa exit kódu.** Hláška v `*_err.txt` „a tool required the "<akcia>" permission" = v deny zozname chýba daná akcia →
-  nahlás orchestrátorovi, súbor nemeň.
+  nezabráni). Lieky: (1) **stráž v priečinku behu** — agy načíta hooky z `.agents/hooks.json` v pracovnom priečinku; hook PreToolUse
+  (`scripts/agy/hooks.json` + `len_web.ps1`, kopíruje sa do `$R/.agents/`) pustí len `search_web` a `read_url_content`, ostatné zamietne
+  s hláškou a model pokračuje cez web; zamietnutia sa zapisujú do `len_web.log`; (2) blok OBMEDZENIE NÁSTROJOV na začiatku promptu.
+  **Nepoužívaj deny zoznam v `~/.gemini/config/config.json`** — súbor je zdieľaný s Antigravity IDE (zakázal by IDE agentovi terminál aj
+  súbory) a nesmie sa meniť. Platné akcie v zoznamoch povolení (fakt): `command`, `read_file`, `write_file`, `read_url`, `mcp`, `execute_url`,
+  `unsandboxed`, tvar `akcia(cieľ)`. **Úspech posudzuj podľa veľkosti packetu, nie podľa exit kódu.** Hláška v `*_err.txt` „a tool required
+  the "<akcia>" permission" = stráž chýba v priečinku behu alebo sa nenačítala → nahlás orchestrátorovi, nič nemeň.
 - `-p -` (stdin) nefunguje; PowerShell rozbije viacriadkový prompt; `--print-timeout` default 5 min je pre rešerš málo.
 - Nepretržitý beh bez obsluhy môže spustiť automatickú detekciu zneužitia Google účtu — `agy` len v behu s obsluhou (Z8), nikdy v nočnej slučke.
 - Packet nie je rozhodnutie: bez reconcile sa nič v návrhu nemení.

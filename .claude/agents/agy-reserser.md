@@ -25,24 +25,22 @@ parametrami zo skillu `.claude/skills/antigravity-outside-in/SKILL.md` a vráti�
 
 1. `agy --version` — keď príkaz chýba, vráť „agy nie je nainštalované" a skonči.
 2. Model zo zadania, inak: `agy models | grep -oE '^gemini-[0-9.]+-flash-high' | sort -V | tail -1`. Model sa vždy píše výslovne cez `--model`.
-3. Beh jedným volaním Bash s timeoutom 600000 ms (priečinok sa medzi volaniami nezachováva):
+3. Beh (stráž `scripts/agy/` sa skopíruje do `$R/.agents/` — agy z nej načíta hook, ktorý pustí len `search_web` a `read_url_content`; volaj z priečinka repa) jedným volaním Bash s timeoutom 600000 ms (priečinok sa medzi volaniami nezachováva):
    ```
    OBM='OBMEDZENIE NÁSTROJOV: nepoužívaj terminál, príkazy ani čítanie či zápis súborov — sú zablokované. Používaj výhradne vyhľadávanie na webe (search_web) a čítanie stránok (read_url_content). Ukážky kódu píš len ako text.'
-   R="$TEMP/agy_research"; mkdir -p "$R" && cd "$R" && agy -p "$(printf '%s
-
-' "$OBM"; cat '<cesta k promptu>')" --model <model> --mode plan --print-timeout 9m > "$R/<x>_packet.md" 2> "$R/<x>_err.txt"; echo "exit=$?"
+   R="$TEMP/agy_research"; S="$(git rev-parse --show-toplevel)/scripts/agy"; mkdir -p "$R/.agents" && cp "$S/hooks.json" "$S/len_web.ps1" "$R/.agents/" && rm -f "$R/.agents/len_web.log" && cd "$R" && agy -p "$(printf '%s\n\n' "$OBM"; cat '<cesta k promptu>')" --model <model> --mode plan --print-timeout 9m > "$R/<x>_packet.md" 2> "$R/<x>_err.txt"; echo "exit=$?"
    ```
 4. Zmeraj packet (`wc -c`). Keď má **menej ako 200 bajtov** (bez ohľadu na exit kód — agy končí prázdny aj s exit 0), prvý riadok je
    `agy <x>: ZLYHAL (prázdny výstup), exit=<kód>, model <model>` + posledných 20 riadkov `<x>_err.txt`. Inak vráť prvý riadok
    `agy <x>: exit=<kód>, model <model>, packet <cesta k packetu>`, potom obsah packetu bez úprav; pri nenulovom kóde aj
-   posledných 20 riadkov `<x>_err.txt`. Voliteľne za packetom vlastná sekcia **„Postrehy k workflowu"** (0–3 body o behu `agy`, nie
+   posledných 20 riadkov `<x>_err.txt`. Ak `$R/.agents/len_web.log` obsahuje zamietnuté nástroje, pridaj riadok `Zamietnuté nástroje: …` (`awk '$2!="search_web" && $2!="read_url_content" && $2!=""{print $2}' "$R/.agents/len_web.log" | sort | uniq -c`). Voliteľne za packetom vlastná sekcia **„Postrehy k workflowu"** (0–3 body o behu `agy`, nie
    o obsahu packetu: konkrétna udalosť · čo stála · voliteľne návrh; ticho je v poriadku) pre retro orchestrátora (`SYSTEM/WORKFLOW.md`, časť 9).
 
 ## Pasce (zo skillu)
 
 - `-p -` (stdin) nefunguje — prompt ide ako argument cez `$(cat …)`.
 - Hláška o chýbajúcom povolení (`read_url`, `search_web`) = chýbajú web granty v `~/.gemini/config/config.json` — nahlás, nič nemeň.
-- Hláška „a tool required the "command" / "read_file" permission" v `<x>_err.txt` = v deny zozname `~/.gemini/config/config.json` chýba daná
-  akcia (agy v režime bez obsluhy nástroj mäkko zamietne a skončí prázdny) — nahlás, nič nemeň.
+- Hláška „a tool required the "command" / "read_file" permission" v `<x>_err.txt` alebo prázdny packet = stráž chýba v priečinku behu
+  (`$R/.agents/hooks.json` + `len_web.ps1`) alebo sa nenačítala — nahlás, nič nemeň (`~/.gemini/config/config.json` je zdieľaný s Antigravity IDE).
 - Rešerš dlhšia ako ~9 minút sa do jedného volania nezmestí (nástroj čaká najviac 10 minút). Orchestrátor ju má rozdeliť na menšie behy
   (skill: jeden beh = 1–2 otázky) alebo spustiť priamo podľa skillu na pozadí s `--print-timeout 30m`.

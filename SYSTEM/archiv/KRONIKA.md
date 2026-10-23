@@ -17,6 +17,10 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **STRÁŽ `agy` V PRIEČINKU BEHU (23.10.2026, PR #?, trieda Ľ — skripty, skill a agent, kód pluginu a VERSION bez zmeny).** Globálny deny zoznam v `~/.gemini/config/config.json` (PR #475) je zdieľaný s Antigravity IDE
+  a zakázal by jeho agentovi terminál aj súbory, preto sa z configu odstránil. Náhrada: `scripts/agy/hooks.json` + `len_web.ps1` — hook PreToolUse z `.agents/` v priečinku behu pustí len `search_web` a `read_url_content`,
+  ostatné zamietne (overené orchestrátorom 23.10., agy 1.4.5: zamietnutý `run_command` aj `read_file`, výstup 862 B so zdrojom). Agent `agy-reserser` a beh na pozadí v skille stráž kopírujú do `$R/.agents/`,
+  agent hlási zamietnuté nástroje z `len_web.log`; pasca „prázdny výstup s exit 0" prepísaná. Zároveň opravený zápis `printf '%s\n\n'` v agentovi (v #475 sa rozpadol na skutočné nové riadky).
 - **OPRAVA SKILLU `antigravity-outside-in` a agenta `agy-reserser` (22.10.2026, PR #475, trieda Ľ — len skill a definícia agenta, kód pluginu a VERSION bez zmeny).** `agy -p` v režime bez obsluhy
   nevie požiadať o povolenie nástroja; keď model siahne po termináli (`command`) alebo čítaní súborov (`read_file`), CLI ho mäkko zamietne a beh skončí prázdny s exit 0 (4.9. a 17.10.2026).
   `--mode plan` tomu nezabráni (opravené tvrdenie v skille). Riešenie overil orchestrátor tromi testami (agy 1.4.5): deny zoznam v `~/.gemini/config/config.json` + blok OBMEDZENIE NÁSTROJOV
