@@ -52,6 +52,7 @@ $fotoRoot = Join-Path $env:TEMP 'noxun_ui_foto'
 New-Item -ItemType Directory -Force -Path $fotoRoot | Out-Null
 $utf8 = New-Object System.Text.UTF8Encoding($false)
 . (Join-Path $tool 'lib.ps1')  # Find-NxLatestRec, Select-NxShots, Set-NxRecOk, Get-NxShotStatus
+. (Join-Path (Join-Path $PSScriptRoot 'lib') 'nx_paths.ps1')  # Resolve-NxTestModel (testovaci model aj z hlavneho checkoutu)
 # Fotka sa robi na konci virtualneho casu Chrome; prehravac posiela finalny report po
 # SETTLE_MS (6000 ms, nx_stub.js) od prehrania - rozpocet musi byt s rezervou dlhsi.
 $NxVirtualBudgetMs = 9500
@@ -74,21 +75,6 @@ function Clear-NxOld([string]$filter, [int]$days) {
     ForEach-Object { try { Remove-Item $_.FullName -Recurse -Force -Confirm:$false -ErrorAction Stop } catch {} }
 }
 
-# Testovaci model: _dev\ENGINEtests.skp tohto checkoutu, vo worktree z HLAVNEHO
-# checkoutu (_dev je gitignorovany a vo worktree nie je). Vracia '' ked chyba.
-function Resolve-NxTestModel {
-  $m = Join-Path $repo '_dev\ENGINEtests.skp'
-  if (Test-Path $m) { return $m }
-  try {
-    $common = (& git -C $repo rev-parse --path-format=absolute --git-common-dir 2>$null)
-    if ($common) {
-      $main = Split-Path ($common.Trim() -replace '/', '\') -Parent
-      $m2 = Join-Path $main '_dev\ENGINEtests.skp'
-      if (Test-Path $m2) { return $m2 }
-    }
-  } catch {}
-  return ''
-}
 
 function ConvertTo-RubySq([string]$s) {
   return ($s -replace '\\', '/') -replace "'", "\'"
@@ -100,9 +86,10 @@ function ConvertTo-RubySq([string]$s) {
 function Invoke-NxRecord {
   $su = 'C:\Program Files\SketchUp\SketchUp 2026\SketchUp\SketchUp.exe'
   if (-not (Test-Path $su)) { Write-Host "CHYBA: SketchUp nenajdeny: $su"; return @{ code = 1 } }
-  $model = Resolve-NxTestModel
+  $model = Resolve-NxTestModel $repo
   if (-not $model) {
-    Write-Host 'POZOR: _dev\ENGINEtests.skp sa nenasiel - nahravka pobezi v novom neulozenom modeli (moze ju zdrzat uvodna obrazovka SketchUpu).'
+    Write-Host ((Get-NxMissingDevMessage 'testovaci model ENGINEtests.skp' $repo @('_dev', 'ENGINEtests.skp')) -replace '^CHYBA:', 'POZOR:')
+    Write-Host '  Nahravka pobezi v novom neulozenom modeli (moze ju zdrzat uvodna obrazovka SketchUpu).'
   }
 
   # ZDIELANY zamok s run_su_tests.ps1 (autorita a komentare: tam). Plugins adresar

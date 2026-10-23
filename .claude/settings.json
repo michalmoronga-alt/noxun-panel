@@ -20,6 +20,17 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(gh pr merge *)",
+            "command": "node -e \"try{require(require('path').join(process.env.CLAUDE_PROJECT_DIR||process.cwd(),'.claude','hooks','po_merge.js')).run()}catch(e){}\"",
+            "timeout": 12
+          }
+        ]
       }
     ],
     "UserPromptSubmit": [
