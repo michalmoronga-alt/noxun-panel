@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **P1b · JADRO AGENTS.md, MOST CLAUDE.md, SÚBORY ORCHESTRÁTORA A IMPLEMENTÁTORA (23.10.2026, PR #?, blok 10 · PRAVIDLA, trieda Ť — len pravidlá a testy;
+- **P1b · JADRO AGENTS.md, MOST CLAUDE.md, SÚBORY ORCHESTRÁTORA A IMPLEMENTÁTORA (23.10.2026, PR #480, blok 10 · PRAVIDLA, trieda Ť — len pravidlá a testy;
   kód pluginu, VERSION ani `?v=` bez zmeny).** `CLAUDE.md` (32 kB, ktorý Claude Code čítal celý v každom okne aj subagentovi a Codex ho nečítal vôbec) sa
   **presunul bez zmeny významu** na štyri miesta: jadro pre všetkých agentov a nástroje `AGENTS.md` (projekt, rola → súbor, rozcestník, zákazy, git v skratke,
   testy, jazyk, sekcia `## Code Review Rules` pre review PR) · `SYSTEM/pravidla/roly/ORCHESTRATOR.md` (roly a modely, delegovanie a merge, inštalácia mainu,
