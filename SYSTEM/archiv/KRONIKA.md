@@ -17,6 +17,20 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **P1a · DEFINÍCIE NA JEDNOM MIESTE (23.10.2026, PR #?, blok 10 · PRAVIDLA, trieda Ť — pravidlá, dokumentácia a testy; kód pluginu, VERSION, `?v=` ani STAV
+  bez zmeny).** Šesť definícií, podľa ktorých sa rozhoduje o bránach každej dávky (výrobná/cenová D1, audit-povinná D2, triedy D3 vrátane novej triedy D, povinná
+  predrecenzia D4, nový ovládací prvok v UI D5, in-SU ako brána mergu D6), má jediné znenie v novom `SYSTEM/pravidla/DEFINICIE.md` (znenie z package P1a § 2 po audite
+  Codex sol). Kvótové prahy (D7) majú jediný domov v skille `usage`, sekcia „Prahy a reakcie"; review kolá, delta a pravidlo 3 kôl (D8) v skille `codex-po-pr`. CLAUDE.md,
+  WORKFLOW (Matica výberu len mapovanie trieda → profil, brány a hranice odkazom, uzly diagramu dávky), typy implementátorov a slepého recenzenta, skilly `predrecenzia`,
+  `codex-audit`, `codex-po-pr`, PLAN, STANDARD §13, README a `docs/architecture/rozsirovacie-body.md` znenie neopakujú, odkazujú. Rozpory R1–R10 vyriešené podľa Michala
+  23.10. (súpis `zdroje/bloky/PRAVIDLA/SUPIS_DEFINICII.md`): nová SketchUp API plocha už nie je kritérium auditu (R1), široké spúšťače in-SU aj v PLAN (R2), bez Codexu
+  náhradná brána / rozhodne Michal namiesto „prísnejšej vlastnej kontroly" (R3), náhrada predrecenzie Codexom ako riadok v `usage` (R4), nová UI interakcia = odporúčaná (R5),
+  300 riadkov vždy bez testov a dokumentácie (R6), eskalácia pri P0 aj P1 bez mena modelu (R7), jeden Codex prah — zostatok pod 10 % (R8), P2/P3 z delty overí orchestrátor (R9),
+  zmena seedu ako príklad v D1 (R10). Nový guard `tests/pure/test_definicie.rb` (G3): 20 podpisových fráz smie byť len v DEFINICIE.md (prehľadá CLAUDE, AGENTS, WORKFLOW,
+  PLAN, README, STANDARD, typy agentov a skilly; bez ohľadu na veľkosť písmen, zalomenie a zvýraznenie) + test vlastného správania; DEFINICIE.md je v strážach odkazov
+  a dĺžky riadkov `test_docs_navigacia.rb`. Do DEFINICIE.md navyše (forma, bez zmeny významu) príklad prednosti tried z WORKFLOW a z predrecenzie „prekreslenie" a „len zmena
+  verzie". Testy: headless 5430/0/0, JS sady 163/163 (každá zvlášť).
+
 - **ŠTART BLOKU 10 · PRAVIDLA (23.10.2026, PR #477, dokumentačné PR — kód pluginu a VERSION bez zmeny).** Michal 17.10. zadal prestavbu pravidiel pre agentov (univerzálne
   `AGENTS.md`, pravidlá podľa roly, menej kontextu, ochrana proti „pretekaniu", retro, hodnotenie modelov a router). Do repa ide priečinok `SYSTEM/zdroje/bloky/PRAVIDLA/`:
   zadanie, surová rešerš (Grok, Codex), prieskum 18 sessions, návrh štruktúry (vrstvy pravidiel, roly, stráže G1–G11, dávky P0–P6), karty rolí a typy úloh (`ROLY.md`),

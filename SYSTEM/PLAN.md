@@ -32,7 +32,7 @@ retro spojené s hodnotením modelov a router. **Kód pluginu sa nemení** — m
 Priečinok [zdroje/bloky/PRAVIDLA/](zdroje/bloky/PRAVIDLA/) — zadanie, návrh štruktúry, karty rolí, súpis kópií definícií, packages.
 
 - ✅ Rešerš agy už nekončí prázdna — oprava postupu (PR #475) a stráž v priečinku behu (PR #476).
-- **P1a** definície na jednom mieste (`SYSTEM/pravidla/DEFINICIE.md` + guard, rozpory R1–R10) — package hotový, audit znenia zapracovaný.
+- ✅ **P1a** definície na jednom mieste (`SYSTEM/pravidla/DEFINICIE.md` + guard, rozpory R1–R10) — PR #?.
 - **P4a** drobnosti: JS testy jedným príkazom · runner berie ENGINEtests z hlavného checkoutu · `otvor_pr.ps1` (kvóta + PR + číslo PR) · pripomienka po mergi.
 - **P1b** jadro `AGENTS.md` + most `CLAUDE.md` + `ORCHESTRATOR.md` + strop veľkosti.
 - **P2** roly — karty rolí, generované typy agentov, rola analytik, jedna tabuľka obsadenia.
@@ -123,7 +123,7 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
 **Dávky z registra auditu a refaktory (blok 1d, 29.8.2026):** Register sa vyprázdňuje **malými dávkami** (malé PR > obrie PR), zoradené podľa závažnosti × blokovanej funkcie.
 Pravidlo podľa druhu dávky: **štrukturálny refaktor = „správanie sa nemení"** (presun zodpovednosti, testy to dokazujú);
 **oprava chyby/hardening = explicitná, testom podložená ZMENA správania** (v PR pomenovaná: čo bolo zle → čo platí teraz).
-In-SU testy povinné pri builderoch/observeroch; mutačné overenie štandard. Nálezy z reálnej výroby majú stále prednosť
+In-SU testy podľa [DEFINICIE § D6](pravidla/DEFINICIE.md#d6); mutačné overenie štandard. Nálezy z reálnej výroby majú stále prednosť
 (Pravidlo pre postrehy). Dávka, ktorá nevie povedať, ktorú naplánovanú funkciu pripravuje alebo ktorý dlh spláca, sa nerobí.
 
 ## Trvalé pravidlá — kde žijú
