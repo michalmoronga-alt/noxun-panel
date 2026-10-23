@@ -167,6 +167,48 @@ foreach ($name in $legacyTargets) {
   }
 }
 
+# ZNACKA NASADENIA (P4a): runner in-SU testov, foto okien aj export test nasadzuju do SketchUpu
+# KOD VETVY a po sebe ho nevracaju - hook .claude/hooks/po_merge.js po `gh pr merge` z tejto
+# znacky zisti, ci je nasadene nieco ine nez main (a teda treba nainstalovat main). Subor
+# %TEMP%\noxun_nasadene.txt (UTF-8 bez BOM, riadky kluc=hodnota): branch, sha (plny HEAD zdrojoveho
+# stromu), clean (yes = `git status --porcelain` prazdny), time (lokalny cas ISO), by.
+# NOXUN_DEPLOY_MARKER prepise cestu (testy). V testovacom rezime (NOXUN_INSTALL_DEST) sa znacka
+# NEZAPISUJE, ak nie je zadana aj NOXUN_DEPLOY_MARKER - test nesmie prepisat skutocny stav.
+# Zapis znacky nikdy nezhodi instalaciu (pri chybe sa len vypise POZOR).
+$markerPath = $env:NOXUN_DEPLOY_MARKER
+if (-not $markerPath -and -not $resolved.Override) {
+  $markerPath = Join-Path ([System.IO.Path]::GetTempPath()) 'noxun_nasadene.txt'
+}
+if ($markerPath) {
+  $savedEap = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  try {
+    $gBranch = ''
+    $gSha = ''
+    $gClean = 'unknown'
+    # Chyba gitu (nie je v PATH, zdroj nie je repo) = prazdny sha / clean=unknown; hook to berie ako
+    # "stav nasadenia neznamy". Znacka sa zapise aj tak, aby po sebe nenechala STARU (zavadzajucu).
+    try {
+      $gb = @(& git -C $src rev-parse --abbrev-ref HEAD 2>$null)
+      if ($LASTEXITCODE -eq 0 -and $gb.Count -gt 0) { $gBranch = ([string]$gb[0]).Trim() }
+      $gs = @(& git -C $src rev-parse HEAD 2>$null)
+      if ($LASTEXITCODE -eq 0 -and $gs.Count -gt 0) { $gSha = ([string]$gs[0]).Trim() }
+      $gst = @(& git -C $src status --porcelain 2>$null)
+      if ($LASTEXITCODE -eq 0) {
+        if (@($gst | Where-Object { $_ }).Count -eq 0) { $gClean = 'yes' } else { $gClean = 'no' }
+      }
+    } catch {}
+    $markerText = ('branch=' + $gBranch + "`n" + 'sha=' + $gSha + "`n" + 'clean=' + $gClean + "`n" +
+                   'time=' + (Get-Date -Format 's') + "`n" + 'by=INSTALL_noxun_engine.ps1' + "`n")
+    [System.IO.File]::WriteAllText($markerPath, $markerText, (New-Object System.Text.UTF8Encoding($false)))
+  } catch {
+    Write-Host ('POZOR: znacku nasadenia sa nepodarilo zapisat (' + $markerPath + '): ' + $_.Exception.Message) -ForegroundColor Yellow
+    try { Remove-Item -LiteralPath $markerPath -Force -ErrorAction SilentlyContinue } catch {}
+  } finally {
+    $ErrorActionPreference = $savedEap
+  }
+}
+
 Write-Host ''
 if ($legacyFailed.Count -gt 0) {
   Write-Host 'POZOR: plugin je nainstalovany, ale STARE pluginy sa nepodarilo odstranit:' -ForegroundColor Yellow
