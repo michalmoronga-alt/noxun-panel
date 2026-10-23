@@ -29,17 +29,17 @@ precedens nesie **licenciu** (GPL = vzory áno, kód nie; proprietárny produkt 
 
 1. **Prompt do súboru (UTF-8):** na začiatku vždy blok (presný text, kryje beh pred prázdnym výstupom — viď Pasce):
    ```
-   OBMEDZENIE NÁSTROJOV: nepoužívaj terminál, príkazy ani čítanie či zápis súborov — sú zablokované. Používaj výhradne vyhľadávanie na webe (search_web) a čítanie stránok (read_url_content). Ukážky kódu píš len ako text.
+   OBMEDZENIE NÁSTROJOV: nepoužívaj terminál, príkazy ani čítanie či zápis súborov — sú zablokované. Používaj výhradne vyhľadávanie na webe (search_web) a čítanie stránok (read_url_content). Nespúšťaj ani nevytváraj subagentov. Ukážky kódu píš len ako text.
    ```
    potom rola + HARD RULES + OUTPUT FORMAT + TARGETED QUESTIONS + inline kontext (text package z PLAN.md,
    výsek FINAL/koncept, prípadne mockup). Vzor: `scratchpad/ag_outside_in_kovcd.md` z 3.9. (pilot KOV-C/D) a `ag_outside_in_sweep.md`
    (jednorazový sweep architektúry). Prompt drž pod ~30 kB; agent NEMÁ čítať repo — obsah ide inline (headless view_file je nespoľahlivé).
 2. **Beh (Bash tool, nie PowerShell — diakritika a newliny):**
    ```
-   R="$TEMP/agy_research"; S="<repo>/scripts/agy"; mkdir -p "$R/.agents"; cp "$S/hooks.json" "$S/len_web.ps1" "$R/.agents/"; rm -f "$R/.agents/len_web.log"; cd "$R"
-   ( agy -p "$(cat <prompt.md>)" --model <model rešeršéra> --mode plan --print-timeout 30m > "$R/<x>_packet.md" 2> "$R/<x>_err.txt"; echo "exit=$?" > "$R/<x>.done" ) > /dev/null 2>&1 &
+   R="$TEMP/agy_research/<x>"; S="<repo>/scripts/agy"
+   ( mkdir -p "$R/.agents" && cp "$S/hooks.json" "$S/len_web.ps1" "$R/.agents/" && rm -f "$R/.agents/len_web.log" && cd "$R" && { agy -p "$(printf '%s\n\n' "$OBM"; cat <prompt.md>)" --model <model rešeršéra> --mode plan --print-timeout 30m > "$R/<x>_packet.md" 2> "$R/<x>_err.txt"; echo "exit=$?" > "$R/<x>.done"; } || echo "exit=setup-fail" > "$R/<x>.done" ) > /dev/null 2>&1 &
    ```
-   potom `Monitor` s `until [ -f "$R/<x>.done" ]`. `--mode plan` chráni repo pred úpravami, ale nezabráni modelu siahnuť po termináli či súboroch (to končí prázdnym behom, viď Pasce); cwd = scratch, nikdy repo.
+   (`OBM` = blok OBMEDZENIE NÁSTROJOV z kroku 1; každý beh má vlastný priečinok `$R`, takže logy stráže paralelných behov sa nemiešajú; pri `exit=setup-fail` sa agy nespustilo) potom `Monitor` s `until [ -f "$R/<x>.done" ]`. `--mode plan` chráni repo pred úpravami, ale nezabráni modelu siahnuť po termináli či súboroch (to končí prázdnym behom, viď Pasce); cwd = scratch, nikdy repo.
    Krátky beh (do ~9 min, jedna-dve otázky) spustí aj typ subagenta `agy-reserser` (`.claude/agents/agy-reserser.md`) s tými istými parametrami
    a výstup vráti priamo; dlhší beh ide takto na pozadí.
    Model: vždy výslovne cez `--model` — rola **rešerš outside-in** v tabuľke Obsadenie rolí (najvyšší Gemini Flash, ktorý ponúkne `agy models`).
@@ -71,7 +71,7 @@ precedens nesie **licenciu** (GPL = vzory áno, kód nie; proprietárny produkt 
   **Nepoužívaj deny zoznam v `~/.gemini/config/config.json`** — súbor je zdieľaný s Antigravity IDE (zakázal by IDE agentovi terminál aj
   súbory) a nesmie sa meniť. Platné akcie v zoznamoch povolení (fakt): `command`, `read_file`, `write_file`, `read_url`, `mcp`, `execute_url`,
   `unsandboxed`, tvar `akcia(cieľ)`. **Úspech posudzuj podľa veľkosti packetu, nie podľa exit kódu.** Hláška v `*_err.txt` „a tool required
-  the "<akcia>" permission" = stráž chýba v priečinku behu alebo sa nenačítala → nahlás orchestrátorovi, nič nemeň.
+  the "<akcia>" permission" = stráž chýba v priečinku behu alebo sa nenačítala → nahlás orchestrátorovi, nič nemeň. Známa chyba agy (antigravity-cli#640): nástroje `invoke_subagent`, `define_subagent`, `manage_subagents` môžu prejsť aj cez zákaz stráže — preto veta o subagentoch v bloku a kontrola `len_web.log`.
 - `-p -` (stdin) nefunguje; PowerShell rozbije viacriadkový prompt; `--print-timeout` default 5 min je pre rešerš málo.
 - Nepretržitý beh bez obsluhy môže spustiť automatickú detekciu zneužitia Google účtu — `agy` len v behu s obsluhou (Z8), nikdy v nočnej slučke.
 - Packet nie je rozhodnutie: bez reconcile sa nič v návrhu nemení.
