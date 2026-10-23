@@ -27,7 +27,7 @@ Nová plocha SketchUp API sama osebe audit-povinná nie je — spúšťa outside
 
 Pre audit-povinnú dávku je **pred implementáciou povinný audit návrhu** (skill `codex-audit`); pred odoslaním orchestrátor overí kľúčové
 tvrdenia package krátkou sondou na kóde bez zápisu do modelu a výsledok zapíše do package (skill `codex-audit`, krok 0). Keď Codex nie je
-k dispozícii, platia náhradné brány skillu `usage`. Ostatné dávky audit návrhu nevyžadujú.
+k dispozícii, platia pravidlá skillu `usage` (sekcia „Prahy a reakcie"). Ostatné dávky audit návrhu nevyžadujú.
 
 <a id="d3"></a>
 
