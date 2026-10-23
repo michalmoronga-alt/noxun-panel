@@ -3,6 +3,8 @@
 > **Stav: BEŽÍ od 19.10.2026** (schválil Michal). Routines: nočná hliadka výroby `trig_015okBjVs4S4nLN596XobFPx`
 > (https://claude.ai/code/routines/trig_015okBjVs4S4nLN596XobFPx, prvý beh 20.10. 00:05 UTC) · strážca pravidiel `trig_014kELU72qnr89ghyh2LcHN3`
 > (https://claude.ai/code/routines/trig_014kELU72qnr89ghyh2LcHN3, prvý beh 20.10. 03:03 UTC). Zrušiť alebo vypnúť sa dajú na claude.ai/code/routines.
+> **Živé routines vs. tento text (23.10.):** trailer commitu a rozšírený rozsah strážcu sú zatiaľ len tu — do routines na claude.ai sa prenesú pri
+> vyhodnotení pilotu (pri zmene modelu routine upraviť aj trailer v oboch príkazoch commitu).
 > **Pasca pri vytváraní:** API pri `create` samo pripojilo všetky claude.ai konektory účtu (Gmail, Drive, Supabase, Figma, SketchUp…) —
 > hneď po vytvorení sa odpojili cez `update` s `clear_mcp_connections: true`; pri každej novej routine skontrolovať `mcp_connections: []`.
 >
