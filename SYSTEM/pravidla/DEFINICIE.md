@@ -1,7 +1,8 @@
 # Definície pravidiel — jediný domov
 
 > Každá definícia tu má jediné znenie. Ostatné súbory na ňu odkazujú (`DEFINICIE.md § D1` …) a znenie neopakujú — stráži guard
-> `tests/pure/test_definicie.rb`. Zmena definície = zmena len tohto súboru (+ KRONIKA). Kvótové prahy: skill `usage`. Review kolá,
+> `tests/pure/test_definicie.rb`. Zmena definície = zmena tohto súboru + podpisových fráz v guarde (`NX_DEF_PHRASES`), keď sa mení
+> podpisová veta, a mapy vo [WORKFLOW](../WORKFLOW.md), keď ju zmena ovplyvní (+ KRONIKA). Kvótové prahy: skill `usage`. Review kolá,
 > delta a pravidlo 3 kôl: skill `codex-po-pr`.
 
 <a id="d1"></a>
