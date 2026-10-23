@@ -5,7 +5,7 @@ description: Po odoslaní PR — budík ~10 min, kontrola Codex GH review (nále
 
 # Codex review po PR
 
-**Jediný domov pravidiel review kôl** (delta-verifikácia, kto opravuje a kto kontroluje, nové plné kolo, pravidlo 3 kôl) — CLAUDE.md
+**Jediný domov pravidiel review kôl** (delta-verifikácia, kto opravuje a kto kontroluje, nové plné kolo, pravidlo 3 kôl) — ORCHESTRATOR.md
 a WORKFLOW na tento skill len odkazujú. Definície tried, na ktoré sa pravidlá odvolávajú (audit-povinná, výrobná/cenová, eskalácia), sú
 v `SYSTEM/pravidla/DEFINICIE.md`; kvótové prahy v skille `usage`, sekcia „Prahy a reakcie".
 

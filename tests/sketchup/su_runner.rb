@@ -4,7 +4,7 @@
 #   load 'C:/APP DEV/RUBY/ENGINE/tests/sketchup/su_runner.rb'
 #
 # BEZPECNOST: bezi VYHRADNE v modeli ENGINEtests*.skp alebo v neulozenom Untitled
-# (pravidla ENGINE/CLAUDE.md). V inom modeli sa okamzite ukonci so SKIP.
+# (pravidla AGENTS.md a SYSTEM/pravidla/roly/IMPLEMENTATOR.md). V inom modeli sa okamzite ukonci so SKIP.
 # Vystup: subor ENV['NOXUN_SU_OUT'] (default %TEMP%/noxun_su_result.txt) — riadky
 # PASS/FAIL/INFO + koncovy marker '=== KONIEC SUBORU ==='. Undo scenare S1/S2 su
 # od V0.3.4 undo fixov TVRDE asserty (transparentne operacie absorpcie a dedupu);

@@ -7,7 +7,7 @@
 #
 # ASCII, bez ternary / ?? / ?. (PS 5.1 aj pwsh).
 
-# Subory, v ktorych davka pise cislo PR (CLAUDE.md, Verzia a uzaver: "Cislo PR").
+# Subory, v ktorych davka pise cislo PR (SYSTEM/pravidla/roly/IMPLEMENTATOR.md, Verzia a uzaver: "Cislo PR").
 $NxPrNumberFiles = @(
   'SYSTEM/PLAN.md',
   'SYSTEM/STAV.md',

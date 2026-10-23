@@ -11,14 +11,14 @@ Kde komponent žije v kóde a odkiaľ berie dáta, opisuje [architecture/ui-life
 **Údržba:** dávka prepíše dotknutý odsek **na mieste** a opisuje pravidlo, nie priebeh prác. Ktorá dávka čo zaviedla, čísla verzií,
 PR a kôl review patria do [../SYSTEM/archiv/KRONIKA.md](../SYSTEM/archiv/KRONIKA.md); jediné miesto pre historické značky v tomto súbore
 je sekcia „História" na konci. Strop veľkosti aj zákaz značiek stráži `tests/pure/test_docs_navigacia.rb`. Čísla § sa nemenia —
-odkazujú na ne kód, testy a CLAUDE.md.
+odkazujú na ne kód, testy a pravidlá v `SYSTEM/pravidla/`.
 
 ---
 
 ## 1. Princípy
 
 - **Vertikálny priestor panela je vzácny** (trvalé pravidlo Michala 20.7.2026, platí pre všetku prácu
-  na paneli; **toto je jeho autorita** — CLAUDE.md, PLAN, ARCHITEKTURA a V1_VIZIA naň len odkazujú).
+  na paneli; **toto je jeho autorita** — POVINNE_CITANIE, PLAN, ARCHITEKTURA a V1_VIZIA naň len odkazujú).
   Pred umiestnením každého nového tlačidla/poľa/funkcie sa POVINNE zamyslieť, či sa nedá umiestniť
   inak a rozumnejšie (do existujúceho radu, do rohu náhľadu, ako ikona, kontextovo) — rast do výšky
   len v krajných prípadoch. Inak panel skončí ako scrollovanie cez 20 tlačidiel a 30 sekcií.
@@ -1771,7 +1771,7 @@ CEF cachuje externé CSS/JS. Konvencia: `?v=` suffix = **presne verzia
 pluginu** (VERSION z loadera) na VŠETKÝCH css/js odkazoch vo VŠETKÝCH ui/*.html —
 stráži to guard test v `tests/pure/test_guards.rb`. Zmena css/js po vydaní teda
 znamená: bump patch VERSION (noxun_engine.rb + main.rb) a prepísať všetky `?v=`
-na novú hodnotu (viď pravidlo verzie v CLAUDE.md). Verzia v pätičke ide z Ruby
+na novú hodnotu (viď pravidlo verzie v `SYSTEM/pravidla/roly/IMPLEMENTATOR.md`). Verzia v pätičke ide z Ruby
 a s cache-bustom sa nikdy needituje ručne zvlášť.
 
 ---

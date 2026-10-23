@@ -41,7 +41,7 @@ Percentá sú **použité** (used), nie zostatok; brána počíta **zostatok = 1
 
 ## Prahy a reakcie (jediný domov kvótových pravidiel)
 
-Táto tabuľka je **jediné znenie** kvótových prahov a reakcií na ne; CLAUDE.md, WORKFLOW a ostatné skilly na ňu len odkazujú. Triedy dávok
+Táto tabuľka je **jediné znenie** kvótových prahov a reakcií na ne; ORCHESTRATOR.md, WORKFLOW a ostatné skilly na ňu len odkazujú. Triedy dávok
 (bežná, audit-povinná, výrobná/cenová) sú v `SYSTEM/pravidla/DEFINICIE.md` (D1–D3). „Bežná dávka" = ani audit-povinná, ani výrobná/cenová,
 ani oprava P0/P1. Prahy shadow behov sú iné pravidlo (`SYSTEM/WORKFLOW.md` § 2, Matica výberu).
 
@@ -60,7 +60,7 @@ Exit 2 a 4 neblokujú nikde — rozhodni ručne a ohlás v reporte.
 
 ## Kedy volať
 
-1. **Na začiatku okna** (spolu s STAV/PLAN): `usage.ps1` bez parametrov — do prvej správy Michalovi jednou vetou, ak niečo obmedzuje plán (napr. Codex weekly zostatok pod 10 %). Je to prvá časť kontroly štartu okna; ďalšie dve (lokálne nástroje a register `agent-register`) popisuje CLAUDE.md, sekcia Kvóty a štart okna — celú kontrolu naraz spustí `powershell -NoProfile -File scripts\start_okna.ps1`.
+1. **Na začiatku okna** (spolu s STAV/PLAN): `usage.ps1` bez parametrov — do prvej správy Michalovi jednou vetou, ak niečo obmedzuje plán (napr. Codex weekly zostatok pod 10 %). Je to prvá časť kontroly štartu okna; ďalšie dve (lokálne nástroje a register `agent-register`) popisuje `SYSTEM/pravidla/roly/ORCHESTRATOR.md`, sekcia Kvóty a štart okna — celú kontrolu naraz spustí `powershell -NoProfile -File scripts\start_okna.ps1`.
 2. **Pred Codex auditom** (`codex-audit`, krok 3): `-Label "audit <dávka>" -Phase before -Gate codex` (číta oboch providerov kvôli logu). Exit 3 = **neposielaj** a postupuj podľa „Prahy a reakcie". Po výsledku (krok 5) `-Label "audit <dávka>" -Phase after`.
 3. **Pred GH kolom** (`codex-po-pr`: `gh pr create` / `@codex review` / `gh pr ready`): `-Gate codex` (číta len Codex — nezaťažuje Claude endpoint). Exit 3 = kolo sa nevyžiada (pred `gh pr create` PR ako draft; hranica N18, 26.9.2026) a ďalej podľa „Prahy a reakcie"; do PR sa zapíše, prečo.
 4. **Pred spustením implementačného subagenta** (drahé Claude okno): `-Label "dávka <názov>" -Phase before` — prah Claude session a reakcia: „Prahy a reakcie" (hranica N18, 26.9.2026, doplnená 6.10.2026); po reporte subagenta `-Phase after` (spotreba dávky do logu).

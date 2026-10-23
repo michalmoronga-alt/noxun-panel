@@ -4,7 +4,7 @@
 > orientovať bez čítania všetkého, má **každý živý dokument práve JEDNU rolu**. Tu je
 > napísané, ktorý súbor je autorita na čo, v akom poradí sa číta a čo sa kam zapisuje.
 > Pravidlá práce v repe (workflow, verzie, checklist uzáveru dávky, testovanie) žijú
-> v [../CLAUDE.md](../CLAUDE.md), definície brán a tried v [pravidla/DEFINICIE.md](pravidla/DEFINICIE.md) — tento súbor ich nenahrádza,
+> v jadre [../AGENTS.md](../AGENTS.md) a v súboroch rolí [pravidla/roly/](pravidla/roly/), definície brán a tried v [pravidla/DEFINICIE.md](pravidla/DEFINICIE.md) — tento súbor ich nenahrádza,
 > len ukazuje na dokumenty.
 > Mapa workflowu (roly a ich obsadenie, diagramy blok · dávka · review, brány) je v [WORKFLOW.md](WORKFLOW.md).
 
@@ -14,7 +14,7 @@
 2. [PLAN.md](PLAN.md) — **čo sa ide robiť** (bloky prác, zásobník, trvalé pravidlá).
 3. [DOGFOODING.md](DOGFOODING.md) — plné znenia **otvorených** postrehov (D-čísla) k bloku.
 4. Podľa témy zásahu: STANDARD · VEPO_KONTRAKT · POJMY (tabuľka nižšie) — pri súbore nad ~50 kB len dotknutú kapitolu
-   (Grep podľa nadpisu `§` alebo mena modulu); **rozpočet povinného čítania jednej dávky je orientačne ≤ 150 kB** (pravidlo v [../CLAUDE.md](../CLAUDE.md)).
+   (Grep podľa nadpisu `§` alebo mena modulu); **rozpočet povinného čítania jednej dávky je orientačne ≤ 150 kB** (pravidlo v [pravidla/POVINNE_CITANIE.md](pravidla/POVINNE_CITANIE.md)).
 5. **Podobná funkcia už bola?** Priečinok jej bloku `archiv/bloky/<BLOK>/` (`ROZHODNUTIA_*`, `FAKTY_Z_KODU_*`, `PACKAGE_*`) a záver
    `archiv/<BLOK>_ZAVER_*` — napr. [archiv/bloky/ROHOVA/](archiv/bloky/ROHOVA/) pre nový typ skrinky. Bloky spred tejto konvencie
    (napr. KOVANIE, GHOST, UI 2.0, M-R) priečinok nemajú: plný text je v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md),
@@ -36,8 +36,10 @@ a [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md) — **len Gre
 | [VEPO_KONTRAKT.md](VEPO_KONTRAKT.md) | formát výstupu do VEPO | ostatné výstupy |
 | [POJMY.md](POJMY.md) | glosár + trvalé fakty stolárskej domény | plán ani stav |
 | [V1_VIZIA.md](V1_VIZIA.md) | definícia „V1 hotové" + nemenné princípy | plán (ten je v PLAN.md) |
-| [WORKFLOW.md](WORKFLOW.md) | mapa workflowu: roly a **obsadenie rolí** (mení Michal), diagramy blok · dávka · review, brány, hranice | záväzné znenie pravidiel (to je v ../CLAUDE.md, pravidla/DEFINICIE.md a skilloch) |
+| [WORKFLOW.md](WORKFLOW.md) | mapa workflowu: roly a **obsadenie rolí** (mení Michal), diagramy blok · dávka · review, brány, hranice | záväzné znenie pravidiel (to je v ../AGENTS.md, pravidla/ a skilloch) |
 | [pravidla/DEFINICIE.md](pravidla/DEFINICIE.md) | **definície brán a tried** (jediné znenie): výrobná/cenová, audit-povinná, triedy D/Ľ/S/Ť, predrecenzia, nový prvok UI, in-SU — kópie stráži guard `test_definicie.rb` | postup (skilly), kvótové prahy (`usage`), review kolá (`codex-po-pr`) ani obsadenie rolí (WORKFLOW) |
+| [pravidla/roly/](pravidla/roly/) | pravidlá jednej roly: [ORCHESTRATOR.md](pravidla/roly/ORCHESTRATOR.md) (merge, review, kvóty, autonómne bloky, uzáver bloku) · [IMPLEMENTATOR.md](pravidla/roly/IMPLEMENTATOR.md) (verzia, checklist uzáveru dávky, testovanie); jadro pre všetkých je [../AGENTS.md](../AGENTS.md) | definície (DEFINICIE.md) ani postupy (skilly) |
+| [pravidla/POVINNE_CITANIE.md](pravidla/POVINNE_CITANIE.md) | povinné čítanie podľa typu práce + rozpočet čítania | pravidlá práce (jadro a roly) |
 | [retro/](retro/README.md) | pokus retro (27.9.–11.10.2026): formát záznamov po behoch v [retro/README.md](retro/README.md); inbox `retro/inbox/` je **lokálny, git ho ignoruje** (pravidlá pokusu: WORKFLOW.md, časť 9) | záväzné pravidlo (retro len navrhuje, rozhoduje Michal) ani archív (spracované vyhodnotenia sú v `archiv/retro/`) |
 
 ## Vrstvy
@@ -70,11 +72,11 @@ a [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md) — **len Gre
   [UI_DIZAJN_dennik_do_v0.17.md](archiv/UI_DIZAJN_dennik_do_v0.17.md) (plné znenie `docs/UI_DIZAJN.md` s denníkom dávok do v0.17.4),
   staršie analýzy a vízie. V archíve sa
   **existujúce záznamy neprepisujú** — pribúdať však pribúda priebežne, presne ako káže
-  checklist uzáveru v CLAUDE.md: záznam dávky navrch KRONIKY, vyriešené D-číslo navrch
+  checklist uzáveru v pravidla/roly/IMPLEMENTATOR.md: záznam dávky navrch KRONIKY, vyriešené D-číslo navrch
   indexu v DOGFOODING_vyriesene.md, hotový blok plným textom do ROADMAP_hotove_etapy.md
   a pri uzávere bloku jeho celý priečinok (debata, mockup, zadania, briefy, smoke checklist) do `archiv/bloky/<BLOK>/`.
   [archiv/retro/](archiv/retro/) drží **spracované retro vyhodnotenia** (`VYHODNOTENIE_<dátum>.md` — postrehy, návrhy a rozhodnutia
-  Michala; záznam „prečo" pri zmenách workflowu, nie autorita — tou sú CLAUDE.md, pravidla/DEFINICIE.md, skilly a WORKFLOW.md).
+  Michala; záznam „prečo" pri zmenách workflowu, nie autorita — tou sú AGENTS.md, pravidla/ (definície a roly), skilly a WORKFLOW.md).
   Jediná výnimka z neprepisovania: záznam **práve prebiehajúcej dávky** sa smie dorovnávať
   až do jej mergu (napr. keď review zmení výsledný stav, ktorý záznam opisuje).
 
@@ -111,7 +113,7 @@ a [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md) — **len Gre
   `ui20/UI20_KONTRAKT.md` a počas bloku jeho priečinok `zdroje/bloky/<BLOK>/` (debata, mockup,
   zadania, briefy, smoke checklist).
 - **Každá dávka, ktorá zvyšuje VERSION, aktualizuje docs** podľa **checklistu uzáveru
-  dávky** v [../CLAUDE.md](../CLAUDE.md) vrátane **prepisu STAV** — nie „niekedy neskôr",
+  dávky** v [pravidla/roly/IMPLEMENTATOR.md](pravidla/roly/IMPLEMENTATOR.md#verzia) vrátane **prepisu STAV** — nie „niekedy neskôr",
   ale v tej istej dávke. **Dokumentačné PR** majú krátky checklist: KRONIKA áno, VERSION nie;
   STAV len vtedy, keď PR mení stav bloku, smoke alebo poradie prác — vtedy aktualizuje faktický
   stav v sekcii „Stav" (verzia a čísla testov sa nemenia) a prepíše sekcie „Robí sa"

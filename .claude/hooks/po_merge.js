@@ -6,7 +6,8 @@
 //    Nasadený je feat/x 1a2b3c4 (2026-10-23T14:02:11). Inštalácia mainu je potrebná (nasadený kód
 //    pluginu sa líši od mainu).
 //    Hodnotenie úlohy pre PR #478 zatiaľ nie je zapísané."
-// Pravidlo, ktoré z toho plynie (CLAUDE.md, Verzia a uzáver): main sa inštaluje po mergi, keď PR menil
+// Pravidlo, ktoré z toho plynie (SYSTEM/pravidla/roly/ORCHESTRATOR.md, Inštalácia mainu):
+// main sa inštaluje po mergi, keď PR menil
 // plugin (`noxun_engine/`, `noxun_engine.rb`) ALEBO keď je v SketchUpe nasadené niečo iné než main
 // (runner in-SU testov, foto okien a export test nasadzujú kód vetvy a po sebe ho nevracajú).
 // Nasadený stav hlási `INSTALL_noxun_engine.ps1` značkou %TEMP%\noxun_nasadene.txt (riadky kľúč=hodnota:
