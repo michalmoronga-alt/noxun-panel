@@ -1882,6 +1882,6 @@ a `SCHEMA_CURRENT` na ňu (test: hodnoty presne podľa tabuľky, v module žiadn
 | kovanie — odkaz na produkt | `noxun_engine/core/hardware_catalog.rb` · `HardwareCatalog::SCHEMA_PRODUCT_URL` | **3** | odkaz na produkt |
 | kovanie — ručné overenie ceny | `noxun_engine/core/hardware_catalog.rb` · `HardwareCatalog::SCHEMA_MANUAL_CHECK` | **4** | ručné overenie ceny |
 
-**Mimo tabuliek (nie sú číselné verzie dát):** verzia pluginu `VERSION` (pravidlá v CLAUDE.md, v configu ako `engine_version`), prah podľa verzie
+**Mimo tabuliek (nie sú číselné verzie dát):** verzia pluginu `VERSION` (pravidlá v `SYSTEM/pravidla/roly/IMPLEMENTATOR.md`, v configu ako `engine_version`), prah podľa verzie
 pluginu `CabinetBuilder::FRONT_VALIDATION_VERSION` a textové identifikátory formátu `HardwareCatalog::STD` / `HardwareTaxonomy::STD`. Config
 skrinky nesie čísla ako proveniencia stavby: `config_schema`, `plan_schema`, `part_key_schema`, `rules_seed_version`.

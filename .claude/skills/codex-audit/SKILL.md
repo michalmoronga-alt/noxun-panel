@@ -44,7 +44,7 @@ DESIGN UNDER REVIEW:
 <celý návrh: čo sa mení, prečo, ktoré súbory/moduly, dátové zmeny>
 
 CONTEXT FILES TO READ FIRST:
-<zoznam kľúčových súborov + CLAUDE.md, SYSTEM/STANDARD.md>
+<zoznam kľúčových súborov + AGENTS.md, SYSTEM/pravidla/DEFINICIE.md, SYSTEM/STANDARD.md>
 
 RULES:
 - Actively try to break the design: hidden regressions, undo/observer

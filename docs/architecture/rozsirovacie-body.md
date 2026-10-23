@@ -213,7 +213,7 @@ ktorý mení výrobné alebo cenové čísla či súbory, je dávka **výrobná/
 `ExportPrep.start`, zhodí test („nový výstup: pridaj riadok do ExportPrep::KINDS a začni ExportPrep.start — žiadna kópia úvodu"); matica G2 overí, že nový
 export odmietnutie úvodu **rešpektuje** (picker ani zápis pri spúšťačoch úvodu); `tests/pure/test_export_compare.rb` zhodí test, keď `KINDS` nesedí so zoznamom
 exportov sondy. Pred mergom výstupnej dávky beží **export test** `scripts\export_test.ps1` (H19): sám urobí 4 exporty testovacej zákazky na mainu (K) a na vetve (P)
-a vypíše `P == K` / `P != K` (CLAUDE.md, sekcia Testovanie).
+a vypíše `P == K` / `P != K` (`SYSTEM/pravidla/roly/IMPLEMENTATOR.md`, sekcia Testovanie).
 
 ## História
 

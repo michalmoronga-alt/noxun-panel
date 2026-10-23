@@ -62,7 +62,10 @@ SCOPE: `git diff main...HEAD` — only this diff and the code it calls or is cal
 INTENT OF THE CHANGE (from the brief):
 <2–6 sentences: what should change for the user, key decisions and constraints>
 
-READ FIRST: CLAUDE.md (workflow + testing rules), the docs/architecture sections of
+READ FIRST: AGENTS.md (core rules), SYSTEM/pravidla/DEFINICIE.md, the matching row of
+SYSTEM/pravidla/POVINNE_CITANIE.md, sections "Verzia a uzáver dávky" and "Testovanie" of
+SYSTEM/pravidla/roly/IMPLEMENTATOR.md (closing checklist, export test P == K, head of
+the in-SU run — the diff is checked against them), the docs/architecture sections of
 the touched modules (find them via docs/ARCHITEKTURA.md), relevant SYSTEM/STANDARD.md
 sections.
 
