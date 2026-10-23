@@ -8,6 +8,12 @@ AUD = skill `codex-audit`, PO = skill `codex-po-pr`, USG = skill `usage`, SLP = 
 Referenčné znenie je C. AGENTS.md (len odkaz na C), SYSTEM/README.md, SYSTEM/STAV.md, docs/*.md, scripts/*.ps1, skilly retro a antigravity-outside-in,
 typy reserser a agy-reserser definície D1–D8 nenesú.
 
+> **Platí — Michal 23.10.2026 schválil odporúčania orchestrátora ku všetkým rozporom:** R1 podľa CLAUDE.md (nová API plocha = outside-in
+> rešerš, nie audit) · R2 podľa CLAUDE.md (široké spúšťače in-SU) · R3 podľa CLAUDE.md (náhradná brána / rozhodne Michal) · R4 ponechať,
+> zapísať do obsadenia (náhradník predrecenzie Codex) · R5 ponechať ako „odporúčaná" · R6 300 riadkov vždy bez testov a dokumentácie ·
+> R7 eskalácia pri P0 aj P1, bez mena modelu · R8 jeden prah: Codex zostatok pod 10 % · R9 ponechať, zapísať do D8 · R10 zmena seedu =
+> príklad výrobnej/cenovej dávky v D1.
+
 ## 1 · Kde je ktorá definícia (súbor:riadok | plná / parafráza / odkaz | odchýlka od C)
 
 **D1 výrobná/cenová dávka** (C:67-76)

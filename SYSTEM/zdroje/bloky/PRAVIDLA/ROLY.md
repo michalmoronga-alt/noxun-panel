@@ -246,7 +246,8 @@ VÝSTUP  odporúčanie + dôvod + alternatíva → rozhoduje orchestrátor
 > **Michal 22.10.: A + B.** Výsledok testov orchestrátora (agy 1.4.5, gemini-3.8-flash-high): zákaz len terminálu nestačil (model siahol
 > po čítaní súborov → prázdny výstup); zákaz `command(*)`, `read_file(*)`, `write_file(*)` → model dostane „zablokované" a pokračuje cez web
 > (reálna outside-in rešerš 1 min 44 s so zdrojmi, 0 zamietnutí). **agy ostáva primárny pre `res-out`, Grok náhradník.** Oprava skillu
-> a obalu (blok v prompte, prázdny výstup = ZLYHAL): samostatné PR `fix/agy-prazdny-vystup`. ❓ Súbor nastavení je zdieľaný s Antigravity IDE.
+> a obalu (blok v prompte, prázdny výstup = ZLYHAL): PR #475. **23.10.:** Michal používa Antigravity IDE → globálny deny zo zdieľaného
+> `config.json` odstránený; náhrada = stráž (hook) v priečinku behu `.agents/hooks.json` (pustí len web, test 4 OK, IDE nedotknuté) — PR `fix/agy-straz-v-priecinku`.
 
 1. **Skript `scripts/otvor_pr.ps1`** — jeden príkaz urobí kvótovú bránu (draft pri Codexe < 10 %), `gh pr create` a doplní číslo PR
    commitom (spája schválené 7c). Implementátor tak nemusí poznať pravidlá kvót. Áno?
