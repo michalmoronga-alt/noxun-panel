@@ -49,9 +49,7 @@ Keď zásah spadá do viacerých riadkov, platia VŠETKY. **Súbor nad ~50 kB sa
   splnení OBOCH brán **pre aktuálnu hlavu vetvy**: **CI zelené** + **review kolo uzavreté**. Nikdy nemergovať hneď po pushi opráv len
   preto, že CI zbehlo skôr než review. Po mergi **návrat na čerstvý `main`** (`git checkout main && git pull`) a **inštalácia mainu**
   (sekcia Verzia a uzáver) — ďalšia dávka štartuje odtiaľ. Vetvy na GitHube maže repo automaticky. Postup: skill `codex-po-pr`.
-- **Review kolá, opravy z review a pravidlo 3 kôl** — jediný domov: skill `codex-po-pr` (delta-verifikácia, kto opravuje a kto kontroluje,
-  vedomá výnimka 3. kola). V skratke: kolo 1 je vždy plné GH review; po nálezoch len P2/P3 stačí oprava pôvodným implementátorom a interná
-  delta, nové plné kolo pri P0/P1 alebo oprave meniacej koncept; keď ani 3. kolo nie je čisté a ide o P0/P1 či zmenu konceptu, PR sa zavrie a rozdelí.
+- **Review kolá, opravy z review a pravidlo 3 kôl** — jediný domov: skill `codex-po-pr`.
 - **Výrobná/cenová dávka** a **nový ovládací prvok v UI** — jediné znenie s hranicami a príkladmi: [DEFINICIE § D1](SYSTEM/pravidla/DEFINICIE.md#d1)
   a [§ D5](SYSTEM/pravidla/DEFINICIE.md#d5).
 - **Audit návrhu PRED implementáciou (skill `codex-audit`):** povinný pre **audit-povinnú dávku** ([DEFINICIE § D2](SYSTEM/pravidla/DEFINICIE.md#d2)
