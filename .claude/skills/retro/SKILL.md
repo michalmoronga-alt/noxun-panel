@@ -23,8 +23,9 @@ Pravidlá pokusu: `SYSTEM/WORKFLOW.md` (časť 9 · Retro); formát záznamu: `S
 
 ## B · Vyhodnotenie (len na pokyn Michala — „vyhodnoť retro")
 
-1. **Čerstvý subagent** (Agent tool, typ `general-purpose` s `model:` výslovne podľa roly **slepý recenzent** v tabuľke Obsadenie rolí,
-   `SYSTEM/WORKFLOW.md`; len číta, nič nemení) — kontext orchestrátora nedostane, len úlohu nižšie. Orchestrátor mu pošle **obsah súborov
+1. **Čerstvý subagent** (Agent tool, typ `analytik` — rola **analytik**, režim *vyhodnotenie retro*, karta `SYSTEM/pravidla/roly/ANALYTIK.md`;
+   model a effort v jeho definícii podľa tabuľky Obsadenie rolí, `SYSTEM/WORKFLOW.md`; len číta, nič nemení; keď typ v session ešte nie je,
+   `general-purpose` s `model:` výslovne podľa roly analytik) — kontext orchestrátora nedostane, len úlohu nižšie. Orchestrátor mu pošle **obsah súborov
    inboxu** (subagent vo worktree inbox nevidí — je git-ignorovaný) a cesty k pravidlám.
 2. **Zadanie subagentovi:** prečítaj záznamy inboxu, `AGENTS.md`, `SYSTEM/pravidla/roly/ORCHESTRATOR.md`, `SYSTEM/WORKFLOW.md` a skilly, ktorých sa postrehy týkajú. Zoskup postrehy
    podľa témy, spočítaj opakovania („znova"), over, či už pravidlo neexistuje. Vráť po slovensky, funkčne (Michal nie je programátor):
