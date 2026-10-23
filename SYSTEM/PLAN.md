@@ -32,7 +32,7 @@ retro spojené s hodnotením modelov a router. **Kód pluginu sa nemení** — m
 Priečinok [zdroje/bloky/PRAVIDLA/](zdroje/bloky/PRAVIDLA/) — zadanie, návrh štruktúry, karty rolí, súpis kópií definícií, packages.
 
 - ✅ Rešerš agy už nekončí prázdna — oprava postupu (PR #475) a stráž v priečinku behu (PR #476).
-- ✅ **P1a** definície na jednom mieste (`SYSTEM/pravidla/DEFINICIE.md` + guard, rozpory R1–R10) — PR #?.
+- ✅ **P1a** definície na jednom mieste (`SYSTEM/pravidla/DEFINICIE.md` + guard, rozpory R1–R10) — PR #478.
 - **P4a** drobnosti: JS testy jedným príkazom · runner berie ENGINEtests z hlavného checkoutu · `otvor_pr.ps1` (kvóta + PR + číslo PR) · pripomienka po mergi.
 - **P1b** jadro `AGENTS.md` + most `CLAUDE.md` + `ORCHESTRATOR.md` + strop veľkosti.
 - **P2** roly — karty rolí, generované typy agentov, rola analytik, jedna tabuľka obsadenia.

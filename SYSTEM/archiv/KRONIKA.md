@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **P1a · DEFINÍCIE NA JEDNOM MIESTE (23.10.2026, PR #?, blok 10 · PRAVIDLA, trieda Ť — pravidlá, dokumentácia a testy; kód pluginu, VERSION, `?v=` ani STAV
+- **P1a · DEFINÍCIE NA JEDNOM MIESTE (23.10.2026, PR #478, blok 10 · PRAVIDLA, trieda Ť — pravidlá, dokumentácia a testy; kód pluginu, VERSION, `?v=` ani STAV
   bez zmeny).** Šesť definícií, podľa ktorých sa rozhoduje o bránach každej dávky (výrobná/cenová D1, audit-povinná D2, triedy D3 vrátane novej triedy D, povinná
   predrecenzia D4, nový ovládací prvok v UI D5, in-SU ako brána mergu D6), má jediné znenie v novom `SYSTEM/pravidla/DEFINICIE.md` (znenie z package P1a § 2 po audite
   Codex sol). Kvótové prahy (D7) majú jediný domov v skille `usage`, sekcia „Prahy a reakcie"; review kolá, delta a pravidlo 3 kôl (D8) v skille `codex-po-pr`. CLAUDE.md,
