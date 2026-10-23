@@ -1,0 +1,7 @@
+{
+  "len-web": {
+    "PreToolUse": [
+      { "matcher": "*", "hooks": [ { "command": "powershell -NoProfile -ExecutionPolicy Bypass -File len_web.ps1", "timeout": 20 } ] }
+    ]
+  }
+}
