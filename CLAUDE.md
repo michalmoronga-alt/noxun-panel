@@ -53,7 +53,7 @@ Keď zásah spadá do viacerých riadkov, platia VŠETKY. **Súbor nad ~50 kB sa
 - **Výrobná/cenová dávka** a **nový ovládací prvok v UI** — jediné znenie s hranicami a príkladmi: [DEFINICIE § D1](SYSTEM/pravidla/DEFINICIE.md#d1)
   a [§ D5](SYSTEM/pravidla/DEFINICIE.md#d5).
 - **Audit návrhu PRED implementáciou (skill `codex-audit`):** povinný pre **audit-povinnú dávku** ([DEFINICIE § D2](SYSTEM/pravidla/DEFINICIE.md#d2)
-  — vrátane zmeny schémy, sondy pred auditom a náhrady, keď Codex nie je); ostatné dávky idú rovno do implementácie. Skill `codex-po-pr`
+  — vrátane zmeny schémy a sondy pred auditom); ostatné dávky idú rovno do implementácie. Čo robiť, keď Codex nie je: skill `usage`. Skill `codex-po-pr`
   po odoslaní PR je povinný **bez výnimky**. Skilly sú v `.claude/skills/`.
 - **Slepá predrecenzia PRED PR (skill `predrecenzia`):** kedy je povinná, odporúčaná alebo sa nerobí a čo slepý recenzent dostane —
   [DEFINICIE § D4](SYSTEM/pravidla/DEFINICIE.md#d4); postup a vzor promptu: skill.
@@ -127,7 +127,7 @@ Keď zásah spadá do viacerých riadkov, platia VŠETKY. **Súbor nad ~50 kB sa
   aktualizovaný na mieste** → **Grepom prehľadaj tvrdenia o zoznamoch, ktoré dávka mení** (typy, ikony, schémy, sekcie — napr. `TYPES`,
   inventár ikon v UI_DIZAJN §4, história `SCHEMA`, zoznam sekcií Štúdia) a oprav každý výskyt, nie len odsek modulu → vyriešené D-čísla do `SYSTEM/archiv/DOGFOODING_vyriesene.md` (**plný text + PR do sekcie „Vyriešené (plné
   texty)" a jeden riadok navrch INDEXU v tom istom súbore**; `SYSTEM/DOGFOODING.md` drží **len otvorené** postrehy) → **prepíš
-  `SYSTEM/STAV.md` + APPEND odsek navrch „Záznamy dávok" v `SYSTEM/archiv/KRONIKA.md`** → v `SYSTEM/PLAN.md` ostáva riadok dávky v bloku
+  `SYSTEM/STAV.md` (okrem triedy D) + APPEND odsek navrch „Záznamy dávok" v `SYSTEM/archiv/KRONIKA.md`** → v `SYSTEM/PLAN.md` ostáva riadok dávky v bloku
   **s ✅ a číslom PR** (presúva sa až s uzáverom bloku).
 - **Checklist dokumentačného PR:** odsek navrch „Záznamy dávok" v KRONIKE **áno**; keď PR mení stav bloku, smoke alebo poradie prác, STAV
   **aktualizuje faktický stav v sekcii „Stav"** (verzia a čísla testov sa nemenia) **a prepíše „Robí sa" a „Ďalší krok"**; VERSION ani `?v=` **nie**.

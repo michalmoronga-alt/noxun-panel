@@ -216,7 +216,7 @@ flowchart TD
   T1["Testy: headless<br/>+ každá JS sada zvlášť"]:::auto
   Q2{"Spúšťač in-SU testu?<br/>DEFINICIE D6"}:::gate
   SU["Test v SketchUpe = brána mergu<br/>runner -CloseWhenDone · znova len pri zmene<br/>Ruby spúšťača po poslednom behu"]:::auto
-  DOC["Docs v tej istej dávke: architektúra na mieste,<br/>D-čísla do archívu, STAV, KRONIKA, v PLAN riadok s ✅<br/>číslo PR zatiaľ PR #?"]:::sub
+  DOC["Docs v tej istej dávke: architektúra na mieste,<br/>D-čísla do archívu, STAV (nie pri triede D), KRONIKA,<br/>v PLAN riadok s ✅, číslo PR zatiaľ PR #?"]:::sub
   Q3{"Predrecenzia povinná?<br/>DEFINICIE D4"}:::gate
   PRE["Implementátor po pushi stojí, PR neotvára<br/>predrecenziu spustí orchestrátor: slepý recenzent<br/>P1/P2 opraví implementátor, PR až na pokyn"]:::sub
   QK{"Codex weekly<br/>zostatok pod 10 %?"}:::gate
@@ -348,7 +348,9 @@ flowchart TD
 ```
 
 *Vetvy, ktoré diagram nekreslí:* Michal povolí GH kolo aj pod prahom → kolo sa vyžiada (pri drafte `gh pr ready`) a vybaví sa bežne ·
-kvóta sa pri `gh pr ready` medzitým obnovila → na spustené kolo sa čaká a vybaví sa podľa skillu `codex-po-pr`.
+kvóta sa pri `gh pr ready` medzitým obnovila → na spustené kolo sa čaká a vybaví sa podľa skillu `codex-po-pr` ·
+**trieda D** (DEFINICIE § D3): len kolo 1 — P2/P3 opraví implementátor a kontrolu opravy urobí orchestrátor sám (bez delta subagenta
+a bez ďalšieho GH kola), P0/P1 → eskalácia na profil Ť a ďalej podľa diagramu.
 
 Diagram je mapa. Záväzné znenie review kôl, internej delty, kto opravuje a kto kontroluje, pravidla 3 kôl a draftu pre kvótu
 (`gh pr ready` pred mergom) je v skille [codex-po-pr](../.claude/skills/codex-po-pr/SKILL.md); kvótové prahy a reakcie podľa triedy
@@ -368,7 +370,7 @@ Všetko, čo musí platiť, aby práca pokračovala. „Kto" = kto bránu uzatv�
 | počkať, nie náhradník | primárny agent roly má čoskoro reset; kedy sa čaká a kedy smie náhradník | orchestrátor | skill `usage` (Prahy a reakcie) · časť 2 Náhradníci |
 | testy zelené | vždy headless + každá JS sada zvlášť | CI + orchestrátor | CLAUDE.md · Testovanie |
 | test v SketchUpe zelený | dávka spadá do spúšťačov in-SU; na finálnej hlave podľa tej istej definície (PR uvedie hlavu behu) | runner → orchestrátor | DEFINICIE § D6 · CLAUDE.md · Testovanie (runner) |
-| docs a verzia na mieste | kódová dávka: celý checklist; dokumentačné PR: KRONIKA + pri zmene stavu bloku, smoke alebo poradia prác aktualizuje faktický stav v STAV „Stav" (bez verzie a čísel testov) a prepíše „Robí sa" a „Ďalší krok" | orchestrátor + guard testy | CLAUDE.md · Verzia a uzáver dávky |
+| docs a verzia na mieste | kódová dávka: celý checklist (trieda D bez prepisu STAV, DEFINICIE § D3); dokumentačné PR: KRONIKA + pri zmene stavu bloku, smoke alebo poradia prác aktualizuje faktický stav v STAV „Stav" (bez verzie a čísel testov) a prepíše „Robí sa" a „Ďalší krok" | orchestrátor + guard testy | CLAUDE.md · Verzia a uzáver dávky |
 | predrecenzia bez P1/P2 | keď je povinná podľa DEFINICIE § D4 | slepý recenzent → orchestrátor | DEFINICIE § D4 · skill `predrecenzia` |
 | review kolo uzavreté | pred mergom, pre aktuálnu hlavu vetvy | review PR alebo náhradná brána → orchestrátor | skill `codex-po-pr` |
 | CI zelené | pred mergom, na aktuálnej hlave | GitHub Actions | skill `codex-po-pr` |
