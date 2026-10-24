@@ -48,14 +48,30 @@
 # SketchUpu 0, presne 1x on_quit a pripravenej sonde; inak 1 (0xC0000374 = 1). S -QuitMenu sonda
 # ukonci SketchUp cestou pouzivatela Subor > Koniec (send_action 57665; poistka
 # Sketchup.quit po 8 s) namiesto Sketchup.quit.
-param([switch]$CloseWhenDone, [switch]$QuitProbe, [switch]$QuitMenu)
+#
+# -DryRun (P4a): sucho - len vyhlada SketchUp a testovaci model a vypise nalezene cesty
+# (`DRYRUN: ...`), nic nenasadi, nezamkne ani nespusti. Overenie, ze vo worktree bez _dev
+# sa model najde v hlavnom checkoute.
+#
+# Testovaci model: _dev\ENGINEtests.skp tohto checkoutu, vo worktree z HLAVNEHO checkoutu
+# (_dev je gitignorovany) - scripts\lib\nx_paths.ps1.
+param([switch]$CloseWhenDone, [switch]$QuitProbe, [switch]$QuitMenu, [switch]$DryRun)
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
+. (Join-Path (Join-Path $PSScriptRoot 'lib') 'nx_paths.ps1')
 $su = 'C:\Program Files\SketchUp\SketchUp 2026\SketchUp\SketchUp.exe'
+$model = Resolve-NxTestModel $repo
+if ($DryRun) {
+  if (Test-Path $su) { Write-Host "DRYRUN: SketchUp: $su" } else { Write-Host "DRYRUN: SketchUp NENAJDENY: $su" }
+  if ($model) { Write-Host "DRYRUN: model: $model" } else { Write-Host 'DRYRUN: model NENAJDENY'; Write-Host (Get-NxMissingDevMessage 'testovaci model ENGINEtests.skp' $repo @('_dev', 'ENGINEtests.skp')) }
+  if ($model -and (Test-Path $su)) { exit 0 } else { exit 1 }
+}
 if (-not (Test-Path $su)) { Write-Host "CHYBA: SketchUp nenajdeny: $su"; exit 1 }
-
-$model = Join-Path $repo '_dev\ENGINEtests.skp'
-if (-not (Test-Path $model)) { Write-Host "CHYBA: testovaci model chyba: $model (vytvor prazdny ENGINEtests.skp)"; exit 1 }
+if (-not $model) {
+  Write-Host (Get-NxMissingDevMessage 'testovaci model ENGINEtests.skp' $repo @('_dev', 'ENGINEtests.skp'))
+  Write-Host '  (vytvor prazdny ENGINEtests.skp v _dev hlavneho checkoutu)'
+  exit 1
+}
 
 $workRoot = Join-Path $env:TEMP 'noxun_su_tests'
 New-Item -ItemType Directory -Force -Path $workRoot | Out-Null

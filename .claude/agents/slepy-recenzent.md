@@ -16,7 +16,7 @@ ktoré dostaneš. Hodnota tvojej kontroly je v tom, že si nezávislý: nič neb
   `gh api` (GET). Nič iné nespúšťaj.
 - **Rozsah:** predrecenzia = `git diff main...HEAD` (alebo rozsah zo zadania) a kód, ktorý diff volá alebo ktorý volá diff; delta = výhradne
   `git diff <hlava pred opravou>..<hlava po oprave>` — správnosť opráv, žiadne vedľajšie zmeny, test na každú opravu.
-- **Najprv čítaj** `CLAUDE.md` (pravidlá práce a testovania), odseky dotknutých modulov v `docs/architecture/` (rozcestník `docs/ARCHITEKTURA.md`)
+- **Najprv čítaj** `AGENTS.md` (jadro pravidiel), `SYSTEM/pravidla/DEFINICIE.md` (definície tried a brán), riadok dotknutého zásahu v `SYSTEM/pravidla/POVINNE_CITANIE.md`, `SYSTEM/pravidla/roly/IMPLEMENTATOR.md` sekcie Verzia a uzáver dávky a Testovanie (checklist uzáveru, export test P == K, hlava in-SU behu — proti nim kontroluješ), odseky dotknutých modulov v `docs/architecture/` (rozcestník `docs/ARCHITEKTURA.md`)
   a dotknuté paragrafy `SYSTEM/STANDARD.md`.
 - Aktívne sa to snaž rozbiť — zoznam, na čo sa zamerať, je vo vzore promptu v skille `.claude/skills/predrecenzia/SKILL.md`. Hlás len reálne,
   reprodukovateľné problémy v tomto diffe; žiadne všeobecné rady.

@@ -1,11 +1,12 @@
 # WORKFLOW — mapa práce agentov
 
 > **Načo je tento súbor:** jedna mapa, ako práca v repe beží — kto čo robí, cez aké kroky ide blok, dávka a review a ktoré brány
-> musia platiť. **Záväzné znenie pravidiel** je v [../CLAUDE.md](../CLAUDE.md) a v skilloch `.claude/skills/`; tento súbor ich
-> nenahrádza, ukazuje súvislosti a drží **jedinú tabuľku obsadenia rolí**. Prečo je to takto:
+> musia platiť. **Záväzné znenie pravidiel** je v [pravidla/DEFINICIE.md](pravidla/DEFINICIE.md) (definície D1–D6, podľa ktorých sa
+> rozhoduje o bránach), v jadre [../AGENTS.md](../AGENTS.md), v súboroch rolí [pravidla/roly/](pravidla/roly/) a v skilloch `.claude/skills/` (kvótové prahy `usage`, review kolá `codex-po-pr`);
+> tento súbor ich nenahrádza, ukazuje súvislosti a drží **jedinú tabuľku obsadenia rolí**. Prečo je to takto:
 > [záznam rozhodnutí 25.–26. 9. 2026](zdroje/next_sessions/WORKFLOW_ROZHODNUTIA_2026-09-26.md) (Z1–Z9, N1–N18) a spracované
 > retro vyhodnotenia v [archiv/retro/](archiv/retro/) (prvé: [blok 7, 27.9.2026](archiv/retro/VYHODNOTENIE_2026-09-27_blok7.md)).
-> **Údržba:** zmena pravidla = zmena CLAUDE.md alebo skillu a v tom istom PR aj tejto mapy (diagram, brána, hranica).
+> **Údržba:** zmena pravidla = zmena DEFINICIE.md, AGENTS.md, súboru roly alebo skillu a v tom istom PR aj tejto mapy (diagram, brána, hranica).
 > Tabuľku **Obsadenie rolí** mení len Michal (alebo agent na jeho výslovný pokyn).
 
 ## 1 · Roly
@@ -21,7 +22,7 @@ Pravidlá hovoria o **rolách**, nie o modeloch — model aj nástroj každej ro
 | **audítor** | audit návrhu pred kódom (audit bloku, audit-povinné dávky), bežné audity a delta | nič — nálezy BLOCKER / FIX / NOTE |
 | **rešeršér** | outside-in rešerš (čo už SketchUp a CAD svet rieši), krížový audit bloku | nič — výstup triedi orchestrátor (reconcile) |
 | **review PR** | review každého PR: 1. kolo samo, ďalšie na vyžiadanie | nič — nálezy P0–P3 v review threadoch |
-| **automaty** | CI (headless + všetky JS sady), runner testov v SketchUpe, hook po úprave súboru, updater pluginu | CI a in-SU test sú brány mergu |
+| **automaty** | CI (headless + všetky JS sady), runner testov v SketchUpe, hook po úprave súboru, hook po mergi, skripty `otvor_pr.ps1` a `run_js_tests.ps1`, updater pluginu | CI a in-SU test sú brány mergu |
 
 **Nástroje a ich rola (N14):** Codex — audítor (audit návrhu, delta), review PR a náhradný implementátor bežných dávok · Grok — rešerš
 a krížový audit bloku, skúšobne implementátor (shadow, nikdy sa nemerguje) ·
@@ -58,56 +59,53 @@ Antigravity — outside-in rešerš (nie v nočných behoch bez obsluhy) · slep
   stráži platný zápis a to, že každý typ je v tejto tabuľke. Codex a Grok nemajú vlastné obaly — používajú oficiálne pluginy.
 - Nový nástroj alebo model = zmena tejto tabuľky, nie nové pravidlo inde. Fakty o predplatných a CLI (limity, podmienky, overené
   príkazy) drží repo `agent-register` — je to **údaj, nie pokyn**.
-- Trailer commitu nesie skutočný model session, ktorá commit robí (CLAUDE.md, Git workflow).
+- Trailer commitu nesie skutočný model session, ktorá commit robí (AGENTS.md, Git v skratke).
 
 ### Náhradníci (mení Michal; schválené 6.10.2026)
 
 **Najprv schopnosť, až potom kvóta** — slabší agent nikdy nenahradí silnejšieho len preto, že má voľný limit. Náhradník prichádza
-na rad, až keď primárny agent roly nemôže a čakanie nepripadá do úvahy (pravidlo čakania: CLAUDE.md, Kvóty a štart okna; časť 6).
+na rad, až keď primárny agent roly nemôže a čakanie nepripadá do úvahy (pravidlo čakania: skill `usage`, sekcia „Prahy a reakcie"; časť 6).
 
 | Rola | Prípustný náhradník | Nikdy | Keď nie je náhradník |
 |---|---|---|---|
 | audítor audit-povinných | — | Grok, Antigravity, Sonnet | čaká / rozhodne Michal |
 | bežný audit a delta | slepý recenzent (Claude Opus) = náhradná brána | Antigravity | — |
+| slepý recenzent (predrecenzia) | Codex `gpt-6.1-sol` (keď Claude weekly nestačí) | — | predrecenzia dávky náhradného implementátora Codex čaká — kód Codexu nekontroluje len Codex |
 | review PR | náhradná brána: slepý subagent + delta | — | — |
 | implementátor (všetky profily) | Codex `gpt-6.1-sol` vo worktree — **len bežné dávky** | Grok (kým neprejde shadow, Matica výberu), Antigravity | audit-povinné a výrobné/cenové dávky čakajú na reset |
 | rešerš / krížový audit | rešeršér Sonnet | — | — |
 | rešerš outside-in | Grok | — | nikdy v nočných behoch |
 | rešerš na webe | Grok | — | — |
 
-- **Náhradný implementátor Codex:** predrecenziu jeho dávky robí **vždy slepý recenzent Claude** — Codex nesmie byť jediný, kto
-  kontroluje kód Codexu. Model náhradníka sa píše výslovne (`--model`, N13).
+- **Náhradný implementátor Codex:** jeho dávka má vždy predrecenziu so slepým recenzentom Claude ([DEFINICIE § D4](pravidla/DEFINICIE.md#d4)).
+  Model náhradníka sa píše výslovne (`--model`, N13).
 
 ### Matica výberu (schválil Michal 7.10.2026)
 
 Zámer: prispôsobiť agenta náročnosti dávky, rozložiť usage medzi poskytovateľov, znížiť spotrebu a zvýšiť efektivitu bez straty kvality.
 **Effort subagenta určuje `effort:` v definícii typu** (`low`/`medium`/`high`/`xhigh`/`max`). Agent tool má od Claude Code v2.1.292 aj
 parameter `effort` pri volaní (nie pre fork) — prepíše `effort:` definície a platí aj po pokračovaní subagenta; premenná
-`CLAUDE_CODE_EFFORT_LEVEL` má prednosť pred oboma. Orchestrátor ho **použije len vtedy, keď to výslovne žiada Michal, CLAUDE.md alebo
+`CLAUDE_CODE_EFFORT_LEVEL` má prednosť pred oboma. Orchestrátor ho **použije len vtedy, keď to výslovne žiada Michal, pravidlá (AGENTS.md, súbor roly) alebo
 skill**; inak platí effort z definície typu. Parameter `model:` pri volaní prepíše model (zdroj: code.claude.com/docs/en/sub-agents,
 overené 7.10. a 10.10.2026). Preto typy agentov ostávajú **profily** (pevná dvojica model + effort) a výber profilu = výber typu.
 
-**Triedy dávok** (záväzné definície tried a prednosť Ť > S > Ľ sú v CLAUDE.md, sekcia „Roly a modely“; tu je ich mapovanie na profily; triedu určuje orchestrátor pri zadaní dávky):
+**Triedy dávok** — definície tried D/Ľ/S/Ť, prednosť, reklasifikácia podľa skutočného diffu a eskalácia: [DEFINICIE § D3](pravidla/DEFINICIE.md#d3)
+(jediné znenie; triedu určuje orchestrátor pri zadaní dávky). Tu je len mapovanie trieda → profil:
 
-| Trieda | Čo spadá | Profil (typ agenta) |
-|---|---|---|
-| **Ľ ľahká** | docs, texty, preklady, ikony, rozloženie, mechanické presuny, testy, presné zadanie bez vlastného rozhodovania | `implementator-lahky` ([definícia](../.claude/agents/implementator-lahky.md)) |
-| **S stredná** | bežná kódová dávka bez zmeny kontraktu (nová logika, bugfix mimo výroby, nový ovládací prvok UI), do ~300 riadkov kódu pluginu | `implementator-stredny` ([definícia](../.claude/agents/implementator-stredny.md)) |
-| **Ť ťažká** | audit-povinná dávka (trieda `codex-audit`), výrobná/cenová (obe definície v CLAUDE.md, Git workflow), nad 300 riadkov kódu pluginu, oprava P0/P1 | `implementator` ([definícia](../.claude/agents/implementator.md)) |
+| Trieda | Profil (typ agenta) |
+|---|---|
+| **D drobnosť** (užší prípad Ľ) | `implementator-lahky` ([definícia](../.claude/agents/implementator-lahky.md)) |
+| **Ľ ľahká** | `implementator-lahky` ([definícia](../.claude/agents/implementator-lahky.md)) |
+| **S stredná** | `implementator-stredny` ([definícia](../.claude/agents/implementator-stredny.md)) |
+| **Ť ťažká** | `implementator` ([definícia](../.claude/agents/implementator.md)) |
 
-**Prednosť tried:** triedu určuje najvyššia, do ktorej dávka spadá — **ktorékoľvek kritérium Ť prebíja S aj Ľ, kritérium S prebíja Ľ**
-(napr. presne zadaná migrácia schémy alebo oprava výrobnej ceny je Ť, aj keď zadanie nevyžaduje vlastné rozhodovanie). Model a effort
-profilov: tabuľka Obsadenie rolí (časť 2) a frontmatter typu agenta — tu sa neopakujú.
+Model a effort profilov: tabuľka Obsadenie rolí (časť 2) a frontmatter typu agenta — tu sa neopakujú.
 
 - **Ostatné roly bez zmeny:** slepý recenzent (`slepy-recenzent`); náhradník implementátora Codex podľa tabuľky Náhradníci
   (len bežné dávky, predrecenzia vždy slepým recenzentom Claude).
-- **Postup výberu:** trieda dávky → profil z tabuľky → kontrola kvót podľa existujúcich pravidiel (CLAUDE.md, Kvóty a štart okna;
-  časť 6; tabuľka Náhradníci). Matica nemení hranice predrecenzie ani auditu — tie platia podľa CLAUDE.md pre každý profil rovnako.
-- **Reklasifikácia:** hranica 300 riadkov pri zadaní je odhad; implementátor profilu Ľ/S pred návratom zmeria skutočný diff kódu pluginu
-  (bez testov a dokumentácie) a keď je nad 300, ohlási to orchestrátorovi — dávka sa reklasifikuje na Ť (povinná predrecenzia; opravy P1
-  a zmeny konceptu profil Ť).
-- **Eskalácia:** keď predrecenzia alebo review nájde v dávke Sonnetu P1 (alebo oprava mení koncept), opravu robí profil Ť (`implementator`)
-  s novým zadaním (nie pokračovanie Sonnet implementátora); pokračovaním sa opravujú len P2/P3, ktoré nemenia koncept.
+- **Postup výberu:** trieda dávky (D3) → profil z tabuľky → kontrola kvót (skill `usage`, sekcia „Prahy a reakcie"; časť 6; tabuľka
+  Náhradníci). Matica nemení hranice predrecenzie (D4) ani auditu (D2) — platia pre každý profil rovnako.
+- **Reklasifikácia a eskalácia** idú podľa D3: oprava P0/P1 alebo zmeny konceptu v dávke D/Ľ/S ide na profil Ť (`implementator`) s novým zadaním.
 - **Shadow (benchmark):** beží **len pri voľných limitoch** — Claude session < 50 % a týždeň < 70 %, Grok týždeň < 70 % a prihlásený
   (`grok models`), **Codex weekly zostatok ≥ 30 %** (hodnotí Codex recenzent; keď nie je, shadow sa nespúšťa). Rovnaké zadanie ako hlavná dávka (zadanie shadow behu začína slovom „SHADOW“ — implementátor ide režimom „Shadow beh“ bez PR, predrecenzie a zásahu do STAV/KRONIKA/PLAN), vlastná vetva `bench/<úloha>-<model>`, **nikdy sa nemerguje a nebrzdí merge**
   hlavnej dávky. Rozsah: **Ľ** bez shadow (pokiaľ orchestrátor nenavrhne inak) · **S** → Grok vždy + profil Ť (`implementator`) každá 3. dávka ·
@@ -187,16 +185,16 @@ flowchart TD
 ```
 
 Blok má dve Michalove brány (schválenie bloku a mockupu) a jednu spätnú väzbu (smoke). **Schválenie bloku = súhlas s naplánovanými
-dávkami** — autonómny beh sa pýta len pri nových, nečakaných veciach; predvolené reakcie sú v CLAUDE.md (Autonómne bloky).
+dávkami** — autonómny beh sa pýta len pri nových, nečakaných veciach; predvolené reakcie sú v ORCHESTRATOR.md (Autonómne bloky).
 Rešerš a krížový audit bloku beží **raz, pred packages**: rešeršéri a audítor dostanú rovnaké zadanie, syntézu a reconcile robí
 orchestrátor (vzor: [S1_CROSS_AUDIT_2026-09-20.md](zdroje/next_sessions/S1_CROSS_AUDIT_2026-09-20.md)); audit dávky už len pri zmene
 kontraktu (mapa 2). **Priečinok bloku** `zdroje/bloky/<BLOK>/` drží od štartu debatu, mockup, packages, briefy a smoke checklist a počas
 bloku je autoritou; pri uzávere sa celý fyzicky presúva do `archiv/bloky/<BLOK>/` s kontrolou odkazov (staršie mockupy v `zdroje/ui20/`
 sa nepresúvajú). Uzáver ide hneď po poslednej dávke (variant B); ďalší blok až po smoke PASS alebo výslovnom „ideme ďalej".
-**Od 27.9.2026 (retro bloku 7; záväzné znenie v CLAUDE.md, Git workflow):** schválenie mockupu uzatvára aj všetky jeho body „návrh —
+**Od 27.9.2026 (retro bloku 7; záväzné znenie v ORCHESTRATOR.md, Tok bloku):** schválenie mockupu uzatvára aj všetky jeho body „návrh —
 potvrdí Michal" (zmena po schválení = rámček „platí" v mockupe + zápis do rozhodnutí bloku) · úvodné PR bloku nesie len rozhodnutia
 Michala a mockup, technické požiadavky až package dávky s jej auditom návrhu · počas implementácie dávky N sa smie písať package
-a bežať audit dávky N+1, implementácia ostáva sekvenčná (CLAUDE.md, Autonómne bloky).
+a bežať audit dávky N+1, implementácia ostáva sekvenčná (ORCHESTRATOR.md, Autonómne bloky).
 
 ## 4 · Jedna kódová dávka (PR)
 
@@ -204,7 +202,7 @@ a bežať audit dávky N+1, implementácia ostáva sekvenčná (CLAUDE.md, Auton
 flowchart TD
   S["Čerstvý main"]:::auto
   R0["Povinné čítanie podľa typu zásahu<br/>+ zadanie z priečinka bloku"]:::orch
-  Q1{"Mení kontrakt, schému alebo STD,<br/>migráciu, observer/undo, nový modul?"}:::gate
+  Q1{"Audit-povinná dávka?<br/>DEFINICIE D2"}:::gate
   SO["Sonda na kóde: kľúčové tvrdenia package<br/>overiť bez zápisu do modelu, výsledok do package"]:::orch
   QA{"Codex weekly zostatok<br/>pod 10 %? (-Gate codex)"}:::gate
   MA["Rozhodne Michal, či audit aj pod prahom<br/>kým neodpovie, dávka čaká"]:::michal
@@ -215,20 +213,20 @@ flowchart TD
   IMN["Náhradný implementátor (časť 2)<br/>predrecenzia vždy slepý recenzent Claude"]:::ext
   IM["Implementácia<br/>subagent vo worktree"]:::sub
   VV["Verzia: patch 2×<br/>+ všetky ?v= v HTML"]:::sub
-  T1["Testy: headless<br/>+ každá JS sada zvlášť"]:::auto
-  Q2{"Buildery, observery, undo a operácie,<br/>geometria, zápis panela do modelu?"}:::gate
+  T1["Testy: headless<br/>+ všetky JS sady (run_js_tests.ps1)"]:::auto
+  Q2{"Spúšťač in-SU testu?<br/>DEFINICIE D6"}:::gate
   SU["Test v SketchUpe = brána mergu<br/>runner -CloseWhenDone · znova len pri zmene<br/>Ruby spúšťača po poslednom behu"]:::auto
-  DOC["Docs v tej istej dávke: architektúra na mieste,<br/>D-čísla do archívu, STAV, KRONIKA, v PLAN riadok s ✅<br/>číslo PR zatiaľ PR #?"]:::sub
-  Q3{"Audit-povinná, výrobná/cenová,<br/>nad 300 riadkov, nový prvok UI<br/>alebo náhradný implementátor?"}:::gate
+  DOC["Docs v tej istej dávke: architektúra na mieste,<br/>D-čísla do archívu, STAV (nie pri triede D), KRONIKA,<br/>v PLAN riadok s ✅, číslo PR zatiaľ PR #?"]:::sub
+  Q3{"Predrecenzia povinná?<br/>DEFINICIE D4"}:::gate
   PRE["Implementátor po pushi stojí, PR neotvára<br/>predrecenziu spustí orchestrátor: slepý recenzent<br/>P1/P2 opraví implementátor, PR až na pokyn"]:::sub
   QK{"Codex weekly<br/>zostatok pod 10 %?"}:::gate
   PR["gh pr create<br/>implementátor"]:::sub
   PRD["PR ako draft, implementátor<br/>ďalej podľa triedy dávky · mapa 3"]:::sub
-  NUM["Doplniť číslo PR všade, kde je PR #?<br/>samostatný commit implementátora, len číslo<br/>pred mergom ho skontroluje orchestrátor"]:::sub
+  NUM["Doplniť číslo PR všade, kde je PR #?<br/>skript otvor_pr.ps1: samostatný commit, len číslo<br/>pred mergom ho skontroluje orchestrátor"]:::sub
   RV["Review po PR · mapa 3"]:::ext
   MG["Merge s pripnutou hlavou<br/>CI zelené + kolo uzavreté"]:::orch
   NM["checkout main + pull"]:::orch
-  INS["Nainštalovať main do SketchUpu<br/>INSTALL_noxun_engine.ps1"]:::orch
+  INS["Nainštalovať main do SketchUpu (keď PR menil plugin<br/>alebo je nasadené niečo iné než main — hook po mergi)<br/>INSTALL_noxun_engine.ps1"]:::orch
   NX["Ďalšia dávka"]:::orch
   S --> R0
   R0 --> Q1
@@ -274,19 +272,19 @@ flowchart TD
 
 *Vetva, ktorú diagram nekreslí:* Michal audit pod prahom nepovolí → audit aj dávka sa odložia po resete kvóty a pokračuje sa ďalšou nezávislou dávkou.
 
-**Sonda pred auditom** (CLAUDE.md, Git workflow; postup skill `codex-audit`, krok 0): kľúčové tvrdenia package overí orchestrátor krátkou
-sondou na kóde skôr, než ich pošle audítorovi — audit má chytať chyby návrhu, nie tvrdenia napísané z úvahy.
-**Paralelná príprava** (CLAUDE.md, Autonómne bloky): package a audit návrhu dávky N+1 smú bežať počas implementácie dávky N; mapa sa
+**Sonda pred auditom** ([DEFINICIE § D2](pravidla/DEFINICIE.md#d2); postup skill `codex-audit`, krok 0) — audit má chytať chyby návrhu,
+nie tvrdenia napísané z úvahy.
+**Paralelná príprava** (ORCHESTRATOR.md, Autonómne bloky): package a audit návrhu dávky N+1 smú bežať počas implementácie dávky N; mapa sa
 pre N+1 začína až na čerstvom maine po mergi N — keď merge N zmenil kontrakt, na ktorý package stavia, package sa zladí (pri zmene kontraktu nový audit).
-**In-SU na finálnej hlave** (CLAUDE.md, Testovanie): keď commity po poslednom behu menia len JS, texty, dokumentáciu alebo testy, beh sa
-neopakuje a PR uvedie, na ktorej hlave bežal; zmena Ruby spúšťača = beh znova.
+**In-SU na finálnej hlave:** kedy sa beh neopakuje, je v [DEFINICIE § D6](pravidla/DEFINICIE.md#d6); runner: IMPLEMENTATOR.md, Testovanie.
 **Kvóta Codexu** (`-Gate codex`) sa kontroluje tesne pred auditom návrhu aj pred otvorením PR — dlhý blok môže medzitým kvótu minúť.
 **PR otvára implementátor.** Pri dávke s povinnou predrecenziou po pushi vetvy stojí a vráti report; predrecenziu spúšťa orchestrátor
 (subagent ďalších subagentov nespúšťa) a PR sa otvorí až na jeho pokyn po oprave P1/P2.
 **Číslo PR** je všade, kde ho dávka píše (PLAN, KRONIKA, STAV, `DOGFOODING_vyriesene`), do otvorenia PR `PR #?`; hneď po `gh pr create`
-ho doplní samostatný commit, ktorý mení len číslo — ten pred mergom skontroluje orchestrátor (pri čistom kole 1 inak žiadna delta nebeží).
+ho doplní samostatný commit, ktorý mení len číslo (PR aj commit jedným príkazom: `scripts\otvor_pr.ps1`) — ten pred mergom skontroluje orchestrátor (pri čistom kole 1 inak žiadna delta nebeží).
 **Dokumentačné PR** (bez kódu pluginu) idú skrátene: vetva `docs/…` → odsek v KRONIKE → headless testy (guardy dokumentácie) → kvóta →
-PR → číslo PR → review → merge. Verzia, `?v=` ani predrecenzia sa pri nich nerobia; STAV len vtedy, keď PR mení stav bloku, smoke alebo
+PR → číslo PR → review → merge. Verzia, `?v=` ani predrecenzia sa pri nich nerobia (výnimka: dávka náhradného implementátora má
+predrecenziu vždy, aj docs-only — DEFINICIE § D4); STAV len vtedy, keď PR mení stav bloku, smoke alebo
 poradie prác — vtedy aktualizuje faktický stav v „Stav" (verzia a čísla testov sa nemenia) a prepíše sekcie „Robí sa" a „Ďalší krok".
 
 ## 5 · Review po PR
@@ -351,15 +349,13 @@ flowchart TD
 ```
 
 *Vetvy, ktoré diagram nekreslí:* Michal povolí GH kolo aj pod prahom → kolo sa vyžiada (pri drafte `gh pr ready`) a vybaví sa bežne ·
-kvóta sa pri `gh pr ready` medzitým obnovila → na spustené kolo sa čaká a vybaví sa podľa skillu `codex-po-pr`.
+kvóta sa pri `gh pr ready` medzitým obnovila → na spustené kolo sa čaká a vybaví sa podľa skillu `codex-po-pr` ·
+**trieda D** (DEFINICIE § D3): len kolo 1 — P2/P3 opraví implementátor a kontrolu opravy urobí orchestrátor sám (bez delta subagenta
+a bez ďalšieho GH kola), P0/P1 → eskalácia na profil Ť a ďalej podľa diagramu.
 
-Po drobnostiach (len P2/P3) stačí interná kontrola opravy — aj pri audit-povinných a výrobných/cenových dávkach, ak prešli
-predrecenziou. Nové plné kolo sa vyžaduje pri P0/P1 alebo oprave, ktorá mení koncept. Opravu robí pôvodný implementátor, kontrolu
-nový slepý subagent; pri P0/P1 alebo zmene konceptu opravuje nový subagent s novým zadaním. Pri Codex kvóte pod 10 % rozhoduje trieda
-dávky: bežná ide cez náhradnú bránu, pri audit-povinnej, výrobnej/cenovej alebo P0/P1 rozhodne Michal a dávka dovtedy čaká (pokračuje sa
-ďalšou nezávislou). Draft otvorený pre kvótu sa pred mergom prepne `gh pr ready` (GitHub draft nezmerguje) — tým sa spustí kolo Codexu;
-ak je kvóta stále pod 10 %, na výsledok sa nečaká (náhradná brána už prebehla) a neskorší nález rieši nový fix PR.
-Postup krok za krokom: skill [codex-po-pr](../.claude/skills/codex-po-pr/SKILL.md).
+Diagram je mapa. Záväzné znenie review kôl, internej delty, kto opravuje a kto kontroluje, pravidla 3 kôl a draftu pre kvótu
+(`gh pr ready` pred mergom) je v skille [codex-po-pr](../.claude/skills/codex-po-pr/SKILL.md); kvótové prahy a reakcie podľa triedy
+dávky v skille [usage](../.claude/skills/usage/SKILL.md), sekcia „Prahy a reakcie".
 
 ## 6 · Brány
 
@@ -367,39 +363,39 @@ Všetko, čo musí platiť, aby práca pokračovala. „Kto" = kto bránu uzatv�
 
 | Brána | Kedy platí | Kto | Kde je pravidlo |
 |---|---|---|---|
-| blok a poradie schválené | pred štartom bloku; schválenie = súhlas s naplánovanými dávkami | Michal | CLAUDE.md · Autonómne bloky |
-| audit bloku bez BLOCKER | raz, pred packages | rešeršéri + audítor → orchestrátor (reconcile) | CLAUDE.md · Git workflow (rešerš a krížový audit) |
-| mockup schválený | pred packages, pri blokoch s UI; každý bod „návrh — potvrdí Michal" zodpovedaný | Michal | CLAUDE.md · Git workflow (poradie bloku, otvorené body mockupu) |
-| audit návrhu dávky bez BLOCKER | dávka mení dátový kontrakt, schému (každé zvýšenie `CONFIG_SCHEMA`, BuildPlan `SCHEMA` alebo STD), migráciu, observer/undo alebo pridáva modul; pred ním sonda na kóde | audítor → orchestrátor | skill `codex-audit` |
-| kvóta | štart okna; pred auditom, implementačným subagentom, predrecenziou, `gh pr create` a `@codex review` | skript `usage` → orchestrátor | CLAUDE.md · Kvóty a štart okna · skill `usage` |
-| počkať, nie náhradník | primárny agent roly má reset do 60 min a úloha neblokuje ďalšiu prácu → čaká sa (orchestrátor medzitým robí nezávislú dávku); audit-povinné a výrobné/cenové dávky čakajú vždy; implementátor pri resete do 60 min čaká aj pri blokujúcej dávke (hranica 2 v časti 7); inak náhradník podľa časti 2 | orchestrátor | CLAUDE.md · Kvóty a štart okna · časť 2 Náhradníci |
-| testy zelené | vždy headless + každá JS sada zvlášť | CI + orchestrátor | CLAUDE.md · Testovanie |
-| test v SketchUpe zelený | buildery, observery, undo a operácie, geometria, akcie panela zapisujúce do modelu; na finálnej hlave znova len pri zmene Ruby spúšťača po poslednom behu (PR uvedie hlavu behu) | runner → orchestrátor | CLAUDE.md · Testovanie |
-| docs a verzia na mieste | kódová dávka: celý checklist; dokumentačné PR: KRONIKA + pri zmene stavu bloku, smoke alebo poradia prác aktualizuje faktický stav v STAV „Stav" (bez verzie a čísel testov) a prepíše „Robí sa" a „Ďalší krok" | orchestrátor + guard testy | CLAUDE.md · Verzia a uzáver dávky |
-| predrecenzia bez P1/P2 | audit-povinné a výrobné/cenové dávky; bežná dávka nad 300 riadkov kódu pluginu alebo s novým prvkom UI; každá dávka náhradného implementátora (časť 2) | slepý recenzent → orchestrátor | skill `predrecenzia` |
+| blok a poradie schválené | pred štartom bloku; schválenie = súhlas s naplánovanými dávkami | Michal | ORCHESTRATOR.md · Autonómne bloky |
+| audit bloku bez BLOCKER | raz, pred packages | rešeršéri + audítor → orchestrátor (reconcile) | ORCHESTRATOR.md · Tok bloku (rešerš a krížový audit) |
+| mockup schválený | pred packages, pri blokoch s UI; každý bod „návrh — potvrdí Michal" zodpovedaný | Michal | ORCHESTRATOR.md · Tok bloku (poradie bloku, otvorené body mockupu) |
+| audit návrhu dávky bez BLOCKER | audit-povinná dávka; pred ním sonda na kóde | audítor → orchestrátor | DEFINICIE § D2 · skill `codex-audit` |
+| kvóta | štart okna; pred auditom, implementačným subagentom, predrecenziou, `gh pr create` a `@codex review` | skript `usage` → orchestrátor | skill `usage` (Prahy a reakcie) · ORCHESTRATOR.md · Kvóty a štart okna |
+| počkať, nie náhradník | primárny agent roly má čoskoro reset; kedy sa čaká a kedy smie náhradník | orchestrátor | skill `usage` (Prahy a reakcie) · časť 2 Náhradníci |
+| testy zelené | vždy headless + všetky JS sady (`scripts\run_js_tests.ps1` — každá sada zvlášť) | CI + orchestrátor | IMPLEMENTATOR.md · Testovanie |
+| test v SketchUpe zelený | dávka spadá do spúšťačov in-SU; na finálnej hlave podľa tej istej definície (PR uvedie hlavu behu) | runner → orchestrátor | DEFINICIE § D6 · IMPLEMENTATOR.md · Testovanie (runner) |
+| docs a verzia na mieste | kódová dávka: celý checklist (trieda D bez prepisu STAV, DEFINICIE § D3); dokumentačné PR: KRONIKA + pri zmene stavu bloku, smoke alebo poradia prác aktualizuje faktický stav v STAV „Stav" (bez verzie a čísel testov) a prepíše „Robí sa" a „Ďalší krok" | orchestrátor + guard testy | IMPLEMENTATOR.md · Verzia a uzáver dávky |
+| predrecenzia bez P1/P2 | keď je povinná podľa DEFINICIE § D4 | slepý recenzent → orchestrátor | DEFINICIE § D4 · skill `predrecenzia` |
 | review kolo uzavreté | pred mergom, pre aktuálnu hlavu vetvy | review PR alebo náhradná brána → orchestrátor | skill `codex-po-pr` |
 | CI zelené | pred mergom, na aktuálnej hlave | GitHub Actions | skill `codex-po-pr` |
-| pravidlo 3 kôl | keď nálezy vráti aj 3. GH kolo | orchestrátor | CLAUDE.md · Git workflow · skill `codex-po-pr` |
-| testovať len v ENGINEtests | vždy — nikdy v okne so zákazkou | orchestrátor | CLAUDE.md · Testovanie |
-| smoke PASS alebo „ideme ďalej" | pred štartom ďalšieho bloku (poistka uzáveru variant B) | Michal | CLAUDE.md · Autonómne bloky |
+| pravidlo 3 kôl | keď nálezy vráti aj 3. GH kolo | orchestrátor | skill `codex-po-pr` |
+| testovať len v ENGINEtests | vždy — nikdy v okne so zákazkou | orchestrátor | IMPLEMENTATOR.md · Testovanie |
+| smoke PASS alebo „ideme ďalej" | pred štartom ďalšieho bloku (poistka uzáveru variant B) | Michal | ORCHESTRATOR.md · Autonómne bloky |
 
 ## 7 · Hranice (N18)
 
 | # | Hranica | Pravidlo | Kde |
 |---|---|---|---|
-| 1 | predrecenzia pri bežnej dávke | nad 300 zmenených riadkov kódu pluginu (bez testov a dokumentácie) alebo nový ovládací prvok v UI (príklady hraníc v CLAUDE.md); dávka náhradného implementátora vždy (časť 2) | CLAUDE.md · skill `predrecenzia` |
-| 2 | kvóta pred implementačným subagentom | Claude session nad 80 % → nový implementačný subagent sa nespúšťa: reset do 60 min → čaká sa; reset neskôr → bežná dávka smie ísť na náhradného implementátora (časť 2), ostatné čakajú | CLAUDE.md · skill `usage` |
-| 3 | výrobná/cenová dávka | mení rozmery alebo počty dielov, hrany, kusovník, VEPO, nákupné zoznamy, kovanie alebo ceny (jediná definícia; príklady hraníc tamtiež) | CLAUDE.md · Git workflow |
-| 4 | `-CloseWhenDone` | agent ho používa vždy; bez neho len Michalovo ručné spustenie | CLAUDE.md · Testovanie |
-| 5 | report | vždy, keď autonómny beh skončí alebo sa zastaví, najneskôr večer | CLAUDE.md · Autonómne bloky |
-| 6 | kvóta a prvé kolo Codexu | kontrola pred `gh pr create`; Codex zostatok pod 10 % → PR ako draft (Codex ho nerecenzuje); bežná dávka → náhradná brána, audit-povinná alebo výrobná/cenová → rozhodne Michal | CLAUDE.md · Kvóty · skill `codex-po-pr` |
+| 1 | predrecenzia pri bežnej dávke | hranica riadkov kódu pluginu (D3), nový ovládací prvok v UI (D5), dávka náhradného implementátora (časť 2) | DEFINICIE § D4 · skill `predrecenzia` |
+| 2 | kvóta pred implementačným subagentom | prah Claude session, čakanie na reset a kedy smie bežná dávka na náhradného implementátora (časť 2) | skill `usage` (Prahy a reakcie) |
+| 3 | výrobná/cenová dávka | jediná definícia s hranicami a príkladmi | DEFINICIE § D1 |
+| 4 | `-CloseWhenDone` | agent ho používa vždy; bez neho len Michalovo ručné spustenie | IMPLEMENTATOR.md · Testovanie |
+| 5 | report | vždy, keď autonómny beh skončí alebo sa zastaví, najneskôr večer | ORCHESTRATOR.md · Autonómne bloky |
+| 6 | kvóta a prvé kolo Codexu | kontrola pred `gh pr create`; pod prahom PR ako draft (Codex ho nerecenzuje), ďalej podľa triedy dávky | skill `usage` (Prahy a reakcie) · skill `codex-po-pr` |
 
 ## 8 · Kontext orchestrátora
 
 - **Chat nie je úložisko (Z2):** rozhodnutia, checklisty a zadania idú hneď do repa alebo pamäte — po kompresii kontextu z chatu miznú.
 - **Delegovanie (Z3):** implementácia, predrecenzia, kontrola opráv, overenia a široké hľadanie idú na subagentov — orchestrátor drží
   kontext bloku, rozhodnutia a merge.
-- **Ukazovateľ kontextu (Z7, hook `.claude/hooks/context_meter.js` z PR #392; pravidlo v CLAUDE.md, Testovanie — Lokálne hooky):**
+- **Ukazovateľ kontextu (Z7, hook `.claude/hooks/context_meter.js` z PR #392; pravidlo v ORCHESTRATOR.md, Ukazovateľ kontextu):**
   od 75 % zapísať rozpracovaný stav do repa alebo pamäte a čítanie delegovať; od 90 % navrhnúť Michalovi `/compact` na hranici dávky
   (lepšie ako automatická kompresia uprostred práce).
 - **Pred kompresiou** zapísať do handoffu označenie implementátora rozrobenej dávky (Z4) — opravy z review robí ten istý subagent.
@@ -409,7 +405,7 @@ Všetko, čo musí platiť, aby práca pokračovala. „Kto" = kto bránu uzatv�
 ## 9 · Retro — pokus 27.9.–11.10.2026
 
 Michal 27.9.2026 zaviedol po hodnotení bloku 7 ([prvé vyhodnotenie](archiv/retro/VYHODNOTENIE_2026-09-27_blok7.md)) pokus: pravidlá
-workflowu sa zlepšujú z **konkrétnych udalostí** zapísaných hneď po behu, nie z pamäte na konci bloku. Veta v CLAUDE.md (Autonómne bloky)
+workflowu sa zlepšujú z **konkrétnych udalostí** zapísaných hneď po behu, nie z pamäte na konci bloku. Veta v ORCHESTRATOR.md (Autonómne bloky)
 odkazuje sem; postup krok za krokom: skill [retro](../.claude/skills/retro/SKILL.md); formát záznamu: [retro/README.md](retro/README.md).
 
 | Čo | Pravidlo |
@@ -431,4 +427,4 @@ odkazuje sem; postup krok za krokom: skill [retro](../.claude/skills/retro/SKILL
   a pravidlo povýšenia po 5 behoch sú v podsekcii **Matica výberu** (časť 2, schválil Michal 7.10.2026); výsledok sa nikdy nemerguje.
   Prvý beh (U001, mimo ENGINE): Claude 3,0 > Grok 2,5 > Codex Terra 1,5 — len smer, nie verdikt. Grok občas aj ako shadow review PR
   (nálezy porovnať s GH Codexom).
-- **Po V1:** spoločné pravidlá do `AGENTS.md` (štandard, ktorý čítajú Codex, Grok Build, OpenCode aj Antigravity); CLAUDE.md ho importuje.
+- **Spoločné pravidlá v `AGENTS.md`** (štandard, ktorý čítajú Codex, Grok Build, OpenCode aj Antigravity) — hotové v bloku PRAVIDLA (dávka P1b); CLAUDE.md ho importuje.

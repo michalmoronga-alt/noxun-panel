@@ -30,11 +30,16 @@ NX_PLAN_MAX_BYTES = 40 * 1024
 # Davka "Docs cleanup C" (26.8.2026) doplnila STANDARD.md a POJMY.md — po
 # reflowe uz ziadny zivy dokument v SYSTEM/ nema vynimku.
 # Davka workflowu (PR B, 26.9.2026) doplnila WORKFLOW.md — mapa workflowu je zivy dokument.
+# Davka P1a (blok 10 · PRAVIDLA, 23.10.2026) doplnila pravidla/DEFINICIE.md — jediny domov definicii.
 NX_SYSTEM_LINE_FILES = %w[
   STAV.md PLAN.md DOGFOODING.md README.md V1_VIZIA.md VEPO_KONTRAKT.md AUDIT_REGISTER.md
-  STANDARD.md POJMY.md WORKFLOW.md
+  STANDARD.md POJMY.md WORKFLOW.md pravidla/DEFINICIE.md pravidla/POVINNE_CITANIE.md
+  pravidla/roly/ORCHESTRATOR.md pravidla/roly/IMPLEMENTATOR.md
 ].freeze
 NX_SYSTEM_MAX_LINE = 400
+# Davka P1b (blok 10 · PRAVIDLA) presunula pravidla z CLAUDE.md do jadra AGENTS.md, suborov roli
+# a povinneho citania; AGENTS.md a most CLAUDE.md v koreni maju rovnaky limit riadka.
+NX_ROOT_LINE_FILES = %w[AGENTS.md CLAUDE.md].freeze
 
 # Koncepty v zdroje/next_sessions/ nesmu vyzerat ako zadanie — kazdy nesie status
 # riadok hned pod nadpisom. README.md priecinka je rozcestnik, nie koncept.
@@ -506,28 +511,49 @@ NxTest.test('docs: kazdy modul core/, modules/ a ui/ je v tabulke routra ARCHITE
                 'doplnit do riadku sekcie Core/Modules/UI, inak sa modul z rozcestnika nedohlada')
 end
 
-# CLAUDE.md sa nacitava AUTOMATICKY kazde sedenie — architektura sa don nesmie vratit
-# (davka U3 ju presunula do docs/ARCHITEKTURA.md). Guard proti recidive.
-NxTest.test('docs: CLAUDE.md neobsahuje nadpis sekcie Architektura') do
-  path = File.join(NxTest::ROOT, 'CLAUDE.md')
-  NxTest.assert(File.exist?(path), 'CLAUDE.md chyba')
-  offenders = File.read(path, encoding: 'UTF-8').lines.map(&:rstrip).select do |l|
-    l.start_with?('## ') && l.downcase.include?('architekt')
+# CLAUDE.md a AGENTS.md sa nacitavaju AUTOMATICKY kazde sedenie — architektura sa do nich nesmie vratit
+# (davka U3 ju presunula do docs/ARCHITEKTURA.md). Guard proti recidive; od davky P1b je CLAUDE.md
+# len most (@AGENTS.md), preto guard strazi oba subory.
+NxTest.test('docs: CLAUDE.md ani AGENTS.md neobsahuje nadpis sekcie Architektura') do
+  %w[CLAUDE.md AGENTS.md].each do |name|
+    path = File.join(NxTest::ROOT, name)
+    NxTest.assert(File.exist?(path), "#{name} chyba")
+    offenders = File.read(path, encoding: 'UTF-8').lines.map(&:rstrip).select do |l|
+      l.start_with?('## ') && l.downcase.include?('architekt')
+    end
+    NxTest.assert(offenders.empty?,
+                  "#{name} ma nadpis architektury (#{offenders.join(' · ')}) — patri do docs/ARCHITEKTURA.md")
   end
-  NxTest.assert(offenders.empty?,
-                "CLAUDE.md ma nadpis architektury (#{offenders.join(' · ')}) — patri do docs/ARCHITEKTURA.md")
 end
 
-NxTest.test('docs: CLAUDE.md odkazuje na docs/ARCHITEKTURA.md') do
-  src = File.read(File.join(NxTest::ROOT, 'CLAUDE.md'), encoding: 'UTF-8')
+# Rozcestnik dokumentov zije v jadre AGENTS.md (davka P1b); CLAUDE.md ho importuje.
+NxTest.test('docs: AGENTS.md odkazuje na docs/ARCHITEKTURA.md') do
+  src = File.read(File.join(NxTest::ROOT, 'AGENTS.md'), encoding: 'UTF-8')
   NxTest.assert(src.include?('docs/ARCHITEKTURA.md'),
-                'CLAUDE.md neodkazuje na docs/ARCHITEKTURA.md — agent by mapu modulov nenasiel')
+                'AGENTS.md neodkazuje na docs/ARCHITEKTURA.md — agent by mapu modulov nenasiel')
+end
+
+NxTest.test('docs: AGENTS.md a CLAUDE.md nemaju riadok nad 400 znakov') do
+  offenders = []
+  NX_ROOT_LINE_FILES.each do |name|
+    path = File.join(NxTest::ROOT, name)
+    NxTest.assert(File.exist?(path), "#{name} chyba")
+    File.readlines(path, encoding: 'UTF-8').each_with_index do |line, i|
+      len = line.rstrip.length
+      offenders << "#{name}:#{i + 1} (#{len})" if len > NX_SYSTEM_MAX_LINE
+    end
+  end
+  NxTest.assert(offenders.empty?,
+                "Riadky nad #{NX_SYSTEM_MAX_LINE} znakov: #{offenders.join(', ')} — " \
+                'rozbi odsek na kratsie riadky (Markdown ich spoji do jedneho odseku)')
 end
 
 NxTest.test('docs: relativne odkazy v navigacnych suboroch ukazuju na existujuce subory') do
   broken = []
-  names = %w[CLAUDE.md docs/ARCHITEKTURA.md SYSTEM/README.md SYSTEM/STAV.md SYSTEM/PLAN.md
-             SYSTEM/DOGFOODING.md SYSTEM/V1_VIZIA.md SYSTEM/WORKFLOW.md docs/UI_DIZAJN.md] +
+  names = %w[CLAUDE.md AGENTS.md docs/ARCHITEKTURA.md SYSTEM/README.md SYSTEM/STAV.md SYSTEM/PLAN.md
+             SYSTEM/DOGFOODING.md SYSTEM/V1_VIZIA.md SYSTEM/WORKFLOW.md SYSTEM/pravidla/DEFINICIE.md
+             SYSTEM/pravidla/POVINNE_CITANIE.md SYSTEM/pravidla/roly/ORCHESTRATOR.md
+             SYSTEM/pravidla/roly/IMPLEMENTATOR.md docs/UI_DIZAJN.md] +
           NX_ARCH_FILES.map { |n| "docs/architecture/#{n}" }
   names.each do |name|
     path = File.join(NxTest::ROOT, name)

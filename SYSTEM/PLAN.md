@@ -25,6 +25,22 @@ odkazom v STAV a KRONIKE neprečíslúvajú:
   [výsledok a smoke checklist](archiv/HARDENING_ZAVER_2026-10-11.md), [priečinok](archiv/bloky/HARDENING/); **smoke čaká na Michala**).
 - **4 · V1 DOTIAHNUTIE** a **6 · INFRA** — formálne uzavreté 1.10.2026 dávkou H1 (**V1 hotové**; blok 6 = updater D-52, v0.9.14). Otvorené zvyšky sú v zásobníku nižšie.
 
+### 10 · PRAVIDLA (pravidlá a workflow agentov)
+
+**Cieľ:** univerzálne `AGENTS.md`, každá rola dostane len svoje pravidlá, jedna definícia = jeden domov, čo sa nesmie stať ani raz stráži stroj,
+retro spojené s hodnotením modelov a router. **Kód pluginu sa nemení** — meta-blok beží popri čakajúcom smoke bloku 9 (Michal 22.10.2026: „pokračuj").
+Priečinok [zdroje/bloky/PRAVIDLA/](zdroje/bloky/PRAVIDLA/) — zadanie, návrh štruktúry, karty rolí, súpis kópií definícií, packages.
+
+- ✅ Rešerš agy už nekončí prázdna — oprava postupu (PR #475) a stráž v priečinku behu (PR #476).
+- ✅ **P1a** definície na jednom mieste (`SYSTEM/pravidla/DEFINICIE.md` + guard, rozpory R1–R10) — PR #478.
+- ✅ **P4a** drobnosti: JS testy jedným príkazom · runner berie ENGINEtests z hlavného checkoutu · `otvor_pr.ps1` (kvóta + PR + číslo PR) · pripomienka po mergi — PR #479.
+- ✅ **P1b** jadro `AGENTS.md` + most `CLAUDE.md` + roly `ORCHESTRATOR.md`, `IMPLEMENTATOR.md` + `POVINNE_CITANIE.md` + strop veľkosti a zákaz histórie (guard) — PR #480.
+- **P2** roly — karty rolí, generované typy agentov, rola analytik, jedna tabuľka obsadenia.
+- **P3** pravidlá oblastí (`.claude/rules/`) + skilly `uzaver-bloku` a `smoke`.
+- **P4** stroje — hooky (commit do main, merge bez pripnutej hlavy, runner bez `-CloseWhenDone`), guardy, `rozpracovane.ps1`, karta priebehu.
+- **P5** hodnotenia po úlohách + karty modelov + router v0 · vyhodnotenie pilotu nočnej hliadky pred 5.11.2026.
+- **P6** uzáver bloku + smoke pravidiel.
+
 ### 3 · STABILITA
 
 **Cieľ:** synchronizácia panela s modelom a okrajové situácie observerov. *(D-101 — panel po Späť/Znova — je vyriešená, PR #162.)*
@@ -61,7 +77,7 @@ odkazom v STAV a KRONIKE neprečíslúvajú:
   (`BoardBuilder.dedup_copies` a dedup skrinky dnes značku ticho prepíšu na aktuálnu a ORANGE nález zanikne bez kontroly kusa); potrebné až pri prvom zvýšení `Store::STD`
   (vzor R-12 pre `config_schema`). Package [PACKAGE_H8.md](archiv/bloky/HARDENING/PACKAGE_H8.md) §14.
 - **Runner testov v SketchUpe po teste sám vráti pôvodnú verziu pluginu** (workflow N4, 26.9.2026) — `scripts\run_su_tests.ps1` dnes nechá nasadenú
-  rozpracovanú vetvu; dovtedy platí pravidlo „po každom mergi nainštalovať main" (CLAUDE.md, Verzia a uzáver).
+  rozpracovanú vetvu; dovtedy platí pravidlo „po mergi nainštalovať main, keď PR menil plugin alebo je nasadené niečo iné než main" (`pravidla/roly/ORCHESTRATOR.md`, Inštalácia mainu).
 - **D-147 · Nárezový plán: menšie dielce nad seba v páse** (Michal 29.9.2026, smoke bloku 2) — vnárať menšie dielce do voľného miesta pásu nad nižším dielcom (plán býva niekedy o platňu opatrnejší, než musí); plné znenie v [DOGFOODING.md](DOGFOODING.md).
 - **D-146 · Falošný duplák** (Michal 28.9.2026) — spodná vrstva dupláku zo 100 mm širokých výstuh namiesto plnej dosky (šetrí materiál aj váhu, keď obe strany nie sú pohľadové); plné znenie v [DOGFOODING.md](DOGFOODING.md).
 - **M-R nadstavby zo smoke 12.9.2026:** **D-126** otočenie zdrojového obrázka o ±90° pred uložením; **D-127** prirodzenejšie umiestnenie textúry (náhodný posun, nadväzovanie na skrinke alebo ručné umiestnenie — výber podľa praxe Lucie). Odložené, bez termínu, neblokujú uzáver M-R; plný kontext v [DOGFOODING.md](DOGFOODING.md).
@@ -100,14 +116,14 @@ odkazom v STAV a KRONIKE neprečíslúvajú:
 
 ## Pravidlá plánovania dávok (prenesené doslova z blokov 1d a 1e pri ich archivácii 1.10.2026)
 
-**Šablóna package (blok 1e, 30.8.2026):** Package = plné zadanie dávky; dnes žije v priečinku bloku `zdroje/bloky/<BLOK>/` (CLAUDE.md, Verzia a uzáver). **Šablóna package (povinné polia):**
+**Šablóna package (blok 1e, 30.8.2026):** Package = plné zadanie dávky; dnes žije v priečinku bloku `zdroje/bloky/<BLOK>/` (`pravidla/roly/ORCHESTRATOR.md`, Tok bloku). **Šablóna package (povinné polia):**
 cieľ · scope IN · **scope OUT** (čo dávka vedome NErobí) · dotknuté dáta/kontrakt → audit áno/nie · testy a DoD · riziká · smoke checklist pre Michala · checklist uzáveru. Každý package si na štarte
 spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom packages preberajú sekvenčne bez ďalšieho plánovania.
 
 **Dávky z registra auditu a refaktory (blok 1d, 29.8.2026):** Register sa vyprázdňuje **malými dávkami** (malé PR > obrie PR), zoradené podľa závažnosti × blokovanej funkcie.
 Pravidlo podľa druhu dávky: **štrukturálny refaktor = „správanie sa nemení"** (presun zodpovednosti, testy to dokazujú);
 **oprava chyby/hardening = explicitná, testom podložená ZMENA správania** (v PR pomenovaná: čo bolo zle → čo platí teraz).
-In-SU testy povinné pri builderoch/observeroch; mutačné overenie štandard. Nálezy z reálnej výroby majú stále prednosť
+In-SU testy podľa [DEFINICIE § D6](pravidla/DEFINICIE.md#d6); mutačné overenie štandard. Nálezy z reálnej výroby majú stále prednosť
 (Pravidlo pre postrehy). Dávka, ktorá nevie povedať, ktorú naplánovanú funkciu pripravuje alebo ktorý dlh spláca, sa nerobí.
 
 ## Trvalé pravidlá — kde žijú

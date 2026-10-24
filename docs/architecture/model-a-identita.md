@@ -581,4 +581,4 @@ vlastnú. Volá sa **z `TemplateStore.rename` pod jeho zámkom, až po úspešno
 
 _(zatiaľ nezdokumentované — doplniť pri najbližšom zásahu)_
 
-Read-only dump stavu enginu pre bugcatch (`Noxun::Engine::Debug.report`); popis použitia je v `CLAUDE.md`, sekcia Testovanie.
+Read-only dump stavu enginu pre bugcatch (`Noxun::Engine::Debug.report`); popis použitia je v `SYSTEM/pravidla/roly/IMPLEMENTATOR.md`, sekcia Testovanie.

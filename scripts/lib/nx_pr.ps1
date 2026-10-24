@@ -1,0 +1,83 @@
+# Noxun Engine - pomocne funkcie pre scripts\otvor_pr.ps1 (dot-source).
+# Testy: tests/pure/test_p4a_skripty.rb
+#
+# Dolezite: doplnenie cisla PR meni IBA riadky, ktore vetva pridala voci base (z `git diff -U0`),
+# a LEN v subroch zo zoznamu $NxPrNumberFiles - `PR #?` sa inde (aj v starych zaznamoch
+# tychto suborov) vyskytuje ako TEXT pravidla a nesmie sa prepisat.
+#
+# ASCII, bez ternary / ?? / ?. (PS 5.1 aj pwsh).
+
+# Subory, v ktorych davka pise cislo PR (SYSTEM/pravidla/roly/IMPLEMENTATOR.md, Verzia a uzaver: "Cislo PR").
+$NxPrNumberFiles = @(
+  'SYSTEM/PLAN.md',
+  'SYSTEM/STAV.md',
+  'SYSTEM/archiv/KRONIKA.md',
+  'SYSTEM/archiv/DOGFOODING_vyriesene.md'
+)
+$NxPrPlaceholder = 'PR #?'
+
+# Nativny prikaz s kontrolovanym stderr (PS 5.1 + EAP Stop by inak z kazdeho riadku stderr urobil chybu).
+# Vracia @{ code; out } - out = pole riadkov stdout.
+function Invoke-NxNative([string]$Exe, [string[]]$ArgList, [switch]$Quiet) {
+  $old = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  try {
+    $global:LASTEXITCODE = 0
+    if ($Quiet) { $out = & $Exe @ArgList 2>$null } else { $out = & $Exe @ArgList }
+    return @{ code = [int]$global:LASTEXITCODE; out = @($out) }
+  } finally {
+    $ErrorActionPreference = $old
+  }
+}
+
+# Cisla riadkov (1-based, vo verzii HEAD), ktore vetva pridala alebo zmenila v $RelPath voci $BaseRef.
+function Get-NxAddedLineNumbers([string]$Repo, [string]$BaseRef, [string]$RelPath) {
+  $r = Invoke-NxNative 'git' @('-C', $Repo, 'diff', '--no-color', '--no-ext-diff', '-U0', "$BaseRef...HEAD", '--', $RelPath)
+  if ($r.code -ne 0) { throw "git diff zlyhal pre $RelPath (exit $($r.code))" }
+  $nums = New-Object System.Collections.Generic.List[int]
+  foreach ($l in $r.out) {
+    $m = [regex]::Match([string]$l, '^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@')
+    if (-not $m.Success) { continue }
+    $start = [int]$m.Groups[1].Value
+    $count = 1
+    if ($m.Groups[2].Success) { $count = [int]$m.Groups[2].Value }
+    for ($i = 0; $i -lt $count; $i++) { $nums.Add($start + $i) }
+  }
+  return $nums.ToArray()
+}
+
+# V $RelPath nahradi `PR #?` cislom len na riadkoch $Lines. Vracia pocet upravenych riadkov.
+# S -DryRun nic nezapise. Zachova konce riadkov (LF aj CRLF) a kodovanie UTF-8 bez BOM.
+function Set-NxPrNumberInFile([string]$Repo, [string]$RelPath, [int[]]$Lines, [string]$Number, [switch]$DryRun) {
+  $path = Join-Path $Repo $RelPath
+  if (-not (Test-Path -LiteralPath $path)) { return 0 }
+  $utf8 = New-Object System.Text.UTF8Encoding($false)
+  $text = [System.IO.File]::ReadAllText($path, $utf8)
+  $parts = [regex]::Split($text, '(?<=\n)')
+  $count = 0
+  foreach ($n in $Lines) {
+    $i = $n - 1
+    if ($i -lt 0 -or $i -ge $parts.Length) { continue }
+    if ($parts[$i].Contains($NxPrPlaceholder)) {
+      $parts[$i] = $parts[$i].Replace($NxPrPlaceholder, "PR #$Number")
+      $count++
+    }
+  }
+  if ($count -gt 0 -and -not $DryRun) {
+    [System.IO.File]::WriteAllText($path, ($parts -join ''), $utf8)
+  }
+  return $count
+}
+
+# Zo zmenenych suborov vetvy (voci $BaseRef) doplni cislo PR. Vracia pole [pscustomobject] { file; replaced }
+# len pre subory, v ktorych sa nieco nahradilo (alebo by sa nahradilo pri -DryRun).
+function Update-NxPrNumber([string]$Repo, [string]$BaseRef, [string]$Number, [switch]$DryRun) {
+  $changed = @()
+  foreach ($f in $NxPrNumberFiles) {
+    $lines = @(Get-NxAddedLineNumbers $Repo $BaseRef $f)
+    if ($lines.Count -eq 0) { continue }
+    $c = Set-NxPrNumberInFile $Repo $f $lines $Number -DryRun:$DryRun
+    if ($c -gt 0) { $changed += [pscustomobject]@{ file = $f; replaced = $c } }
+  }
+  return $changed
+}
