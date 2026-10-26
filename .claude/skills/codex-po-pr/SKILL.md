@@ -20,12 +20,12 @@ GitHub Codex review (rola **review PR** v tabuľke Obsadenie rolí, `SYSTEM/WORK
    - **Číslo PR** je všade, kde ho dávka píše (PLAN, KRONIKA, STAV, `DOGFOODING_vyriesene`), zatiaľ `PR #?` — doplní ho samostatný commit hneď
      po `gh pr create` (krok 1); **PR aj ten commit urobí jedným príkazom `scripts\otvor_pr.ps1`** (ručný postup ostáva ako záloha).
    - **Kvótová brána (rozhodnutie N18, 26.9.2026; `scripts\otvor_pr.ps1` ju volá sám):** `& ".claude\skills\usage\usage.ps1" -Label "<dávka>" -Phase before -Gate codex` — **exit 3 = PR sa
-     otvorí ako draft** (`gh pr create --draft`; Codex draft nerecenzuje) a ďalej podľa triedy dávky — prah a reakcie (náhradná brána z kroku 3, alebo
+     otvorí ako draft** (`gh pr create --draft`; Codex draft nerecenzuje; draft aj pri neznámom stave kvóty, exit 2/4) a ďalej podľa triedy dávky — prah a reakcie (náhradná brána z kroku 3, alebo
      rozhodne Michal a draft dovtedy čaká): skill `usage`, sekcia „Prahy a reakcie". Dôvod draftu: kolo, ktoré beží samo po otvorení PR, sa nedá zastaviť.
 1. **Otvorenie PR:** `powershell -NoProfile -File scripts\otvor_pr.ps1 -Title "<názov>" -BodyFile <popis.md> -CoAuthor "Claude <model> <noreply@anthropic.com>"`
    (PR popis po slovensky v súbore, nie here-string; `-WhatIf` = suchý beh) — skript spraví kvótovú bránu (exit 3 aj neznámy stav kvóty = draft), pushne vetvu, `gh pr create` a hneď **doplní číslo PR**
    namiesto `PR #?` (PLAN, KRONIKA, STAV, `DOGFOODING_vyriesene`; len na riadkoch pridaných vetvou) samostatným commitom, ktorý mení len číslo, a pushne ho.
-   **Záloha ručne:** `git push` + `gh pr create` (`--body-file`) a samostatný commit s číslom. Tento commit **pred mergom skontroluje orchestrátor** (pri čistom
+   **Záloha ručne:** kvótová brána z kroku 0 (exit 3 aj neznámy stav kvóty, exit 2/4 = `--draft`) + `git push` + `gh pr create` (`--body-file`) a samostatný commit s číslom. Tento commit **pred mergom skontroluje orchestrátor** (pri čistom
    kole 1 inak žiadna delta nebeží; keď delta beží, patrí do nej). Potom nastav budík — Bash `sleep 600` s `run_in_background: true`;
    medzitým pokračuj v inej práci. **Prvé kolo (po `gh pr create`) beží automaticky — ďalšie NIE.**
 2. **Po budíku over stav:**

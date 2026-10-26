@@ -3,8 +3,8 @@
 > Platí pre každú rolu podľa druhu práce (rozcestník: [AGENTS.md](../../AGENTS.md)). Cesty v zátvorkách sú od koreňa repa.
 
 **Nájdi riadok svojho zásahu a uvedené dokumenty si prečítaj PRED prácou.** Je to povinnosť, nie odporúčanie: automaticky sa načíta
-len AGENTS.md (Claude Code cez most `CLAUDE.md` aj ORCHESTRATOR.md); súbor svojej roly čítaj podľa typu agenta alebo zadania —
-architektúra, štandard ani pravidlá kódu sa nenačítajú. Neprečítaný riadok = zásah naslepo.
+len AGENTS.md (hlavné okno Claude Code cez most `CLAUDE.md` aj ORCHESTRATOR.md; typy agentov majú jadro a súbor svojej roly vložené
+v tele, Codexu a Groku ich menuje zadanie) — architektúra, štandard ani pravidlá kódu sa nenačítajú. Neprečítaný riadok = zásah naslepo.
 
 Riadok = **Ideš robiť…** → **Pred prácou POVINNE prečítaj**:
 
@@ -33,7 +33,7 @@ Riadok = **Ideš robiť…** → **Pred prácou POVINNE prečítaj**:
   Kusovníka** [SYSTEM/zdroje/ui20/UI20_KONTRAKT.md](../zdroje/ui20/UI20_KONTRAKT.md) (Š2 stĺpce) + **cache-bust pravidlo**
   ([IMPLEMENTATOR.md, Verzia a uzáver dávky](roly/IMPLEMENTATOR.md#verzia); `?v=` = presne VERSION) + trvalé pravidlo **„vertikálny
   priestor panela je vzácny"** (autorita UI_DIZAJN §1). Po zmene UI nafoť okná (`scripts\ui_foto.ps1`,
-  [IMPLEMENTATOR.md, sekcia **Testovanie**](roly/IMPLEMENTATOR.md#testovanie))
+  [NASTROJE_TESTOV.md, Fotenie okien](NASTROJE_TESTOV.md#foto))
 - **materiály · ABS · katalóg · Demos** → odseky `materials`, `materials_*` split, `materials_migration`, `materials_health`, `abs_rules`,
   `demos/` v [docs/architecture/materials.md](../../docs/architecture/materials.md) (Grep `^### <modul>`; celý má 72 kB)
   + [SYSTEM/STANDARD.md](../STANDARD.md) **§7 Materiály a ABS**
@@ -43,7 +43,7 @@ Riadok = **Ideš robiť…** → **Pred prácou POVINNE prečítaj**:
 - **výstupy — VEPO, kusovník, nákup, CSV/XLSX** → [SYSTEM/VEPO_KONTRAKT.md](../VEPO_KONTRAKT.md) + odseky `validation`, `production_core`
   a dotknutého výstupu v [docs/architecture/outputs.md](../../docs/architecture/outputs.md) (Grep `^### <modul>`; celý má 163 kB) + odseky
   `build_plan`, `part_keys` v [docs/architecture/model-a-identita.md](../../docs/architecture/model-a-identita.md) + STANDARD §8 a §11.
-  Po zmene exportu **export test** `scripts\export_test.ps1` ([IMPLEMENTATOR.md, sekcia **Testovanie**](roly/IMPLEMENTATOR.md#testovanie))
+  Po zmene exportu **export test** `scripts\export_test.ps1` ([NASTROJE_TESTOV.md, Export test](NASTROJE_TESTOV.md#export))
 - **bugfix · diagnostiku · „prečo to padá"** → mapa „Kam sa pozrieť" v [SYSTEM/STAV.md](../STAV.md) → odsek dotknutého modulu
   v `docs/architecture/` (cez rozcestník [docs/ARCHITEKTURA.md](../../docs/ARCHITEKTURA.md)) → pri otázke **„prečo je to takto?"** najprv
   priečinok bloku (`SYSTEM/archiv/bloky/<BLOK>/`, `SYSTEM/archiv/<BLOK>_ZAVER_*`), potom [SYSTEM/archiv/KRONIKA.md](../archiv/KRONIKA.md)

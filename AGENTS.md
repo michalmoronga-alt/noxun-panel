@@ -2,13 +2,17 @@
 
 SketchUp Ruby plugin — parametrický nábytkársky systém (korpusy, zóny, čelá, materiály/ABS, kovanie, výstupy).
 GitHub: https://github.com/michalmoronga-alt/noxun-panel
-Tento súbor číta každý agent a nástroj (Claude Code cez most `CLAUDE.md`, Codex, Grok, review PR); k nemu patrí súbor tvojej roly.
+Tento súbor číta každý agent a nástroj (hlavné okno Claude Code cez most `CLAUDE.md`, typy agentov vo svojom tele, Codex, Grok,
+review PR; výnimka: rešeršér má len svoju kartu); k nemu patrí súbor tvojej roly.
 
 ## Tvoja rola
 
 - **orchestrátor** (hlavné okno) → [SYSTEM/pravidla/roly/ORCHESTRATOR.md](SYSTEM/pravidla/roly/ORCHESTRATOR.md)
 - **implementátor** → [SYSTEM/pravidla/roly/IMPLEMENTATOR.md](SYSTEM/pravidla/roly/IMPLEMENTATOR.md)
-- **slepý recenzent, audítor, rešeršér** → typ agenta v `.claude/agents/` a zadanie od orchestrátora
+- **slepý recenzent** → [RECENZENT.md](SYSTEM/pravidla/roly/RECENZENT.md) · **audítor** → [AUDITOR.md](SYSTEM/pravidla/roly/AUDITOR.md) ·
+  **rešeršér** → [RESERSER.md](SYSTEM/pravidla/roly/RESERSER.md) · **analytik** → [ANALYTIK.md](SYSTEM/pravidla/roly/ANALYTIK.md)
+- Claude typy agentov (`.claude/agents/`) majú pravidlá svojej roly vložené v tele — generuje ich `scripts/generuj_typy_agentov.rb`
+  zo `SYSTEM/pravidla/typy/`; ručne sa needitujú.
 - **review PR** → sekcia [Code Review Rules](#code-review-rules) nižšie
 - Každá rola: [SYSTEM/pravidla/DEFINICIE.md](SYSTEM/pravidla/DEFINICIE.md) — jediné znenie definícií brán a tried (D1–D6).
 - Každá rola podľa druhu práce: riadok svojho zásahu v [SYSTEM/pravidla/POVINNE_CITANIE.md](SYSTEM/pravidla/POVINNE_CITANIE.md)

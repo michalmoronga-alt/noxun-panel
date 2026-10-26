@@ -35,10 +35,10 @@ Priečinok [zdroje/bloky/PRAVIDLA/](zdroje/bloky/PRAVIDLA/) — zadanie, návrh 
 - ✅ **P1a** definície na jednom mieste (`SYSTEM/pravidla/DEFINICIE.md` + guard, rozpory R1–R10) — PR #478.
 - ✅ **P4a** drobnosti: JS testy jedným príkazom · runner berie ENGINEtests z hlavného checkoutu · `otvor_pr.ps1` (kvóta + PR + číslo PR) · pripomienka po mergi — PR #479.
 - ✅ **P1b** jadro `AGENTS.md` + most `CLAUDE.md` + roly `ORCHESTRATOR.md`, `IMPLEMENTATOR.md` + `POVINNE_CITANIE.md` + strop veľkosti a zákaz histórie (guard) — PR #480.
-- **P2** roly — karty rolí, generované typy agentov, rola analytik, jedna tabuľka obsadenia.
+- ✅ **P2** roly — karty rolí (`RECENZENT`, `AUDITOR`, `RESERSER`, `ANALYTIK` + doplnené `ORCHESTRATOR`, `IMPLEMENTATOR`), typy agentov generované zo `SYSTEM/pravidla/typy/` s `omitClaudeMd`, typ `analytik`, guard G4 — PR #482.
 - **P3** pravidlá oblastí (`.claude/rules/`) + skilly `uzaver-bloku` a `smoke`.
 - **P4** stroje — hooky (commit do main, merge bez pripnutej hlavy, runner bez `-CloseWhenDone`), guardy, `rozpracovane.ps1`, karta priebehu.
-- **P5** hodnotenia po úlohách + karty modelov + router v0 · vyhodnotenie pilotu nočnej hliadky pred 5.11.2026.
+- **P5** hodnotenia po úlohách + karty modelov + router v0 + jedna tabuľka obsadenia (`OBSADENIE.md`, úprava modu usage-bar) · vyhodnotenie pilotu nočnej hliadky pred 5.11.2026.
 - **P6** uzáver bloku + smoke pravidiel.
 
 ### 3 · STABILITA

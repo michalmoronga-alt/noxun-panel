@@ -43,11 +43,13 @@ NX_DEF_PHRASES = {
 # Subory pravidiel, ktore nesmu niest kopiu definicie (relativne k rootu; glob povoleny).
 # STANDARD.md navyse oproti package P1a § 5 — v §13 niesol parafrazu D1/D2 (R10); docs/architecture/*.md
 # po review PR #478 (rozsirovacie-body.md prerozpravalo hranice D1 a D5). Davka P1b: subory roli
-# a povinne citanie (pravidla presunute z CLAUDE.md).
+# a povinne citanie (pravidla presunute z CLAUDE.md). Davka P2: typy agentov .claude/agents/*.md su GENEROVANE
+# a DEFINICIE.md v nich je vlozena doslova (zamerne) — prehladavaju sa ich rucne zdroje SYSTEM/pravidla/typy/*.md
+# (zhodu typov so zdrojmi strazi G4 v test_agent_definitions.rb).
 NX_DEF_SCAN = %w[
   CLAUDE.md AGENTS.md SYSTEM/WORKFLOW.md SYSTEM/PLAN.md SYSTEM/README.md SYSTEM/STANDARD.md
-  SYSTEM/pravidla/roly/*.md SYSTEM/pravidla/POVINNE_CITANIE.md
-  .claude/agents/*.md .claude/skills/*/SKILL.md docs/architecture/*.md
+  SYSTEM/pravidla/roly/*.md SYSTEM/pravidla/POVINNE_CITANIE.md SYSTEM/pravidla/NASTROJE_TESTOV.md SYSTEM/pravidla/typy/*.md
+  .claude/skills/*/SKILL.md docs/architecture/*.md
 ].freeze
 
 def nx_def_normalize(text)

@@ -34,7 +34,8 @@ NX_PLAN_MAX_BYTES = 40 * 1024
 NX_SYSTEM_LINE_FILES = %w[
   STAV.md PLAN.md DOGFOODING.md README.md V1_VIZIA.md VEPO_KONTRAKT.md AUDIT_REGISTER.md
   STANDARD.md POJMY.md WORKFLOW.md pravidla/DEFINICIE.md pravidla/POVINNE_CITANIE.md
-  pravidla/roly/ORCHESTRATOR.md pravidla/roly/IMPLEMENTATOR.md
+  pravidla/roly/ORCHESTRATOR.md pravidla/roly/IMPLEMENTATOR.md pravidla/roly/RECENZENT.md
+  pravidla/roly/AUDITOR.md pravidla/roly/RESERSER.md pravidla/roly/ANALYTIK.md pravidla/NASTROJE_TESTOV.md
 ].freeze
 NX_SYSTEM_MAX_LINE = 400
 # Davka P1b (blok 10 · PRAVIDLA) presunula pravidla z CLAUDE.md do jadra AGENTS.md, suborov roli

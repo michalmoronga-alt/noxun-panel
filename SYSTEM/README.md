@@ -38,8 +38,10 @@ a [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md) — **len Gre
 | [V1_VIZIA.md](V1_VIZIA.md) | definícia „V1 hotové" + nemenné princípy | plán (ten je v PLAN.md) |
 | [WORKFLOW.md](WORKFLOW.md) | mapa workflowu: roly a **obsadenie rolí** (mení Michal), diagramy blok · dávka · review, brány, hranice | záväzné znenie pravidiel (to je v ../AGENTS.md, pravidla/ a skilloch) |
 | [pravidla/DEFINICIE.md](pravidla/DEFINICIE.md) | **definície brán a tried** (jediné znenie): výrobná/cenová, audit-povinná, triedy D/Ľ/S/Ť, predrecenzia, nový prvok UI, in-SU — kópie stráži guard `test_definicie.rb` | postup (skilly), kvótové prahy (`usage`), review kolá (`codex-po-pr`) ani obsadenie rolí (WORKFLOW) |
-| [pravidla/roly/](pravidla/roly/) | pravidlá jednej roly: [ORCHESTRATOR.md](pravidla/roly/ORCHESTRATOR.md) (merge, review, kvóty, autonómne bloky, uzáver bloku) · [IMPLEMENTATOR.md](pravidla/roly/IMPLEMENTATOR.md) (verzia, checklist uzáveru dávky, testovanie); jadro pre všetkých je [../AGENTS.md](../AGENTS.md) | definície (DEFINICIE.md) ani postupy (skilly) |
+| [pravidla/roly/](pravidla/roly/) | karty rolí — pravidlá jednej roly: ORCHESTRATOR (merge, review, kvóty, autonómne bloky, uzáver bloku) · IMPLEMENTATOR (postup, verzia, uzáver dávky, testovanie) · RECENZENT · AUDITOR · RESERSER · ANALYTIK; jadro pre všetkých je [../AGENTS.md](../AGENTS.md) | definície (DEFINICIE.md) ani postupy (skilly) |
+| [pravidla/typy/](pravidla/typy/) | zdroje Claude typov agentov (frontmatter, hlavička, zoznam vložených súborov); `.claude/agents/` z nich generuje `scripts/generuj_typy_agentov.rb` | pravidlá rolí (tie sú v kartách) |
 | [pravidla/POVINNE_CITANIE.md](pravidla/POVINNE_CITANIE.md) | povinné čítanie podľa typu práce + rozpočet čítania | pravidlá práce (jadro a roly) |
+| [pravidla/NASTROJE_TESTOV.md](pravidla/NASTROJE_TESTOV.md) | podrobnosti nástrojov testov: fotenie okien, export test, diagnostika MCP | kedy nástroj platí (IMPLEMENTATOR.md, Testovanie) |
 | [retro/](retro/README.md) | pokus retro (27.9.–11.10.2026): formát záznamov po behoch v [retro/README.md](retro/README.md); inbox `retro/inbox/` je **lokálny, git ho ignoruje** (pravidlá pokusu: WORKFLOW.md, časť 9) | záväzné pravidlo (retro len navrhuje, rozhoduje Michal) ani archív (spracované vyhodnotenia sú v `archiv/retro/`) |
 
 ## Vrstvy
