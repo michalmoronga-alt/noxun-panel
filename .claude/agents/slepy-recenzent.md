@@ -235,8 +235,7 @@ súbory nezapisuj.
 ## Verzia a uzáver dávky
 
 - `VERSION` žije na 2 miestach: `noxun_engine.rb` (autorita) + `noxun_engine/main.rb` (fallback); synchro stráži guard test.
-  **Každý PR meniaci kód pluginu = bump patch**; **minor = výhradne uzáver bloku**
-  ([ORCHESTRATOR.md, Uzáver bloku](ORCHESTRATOR.md#uzaver-bloku)).
+  **Každý PR meniaci kód pluginu = bump patch**; **minor = výhradne uzáver bloku** (skill `uzaver-bloku`).
 - **Každé zvýšenie VERSION = prepis `SYSTEM/STAV.md`** (okrem triedy D — [DEFINICIE § D3](../DEFINICIE.md#d3)); čo robí STAV pri
   dokumentačnom PR, určuje hlavička „Údržba" v [STAV.md](../../STAV.md).
 - **Checklist uzáveru kódovej dávky:** bump VERSION (2×) + každý `?v=` v `ui/*.html` (pravidlo: `.claude/rules/ui.md`) → testy zelené →

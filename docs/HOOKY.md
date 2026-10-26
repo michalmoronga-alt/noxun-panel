@@ -15,7 +15,21 @@ nad celým repom; pravidlá sa menia len tam. Ručne: `ruby scripts/encoding_gua
 
 Hook je rýchla spätná väzba: edit už je zapísaný, takže pri hláške chybu hneď oprav. Vynucovanie ostáva na CI.
 
-## Hooky hlavného okna
+## Hooky hlavného okna (orchestrátor)
 
-Pripomienka po mergi a ukazovateľ kontextu patria hlavnému oknu (orchestrátor) a sú opísané v
-[ORCHESTRATOR.md](../SYSTEM/pravidla/roly/ORCHESTRATOR.md).
+Pravidlá, ktoré z nich plynú, sú v [ORCHESTRATOR.md](../SYSTEM/pravidla/roly/ORCHESTRATOR.md); tu je len opis hookov.
+
+### Pripomienka po mergi — `po_merge.js`
+
+PostToolUse na Bash s filtrom `gh pr merge` (hook si príkaz filtruje sám; v settings je len matcher Bash, bez poľa `if`). Po `gh pr merge <N>`
+vloží hlavnému agentovi vecné konštatovanie v dvoch riadkoch: „PR #N menil plugin: áno/nie" (z `gh pr view`) a „Nasadený je <vetva> <sha>
+(<čas>) → inštalácia mainu je potrebná / nie je potrebná". Údaje berie zo značky nasadenia `%TEMP%\noxun_nasadene.txt` (vetva, SHA, či bol
+strom čistý, čas; zapisuje ju `INSTALL_noxun_engine.ps1`) a z porovnania kódu pluginu s `origin/main`; chýbajúca značka alebo neznámy stav
+= „potrebná". Sama nič nespúšťa, pri chybe mlčí a príkaz nikdy neblokuje. Živé spustenie z Claude Code sa overuje pri reálnom merge.
+Testy: `tests/js/test_po_merge.js`.
+
+### Ukazovateľ kontextu — `context_meter.js`
+
+Hook vloží hlavnému agentovi riadok `Kontext orchestrátora: 612k z 1M (61 %).` pri každej správe Michala a po nástroji len pri prechode
+do vyššieho pásma (50–95 %); subagentov nechá na pokoji. Čo robiť od 75 % a 90 %, určuje ORCHESTRATOR.md (Ukazovateľ kontextu).
+Testy: `tests/js/test_context_meter.js`.
