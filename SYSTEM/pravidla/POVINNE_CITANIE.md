@@ -3,8 +3,9 @@
 > Platí pre každú rolu podľa druhu práce (rozcestník: [AGENTS.md](../../AGENTS.md)). Cesty v zátvorkách sú od koreňa repa.
 
 **Nájdi riadok svojho zásahu a uvedené dokumenty si prečítaj PRED prácou.** Je to povinnosť, nie odporúčanie: automaticky sa načíta
-len AGENTS.md (hlavné okno Claude Code cez most `CLAUDE.md` aj ORCHESTRATOR.md; typy agentov majú jadro a súbor svojej roly vložené
-v tele, Codexu a Groku ich menuje zadanie) — architektúra, štandard ani pravidlá kódu sa nenačítajú. Neprečítaný riadok = zásah naslepo.
+AGENTS.md (hlavné okno Claude Code cez most `CLAUDE.md` aj ORCHESTRATOR.md; typy agentov majú jadro a súbor svojej roly vložené
+v tele, Codexu a Groku ich menuje zadanie) a v Claude Code aj **súbor oblasti** `.claude/rules/<oblasť>.md`, keď agent súbor oblasti
+číta (Read) alebo upravuje (Edit, Write). Architektúra, štandard ani pravidlá kódu sa inak nenačítajú. Neprečítaný riadok = zásah naslepo.
 
 Riadok = **Ideš robiť…** → **Pred prácou POVINNE prečítaj**:
 
@@ -18,47 +19,36 @@ Riadok = **Ideš robiť…** → **Pred prácou POVINNE prečítaj**:
   `PACKAGE_*`) a záver `SYSTEM/archiv/<BLOK>_ZAVER_*`; bloky spred tejto konvencie (napr. KOVANIE, GHOST, UI 2.0, M-R) → plný text
   v `SYSTEM/archiv/ROADMAP_hotove_etapy.md`, KRONIKA Grepom podľa ID dávky a staršie podklady v `SYSTEM/zdroje/next_sessions/`
   (`KOVANIE_*`, `GHOST_*`, `MR_*`…) a `SYSTEM/zdroje/ui20/`. Keď nevieš, ktorý dokument je autorita na čo: [SYSTEM/README.md](../README.md)
-- **zmenu Ruby kódu — core / modules** → rozcestník [docs/ARCHITEKTURA.md](../../docs/ARCHITEKTURA.md) → odseky **dotknutých modulov**
-  v `docs/architecture/` (Grep `^### <súbor>`; súbory mapy majú 47–257 kB, celé sa nečítajú) + dotknuté § [SYSTEM/STANDARD.md](../STANDARD.md)
-  (Grep `^## <číslo>.` / `^### <číslo>`; celý má 170 kB)
-- **buildery · observery · undo · geometriu** → odseky `construction`, `cabinet_builder`, `board_builder`, `zone_tree`, `scale_observer`
-  v [docs/architecture/construction.md](../../docs/architecture/construction.md) (Grep `^### <modul>`; celý má 174 kB)
-  + [docs/SKETCHUP_PRAVIDLA.md](../../docs/SKETCHUP_PRAVIDLA.md) + STANDARD §3, §4, §9. **In-SU test je tu brána mergu** (spúšťače:
-  [DEFINICIE § D6](DEFINICIE.md#d6); runner: [IMPLEMENTATOR.md, sekcia **Testovanie**](roly/IMPLEMENTATOR.md#testovanie))
-- **UI — Inspector, Štúdio, HTML, JS, CSS** → [docs/UI_DIZAJN.md](../../docs/UI_DIZAJN.md) **§1–§3** (norma, pri KAŽDEJ UI práci; pri ikone
-  či komponente aj dotknutý §4 / §5.x) + **odsek dotknutej UI sekcie alebo modulu** v
-  [docs/architecture/ui-lifecycle.md](../../docs/architecture/ui-lifecycle.md) (Grep podľa nadpisu; celý má ~257 kB) — napr. sekcia Štúdia
-  `^### Sekcia ROZPOČET`, kontext Inspectora `^### Kontext Čelá`, `^### Satelitné okná` a súbor dialógu (`^### <súbor>_dialog.rb`),
-  `^### D-15 modal`, `^### Paleta a téma`, `^### Veľkosť okna pri otvorení` + pri zmene stĺpcov alebo sekcií Štúdia **záväzný kontrakt
-  Kusovníka** [SYSTEM/zdroje/ui20/UI20_KONTRAKT.md](../zdroje/ui20/UI20_KONTRAKT.md) (Š2 stĺpce) + **cache-bust pravidlo**
-  ([IMPLEMENTATOR.md, Verzia a uzáver dávky](roly/IMPLEMENTATOR.md#verzia); `?v=` = presne VERSION) + trvalé pravidlo **„vertikálny
-  priestor panela je vzácny"** (autorita UI_DIZAJN §1). Po zmene UI nafoť okná (`scripts\ui_foto.ps1`,
-  [NASTROJE_TESTOV.md, Fotenie okien](NASTROJE_TESTOV.md#foto))
-- **materiály · ABS · katalóg · Demos** → odseky `materials`, `materials_*` split, `materials_migration`, `materials_health`, `abs_rules`,
-  `demos/` v [docs/architecture/materials.md](../../docs/architecture/materials.md) (Grep `^### <modul>`; celý má 72 kB)
-  + [SYSTEM/STANDARD.md](../STANDARD.md) **§7 Materiály a ABS**
-- **kovanie — pravidlá, sety, katalóg** → odseky `hardware_rules`, `hardware_catalog`, `hardware_sets` v
-  [docs/architecture/hardware.md](../../docs/architecture/hardware.md) (Grep `^### <modul>`; celý má 208 kB) + [SYSTEM/STANDARD.md](../STANDARD.md)
-  **§6 Kovanie** (42 kB — dotknuté §6.x)
-- **výstupy — VEPO, kusovník, nákup, CSV/XLSX** → [SYSTEM/VEPO_KONTRAKT.md](../VEPO_KONTRAKT.md) + odseky `validation`, `production_core`
-  a dotknutého výstupu v [docs/architecture/outputs.md](../../docs/architecture/outputs.md) (Grep `^### <modul>`; celý má 163 kB) + odseky
-  `build_plan`, `part_keys` v [docs/architecture/model-a-identita.md](../../docs/architecture/model-a-identita.md) + STANDARD §8 a §11.
-  Po zmene exportu **export test** `scripts\export_test.ps1` ([NASTROJE_TESTOV.md, Export test](NASTROJE_TESTOV.md#export))
 - **bugfix · diagnostiku · „prečo to padá"** → mapa „Kam sa pozrieť" v [SYSTEM/STAV.md](../STAV.md) → odsek dotknutého modulu
   v `docs/architecture/` (cez rozcestník [docs/ARCHITEKTURA.md](../../docs/ARCHITEKTURA.md)) → pri otázke **„prečo je to takto?"** najprv
   priečinok bloku (`SYSTEM/archiv/bloky/<BLOK>/`, `SYSTEM/archiv/<BLOK>_ZAVER_*`), potom [SYSTEM/archiv/KRONIKA.md](../archiv/KRONIKA.md)
   a [SYSTEM/archiv/DOGFOODING_vyriesene.md](../archiv/DOGFOODING_vyriesene.md) **len Grepom** podľa ID dávky alebo D-čísla (stovky kB,
   celé sa nečítajú)
-- **testy — novú sadu alebo úpravu** → [IMPLEMENTATOR.md, sekcia **Testovanie**](roly/IMPLEMENTATOR.md#testovanie) + vzory v `tests/pure/`,
-  `tests/js/`, `tests/sketchup/` (nová sada = štruktúra najbližšej existujúcej, nie vlastný formát)
 - **code review · audit návrhu** → dotknuté § [SYSTEM/STANDARD.md](../STANDARD.md) (kontrakt, proti ktorému sa posudzuje; Grep podľa
   nadpisu) + odseky dotknutých modulov v `docs/architecture/` + skill `codex-audit` + pri review diffu pravidlá, proti ktorým sa kontroluje
   uzáver dávky: [IMPLEMENTATOR.md, Verzia a uzáver dávky](roly/IMPLEMENTATOR.md#verzia) (checklist uzáveru, číslo PR) a
-  [Testovanie](roly/IMPLEMENTATOR.md#testovanie) (export test `P == K`, hlava in-SU behu)
-- **dynamické komponenty (DC)** → [docs/DC_PRAVIDLA.md](../../docs/DC_PRAVIDLA.md) — vždy a bez výnimky (draho zaplatené pasce)
+  [Testovanie](roly/IMPLEMENTATOR.md#testovanie) (export test `P == K` — `.claude/rules/vystupy.md`, hlava in-SU behu)
 - **workflow · pravidlá práce · skilly** → [SYSTEM/WORKFLOW.md](../WORKFLOW.md) (roly a ich obsadenie, diagramy blok · dávka · review,
   brány, hranice) + záznam „prečo" [WORKFLOW_ROZHODNUTIA_2026-09-26.md](../zdroje/next_sessions/WORKFLOW_ROZHODNUTIA_2026-09-26.md)
 
-Keď zásah spadá do viacerých riadkov, platia VŠETKY. **Súbor nad ~50 kB sa nečíta celý** — len kapitola alebo odsek, ktorý riadok menuje
-(Grep podľa nadpisu alebo mena modulu). **Rozpočet čítania:** povinné čítanie jednej dávky je orientačne **≤ 150 kB**; keď by bolo viac,
-orchestrátor dá do briefu výťah alebo presné kotvy.
+## Pravidlá oblastí (`.claude/rules/`)
+
+Každý súbor oblasti nesie povinné čítanie pre prácu so svojimi súbormi (architektúra, štandard, normy) a pravidlá, ktoré platia len tam.
+V Claude Code sa načíta sám, keď agent otvorí súbor oblasti. **Codex, Grok a iný harness ho automaticky nedostanú — prečítaj si súbor
+oblasti sám podľa tabuľky.** Ak prácu so súbormi oblasti ešte len plánuješ (zadanie, review, audit), prečítaj ho tiež.
+
+| Ideš robiť… | Súbor | Načíta sa pri práci so súbormi |
+|---|---|---|
+| zmenu Ruby kódu — core / modules | `.claude/rules/kod.md` | všetky `noxun_engine/**/*.rb`, `noxun_engine.rb` |
+| buildery · observery · undo · geometriu | `.claude/rules/konstrukcia.md` | buildery, zóny, observery, nástroje (`tools/`), `modules/`, `data/recipes/`, akcie panela a dialógy so `start_operation`; práca s observerom alebo operáciou (`start_operation`) inde → súbor si prečítaj sám |
+| UI — Inspector, Štúdio, HTML, JS, CSS | `.claude/rules/ui.md` | `noxun_engine/ui/**`, `tests/js/**`, fotenie okien (`scripts/ui_foto*`) |
+| materiály · ABS · katalóg · Demos | `.claude/rules/materialy.md` | `core/materials*.rb`, `abs_rules.rb`, `appearance_mapping.rb`, `core/demos/`, dialógy materiálov |
+| kovanie — pravidlá, sety, katalóg | `.claude/rules/kovanie.md` | `core/hardware_*.rb`, `drawer_recipes.rb`, dialógy kovania a pravidiel |
+| výstupy — VEPO, kusovník, nákup, CSV/XLSX | `.claude/rules/vystupy.md` | VEPO, BOM, CP, XLSX, CSV kovania, validácia, plán a kľúče dielcov, rozpočet, `sheet_*`, `production_core`, `export_prep`, `studio_dialog`, export test; generátor exportu inde → súbor si prečítaj sám |
+| testy — novú sadu alebo úpravu | `.claude/rules/testy.md` | `tests/**`, `scripts/run_*.ps1`, `scripts/lib/**` |
+| dynamické komponenty (DC) | `.claude/rules/dc.md` | `board_builder.rb`, `cabinet_builder.rb`, `tools/mower.rb`, `docs/DC_PRAVIDLA.md`; práca s DC inde → [docs/DC_PRAVIDLA.md](../../docs/DC_PRAVIDLA.md) vždy |
+
+Presné cesty (`paths:`) sú v hlavičke každého súboru. Keď zásah spadá do viacerých riadkov alebo oblastí, platia VŠETKY.
+**Súbor nad ~50 kB sa nečíta celý** — len kapitola alebo odsek, ktorý riadok menuje (Grep podľa nadpisu alebo mena modulu).
+**Rozpočet čítania:** povinné čítanie jednej dávky je orientačne **≤ 150 kB**; keď by bolo viac, orchestrátor dá do briefu výťah alebo
+presné kotvy.

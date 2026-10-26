@@ -1,7 +1,8 @@
 # Nástroje testov — fotenie okien, export test, diagnostika MCP
 
-> Podrobnosti k nástrojom zo sekcie Testovanie v [roly/IMPLEMENTATOR.md](roly/IMPLEMENTATOR.md#testovanie) — tam je, kedy ktorý
-> nástroj platí (fotenie: UI dávka · export test: brána mergu výstupov · diagnostika: visiaci MCP). Čítaj podľa potreby.
+> Podrobnosti k nástrojom zo sekcie Testovanie v [roly/IMPLEMENTATOR.md](roly/IMPLEMENTATOR.md#testovanie) — kedy ktorý nástroj platí
+> (fotenie: UI dávka, `.claude/rules/ui.md` · export test: brána mergu výstupov, `.claude/rules/vystupy.md` · diagnostika: visiaci MCP).
+> Čítaj podľa potreby.
 
 <a id="foto"></a>
 
@@ -36,8 +37,11 @@
 
 <a id="mcp"></a>
 
-## Diagnostika MCP
+## Interaktívny kanál a diagnostika MCP
 
+- **Interaktívny kanál:** MCP `mcp__vbo-sketchup__execute_ruby` (SketchUp 2026 + VBO SkAgent, port 7891); záloha file-bridge
+  (`vbo_sk_agent\bridge\command.rb` → `result.json`, pozor na mtime pascu); overená slučka `-RubyStartup skript + kópia modelu`
+  (vzor v `scripts\run_su_tests.ps1`). Deploy pluginu: `INSTALL_noxun_engine.ps1`. Bridge zapínaj len v testovacom okne.
 - **Diagnostika MCP:** pri visiacom/zamrznutom porte 7891 spusti `scripts\skagent_doctor.ps1` — zistí držiteľa portu a `/health`, `-Kill`
   odstráni zamrznutý bridge (živú zákazku ani cez `-Force` nezabije). Dump stavu enginu pre bugcatch: `Noxun::Engine::Debug.report` cez
   `execute_ruby` (model + výber + stav panela ako read-only JSON, nikdy nezapisuje).

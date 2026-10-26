@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 # Guardy G1 "strop velkosti" a G2 "bez historie" pravidiel (blok 10 · PRAVIDLA, davka P1b).
-# Pravidla, ktore agenti citaju automaticky (AGENTS.md, most CLAUDE.md, SYSTEM/pravidla/**), nesmu znova
+# Pravidla, ktore agenti citaju automaticky (AGENTS.md, most CLAUDE.md, SYSTEM/pravidla/**, .claude/rules/**), nesmu znova
 # "pretiect": CLAUDE.md narastol na 35 kB a Codex oreze AGENTS.md na 32 KiB. Historia (datumy zavedenia,
 # revizie, cisla PR) patri do KRONIKY a archivu — v pravidle len platne znenie.
 # Zmena stropu = zmena konstanty nizsie (jedine miesto).
@@ -11,16 +11,20 @@ require_relative '../helper' unless defined?(NxTest)
 NX_PRAV_LIMITS = {
   'AGENTS.md' => [12 * 1024, 150],
   'CLAUDE.md' => [1 * 1024, nil],
-  # Docasne 14 kB: P3 (presun pravidiel oblasti do .claude/rules/) znizi na 8 kB.
+  # Roly: spolocny strop 14 kB; IMPLEMENTATOR.md ma vlastny 8 kB riadok — pravidla oblasti ziju v .claude/rules/, nie v roli.
   'SYSTEM/pravidla/roly/*.md' => [14 * 1024, nil],
-  'SYSTEM/pravidla/POVINNE_CITANIE.md' => [8 * 1024, nil],
+  'SYSTEM/pravidla/roly/IMPLEMENTATOR.md' => [8 * 1024, nil],
+  # POVINNE_CITANIE je rozcestnik: riadky bez cesty + tabulka oblasti; obsah oblasti je v .claude/rules/.
+  'SYSTEM/pravidla/POVINNE_CITANIE.md' => [6 * 1024, nil],
+  # Subory oblasti: nacitaju sa do kontextu agenta pri praci so subormi oblasti.
+  '.claude/rules/*.md' => [6 * 1024, nil],
   'SYSTEM/pravidla/DEFINICIE.md' => [10 * 1024, nil],
   # Davka P2: podrobnosti nastrojov testov (foto okien, export test, diagnostika MCP) vybrane z IMPLEMENTATOR.md.
   'SYSTEM/pravidla/NASTROJE_TESTOV.md' => [8 * 1024, nil]
 }.freeze
 
 # G2 — subory bez historie a vzory historie.
-NX_PRAV_HISTORY_SCAN = %w[AGENTS.md CLAUDE.md SYSTEM/pravidla/**/*.md].freeze
+NX_PRAV_HISTORY_SCAN = %w[AGENTS.md CLAUDE.md SYSTEM/pravidla/**/*.md .claude/rules/**/*.md].freeze
 NX_PRAV_HISTORY_PATTERNS = {
   'od <dátum>' => /\bod\s+\d{1,2}\.\s?\d{1,2}\./i,
   '(od <č>.<č>.20' => /\(od\s+\d{1,2}\.\s?\d{1,2}\.\s?20/i,

@@ -17,6 +17,22 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **P3a · PRAVIDLÁ OBLASTÍ V `.claude/rules/` (26.10.2026, PR #483, blok 10 · PRAVIDLA, trieda S — len pravidlá, dokumentácia a testy; kód pluginu,
+  VERSION ani `?v=` bez zmeny).** Povinné čítanie podľa oblasti sa načíta samo, keď agent číta alebo upravuje súbor oblasti — rola, ktorej sa
+  oblasť netýka, ho nedostane. **Sonda** (docs code.claude.com/docs/en/memory a sub-agents, Claude Code 2.1.310): `paths:` v `.claude/rules/*.md`
+  sa spúšťa pri Read/Write/Edit (a čítaní cez Bash), platí aj pre subagentov s `omitClaudeMd`; Grep a Glob medzi spúšťačmi nie sú. **Čo sa
+  zmenilo:** nových 8 súborov oblastí (`kod`, `konstrukcia`, `ui`, `materialy`, `kovanie`, `vystupy`, `testy`, `dc`; každý ≤ 6 kB, s `paths:`);
+  `POVINNE_CITANIE.md` je rozcestník s tabuľkou oblastí (8 → 6 kB, Codex a Grok si súbor oblasti čítajú sami podľa tabuľky);
+  `IMPLEMENTATOR.md` 12 → 8 kB (cache-bust → `ui.md`, podrobnosti testov → `testy.md`, hooky → nový `docs/HOOKY.md`, interaktívny kanál MCP →
+  NASTROJE_TESTOV, pravidlo STAV pri dokumentačnom PR → hlavička „Údržba" v STAV, ručný postup čísla PR → hlavička `otvor_pr.ps1`); typy agentov
+  pregenerované. **Stráže:** strop `.claude/rules/*.md` 6 kB a IMPLEMENTATOR 8 kB (G1), `.claude/rules/**` v skene histórie (G2), nový
+  `test_pravidla_oblasti.rb` (každý súbor má `paths:`, každý glob trafí súbor, POVINNE_CITANIE menuje každý súbor, vlastné správanie).
+  Mapa presunu a odchýlky: `SYSTEM/zdroje/bloky/PRAVIDLA/P3a_MAPA.md`. **Smoke typov po P2 (26.10.2026, main po PR #482, Claude Code 2.1.310): PASS** —
+  `analytik`, `slepy-recenzent` a `implementator-lahky` majú len pravidlá svojej roly (poznajú poslednú vetu `AGENTS.md`, nie prvú vetu
+  `ORCHESTRATOR.md` ani `~/.claude/CLAUDE.md`); auto-pamäť `MEMORY.md` typy s `omitClaudeMd` nevidia; podrobnosti
+  v `SYSTEM/zdroje/bloky/PRAVIDLA/P2_KTO_CO_DOSTANE.md`, sekcia „Smoke typov po mergi". Smoke samotných oblastí (typ `analytik` otvorí
+  `noxun_engine/ui/panel.rb` a hlási `ui.md`, nie `vystupy.md`) nasleduje po mergi v novej session.
+
 - **P2 · KARTY ROLÍ, TYPY AGENTOV LEN SO SVOJIMI PRAVIDLAMI, ROLA ANALYTIK (23.10.2026, PR #482, blok 10 · PRAVIDLA, trieda Ť — len pravidlá,
   generátor a testy; kód pluginu, VERSION ani `?v=` bez zmeny).** Každý typ subagenta dostane **len pravidlá svojej roly** a typy sa nerozídu
   so súbormi rolí. **Sonda:** pole `omitClaudeMd` overené v docs code.claude.com/docs/en/sub-agents (Claude Code 2.1.301, pole od 2.1.271) —

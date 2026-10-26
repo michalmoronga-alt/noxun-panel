@@ -24,7 +24,8 @@
 
 - **Rozsah:** predrecenzia = `git diff main...HEAD` (alebo rozsah zo zadania) a kód, ktorý diff volá alebo ktorý volá diff; delta = výhradne
   `git diff <hlava pred opravou>..<hlava po oprave>` — správnosť opráv, žiadne vedľajšie zmeny, test na každú opravu.
-- **Najprv čítaj** riadok dotknutého zásahu v [POVINNE_CITANIE.md](../POVINNE_CITANIE.md), sekcie Verzia a uzáver dávky a Testovanie
+- **Najprv čítaj** riadok dotknutého zásahu v [POVINNE_CITANIE.md](../POVINNE_CITANIE.md) a súbor dotknutej oblasti `.claude/rules/`
+  (tabuľka tamže; pri čítaní samotného diffu sa sám nenačíta — prečítaj ho), sekcie Verzia a uzáver dávky a Testovanie
   z IMPLEMENTATOR.md (checklist uzáveru, export test P == K, hlava in-SU behu — proti nim kontroluješ), odseky dotknutých modulov
   v `docs/architecture/` (rozcestník `docs/ARCHITEKTURA.md`) a dotknuté paragrafy `SYSTEM/STANDARD.md`.
 - Aktívne sa to snaž rozbiť — zoznam, na čo sa zamerať, je vo vzore promptu v skille `.claude/skills/predrecenzia/SKILL.md`. Hlás len

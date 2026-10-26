@@ -554,8 +554,9 @@ NxTest.test('docs: relativne odkazy v navigacnych suboroch ukazuju na existujuce
   names = %w[CLAUDE.md AGENTS.md docs/ARCHITEKTURA.md SYSTEM/README.md SYSTEM/STAV.md SYSTEM/PLAN.md
              SYSTEM/DOGFOODING.md SYSTEM/V1_VIZIA.md SYSTEM/WORKFLOW.md SYSTEM/pravidla/DEFINICIE.md
              SYSTEM/pravidla/POVINNE_CITANIE.md SYSTEM/pravidla/roly/ORCHESTRATOR.md
-             SYSTEM/pravidla/roly/IMPLEMENTATOR.md docs/UI_DIZAJN.md] +
-          NX_ARCH_FILES.map { |n| "docs/architecture/#{n}" }
+             SYSTEM/pravidla/roly/IMPLEMENTATOR.md docs/UI_DIZAJN.md docs/HOOKY.md] +
+          NX_ARCH_FILES.map { |n| "docs/architecture/#{n}" } +
+          Dir[File.join(NxTest::ROOT, '.claude', 'rules', '*.md')].sort.map { |p| p.sub("#{NxTest::ROOT}/", '') }
   names.each do |name|
     path = File.join(NxTest::ROOT, name)
     NxTest.assert(File.exist?(path), "#{name} chyba")

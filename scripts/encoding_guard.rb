@@ -113,11 +113,11 @@ module NxEncodingGuard
 
   # Rozsah CI testu = vsetky subory s EXTENSIONS v repozitari (relativne cesty). Glob
   # nevstupuje do bodkovych priecinkov (.git, .claude/worktrees s kopiami repa), z .claude
-  # sa berie len to, co je v gite (skilly, hooky, typy agentov).
+  # sa berie len to, co je v gite (skilly, hooky, typy agentov, pravidla oblasti).
   def repo_files(root)
     exts = EXTENSIONS.map { |e| e.delete('.') }.join(',')
     files = Dir.glob("**/*.{#{exts}}", base: root) +
-            Dir.glob(".claude/{skills,hooks,agents}/**/*.{#{exts}}", base: root)
+            Dir.glob(".claude/{skills,hooks,agents,rules}/**/*.{#{exts}}", base: root)
     files.reject { |rel| rel.start_with?(*LOCAL_ONLY_DIRS) }.uniq.sort
   end
 

@@ -49,7 +49,7 @@ NX_DEF_PHRASES = {
 NX_DEF_SCAN = %w[
   CLAUDE.md AGENTS.md SYSTEM/WORKFLOW.md SYSTEM/PLAN.md SYSTEM/README.md SYSTEM/STANDARD.md
   SYSTEM/pravidla/roly/*.md SYSTEM/pravidla/POVINNE_CITANIE.md SYSTEM/pravidla/NASTROJE_TESTOV.md SYSTEM/pravidla/typy/*.md
-  .claude/skills/*/SKILL.md docs/architecture/*.md
+  .claude/skills/*/SKILL.md .claude/rules/*.md docs/architecture/*.md
 ].freeze
 
 def nx_def_normalize(text)
