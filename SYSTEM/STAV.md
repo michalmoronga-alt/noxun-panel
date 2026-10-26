@@ -30,16 +30,16 @@ ani nevyexportuje** (rohovú by sklopil na dolnú, úzku rozšíril na 200). **R
 
 **Blok 10 · PRAVIDLA** — pravidlá a workflow agentov, plugin sa nemení ([PLAN.md](PLAN.md), priečinok [zdroje/bloky/PRAVIDLA/](zdroje/bloky/PRAVIDLA/)); hotové sú dávky P1a (definície na jednom mieste, PR #478), P4a
 (drobnosti workflowu, PR #479), P1b (pravidlá z `CLAUDE.md` presunuté do jadra `AGENTS.md`, súborov rolí `pravidla/roly/` a `pravidla/POVINNE_CITANIE.md`; `CLAUDE.md` je most; stropy veľkosti a zákaz histórie stráži guard, PR #480)
-a P2 (karty všetkých rolí, typy agentov generované z kariet bez dedenia `CLAUDE.md`, nová rola analytik, PR #482); ďalej dávka P3. Popri ňom čaká **Michalov smoke bloku 9** (94 bodov v 5 skupinách) a aktualizácia pluginu na 0.18.1 na oboch PC.
+P2 (karty všetkých rolí, typy agentov generované z kariet bez dedenia `CLAUDE.md`, nová rola analytik, PR #482; smoke typov PASS 26.10.)
+a P3a (pravidlá oblastí v `.claude/rules/` s `paths:`, POVINNE_CITANIE je rozcestník, IMPLEMENTATOR ≤ 8 kB, PR #?); ďalej P3b (postupy). Popri ňom čaká **Michalov smoke bloku 9** (94 bodov v 5 skupinách) a aktualizácia pluginu na 0.18.1 na oboch PC.
 **Zásobník z bloku:** D-154 „Exportovať všetko" · D-151 · D-152 · D-153 (podmienený) · H18b-2 mimo scope. **Luciin PC:** nevieme, či má SketchUp 2026.2 (H11 Q3 bez odpovede).
 **Otázky bez odpovede, platí návrh:** vymenované v [záverečnom dokumente](archiv/HARDENING_ZAVER_2026-10-11.md) (Otvorené body) · pri prvej rohovej v dielni overiť záves Sensys ·
 **na smoke čakajú aj** D-132 (#367), D-133 (#368), D-134 (#369) — sú v checkliste (B25, C19, C20).
 
 ## Ďalší krok
 
-**Blok PRAVIDLA:** po P2 smoke typov v novej session (typ `analytik` len z kontextu: pozná poslednú vetu AGENTS.md, nie ORCHESTRATOR.md
-ani `~/.claude/CLAUDE.md`; MEMORY.md zapísať — PACKAGE_P2 § 3 bod 5), potom
-dávka P3 — pravidlá oblastí (podľa [PLAN.md](PLAN.md)). **Michal:** smoke bloku 9 podľa [HARDENING_ZAVER_2026-10-11.md](archiv/HARDENING_ZAVER_2026-10-11.md)** — skupiny A Exporty a čísla (28) · B Inspector (25) · C Štúdio (20) · D Ochrana dát a dve okná (10) ·
+**Blok PRAVIDLA:** po mergi P3a smoke oblastí v novej session (typ `analytik` otvorí `noxun_engine/ui/panel.rb` nástrojom Read a hlási, či vidí
+`.claude/rules/ui.md` a nevidí `vystupy.md` — PACKAGE_P3a § 3 bod 5), potom dávka P3b — postupy (podľa [PLAN.md](PLAN.md)). **Michal:** smoke bloku 9 podľa [HARDENING_ZAVER_2026-10-11.md](archiv/HARDENING_ZAVER_2026-10-11.md)** — skupiny A Exporty a čísla (28) · B Inspector (25) · C Štúdio (20) · D Ochrana dát a dve okná (10) ·
 E SketchUp a štart (11, vrátane Koniec SketchUpu na 2026.2). Pred ním aktualizovať plugin na oboch PC a zavrieť všetky okná SketchUpu. Nálezy zo smoke = opravy x.y.z (dočasná skupina
 v [DOGFOODING.md](DOGFOODING.md)). Potom nový blok podľa výberu Michala. **Test na reálnej zákazke po V1.**
 

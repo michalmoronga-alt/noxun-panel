@@ -102,3 +102,16 @@ Jedno pravidlo = jeden domov: riadok oblasti sa z `POVINNE_CITANIE.md` **presúv
 
 ## 5 · Výsledok sondy a odchýlky (vyplní implementátor)
 
+**Sonda § 0 — PASS (overené 26.10.2026, lokálne `claude --version` = 2.1.310):**
+
+| Tvrdenie | Výsledok | Zdroj |
+|---|---|---|
+| `paths:` v `.claude/rules/*.md` načíta pravidlo až pri práci s matchujúcim súborom; súbor bez `paths:` sa načíta pri štarte | **platí.** „A path-scoped rule loads when Claude uses the Read, Write, or Edit tool on a matching file", tiež pri čítaní jedného súboru cez Bash (`cat`, `head`); „Rules without `paths` frontmatter are loaded at launch". Grep a Glob medzi spúšťačmi uvedené **nie sú** — súbor oblasti sa spoľahlivo načíta po otvorení súboru, nie po vyhľadaní. | code.claude.com/docs/en/memory, „Organize rules with .claude/rules/" a „Path-specific rules" |
+| platí aj pre subagentov s `omitClaudeMd: true` | **platí.** „For Explore, Plan, and subagents with `omitClaudeMd`, a subdirectory's `CLAUDE.md` and matching path-scoped rules still load when the subagent works with files there." Docs nehovoria, či `omitClaudeMd` odstraňuje aj pravidlá **bez** `paths:` — preto stráž (a) vyžaduje `paths:` v každom súbore oblasti. | code.claude.com/docs/en/sub-agents, „What loads at startup", `omitClaudeMd` |
+| tvar globov | **platí.** `**`, `*`, `{a,b}` (zložené zátvorky), zoznam alebo reťazec oddelený čiarkami; vzor relatívny od adresára, ktorý obsahuje `.claude/` (tu koreň repa). `paths` je jediné pole, ktoré Claude Code číta; nečitateľné YAML = pravidlo sa načíta ako bez `paths:`. **Worktree:** pravidlá sa viažu na `.claude/` adresára, v ktorom beží session — pre súbory v súrodeneckom worktree treba session spustiť v ňom. | code.claude.com/docs/en/memory, „Path-specific rules" |
+
+**Dôsledok pre smoke po mergi** (§ 3 bod 5): `analytik` musí súbor skutočne otvoriť nástrojom Read (nie Grep).
+
+**Odchýlky od package** sú v [P3a_MAPA.md](P3a_MAPA.md), sekcia „Odchýlky od package P3a" (rozšírenie zoznamov ciest podľa
+odsekov `docs/architecture/`, `drawer_recipes.rb` v `kovanie.md`, `dc.md` s tromi súbormi pluginu).
+

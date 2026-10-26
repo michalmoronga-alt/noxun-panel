@@ -55,6 +55,8 @@ review PR; výnimka: rešeršér má len svoju kartu); k nemu patrí súbor tvoj
 - **Pravidlá SketchUp kódu:** [docs/SKETCHUP_PRAVIDLA.md](docs/SKETCHUP_PRAVIDLA.md) · DC pasce: [docs/DC_PRAVIDLA.md](docs/DC_PRAVIDLA.md) ·
   UI dizajn: [docs/UI_DIZAJN.md](docs/UI_DIZAJN.md) — kompletné a samostatné v tomto repe. (Nadradený `..\CLAUDE.md` existuje len
   v Michalovom lokálnom workspace `C:\APP DEV\RUBY` — mapa ostatných pluginov; pre prácu v tomto repe nie je potrebný.)
+- **Pravidlá oblastí** `.claude/rules/` — načítajú sa samé pri práci so súbormi oblasti; mimo Claude Code (Codex, Grok) podľa tabuľky
+  v [POVINNE_CITANIE.md](SYSTEM/pravidla/POVINNE_CITANIE.md#pravidlá-oblastí-clauderules).
 - **Skilly** (postupy krok za krokom): `.claude/skills/`.
 
 ## Zákazy pre všetkých
@@ -80,7 +82,7 @@ review PR; výnimka: rešeršér má len svoju kartu); k nemu patrí súbor tvoj
 
 Headless sada `ruby tests/run_all.rb` (lokálne `scripts\run_tests.ps1`) + všetky JS sady jedným príkazom
 `powershell -NoProfile -File scripts\run_js_tests.ps1`. Test v SketchUpe, foto okien a export test:
-[IMPLEMENTATOR.md, Testovanie](SYSTEM/pravidla/roly/IMPLEMENTATOR.md#testovanie).
+[IMPLEMENTATOR.md, Testovanie](SYSTEM/pravidla/roly/IMPLEMENTATOR.md#testovanie) (podrobnosti: `.claude/rules/testy.md`).
 
 ## Jazyk a jednotky
 

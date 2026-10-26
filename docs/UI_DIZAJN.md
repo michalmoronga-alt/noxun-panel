@@ -1771,7 +1771,7 @@ CEF cachuje externé CSS/JS. Konvencia: `?v=` suffix = **presne verzia
 pluginu** (VERSION z loadera) na VŠETKÝCH css/js odkazoch vo VŠETKÝCH ui/*.html —
 stráži to guard test v `tests/pure/test_guards.rb`. Zmena css/js po vydaní teda
 znamená: bump patch VERSION (noxun_engine.rb + main.rb) a prepísať všetky `?v=`
-na novú hodnotu (viď pravidlo verzie v `SYSTEM/pravidla/roly/IMPLEMENTATOR.md`). Verzia v pätičke ide z Ruby
+na novú hodnotu (viď cache-bust v `.claude/rules/ui.md` a pravidlo verzie v `SYSTEM/pravidla/roly/IMPLEMENTATOR.md`). Verzia v pätičke ide z Ruby
 a s cache-bustom sa nikdy needituje ručne zvlášť.
 
 ---
