@@ -19,7 +19,8 @@ Záložný orchestrátor uzáver bloku nemerguje (ORCHESTRATOR.md, Karta roly).
 
 1. **Minor bump** — `VERSION` 2× + všetky `?v=` v `ui/*.html` ([IMPLEMENTATOR.md](../../../SYSTEM/pravidla/roly/IMPLEMENTATOR.md#verzia)). Uzáver
    je dávka triedy Ľ — dokumentácia a verzia (kód pluginu sa nemení); predrecenzia podľa [DEFINICIE § D4](../../../SYSTEM/pravidla/DEFINICIE.md#d4)
-   sa nerobí, lebo dávka mení len verziu.
+   nie je povinná: D4 ju nevyžaduje pre dokumentačnú dávku ani pre dávku, ktorá mení len verziu, a uzáver nemení nič iné než
+   dokumentáciu a verziu.
 2. **Hotový blok z `SYSTEM/PLAN.md` plným textom** do `SYSTEM/archiv/ROADMAP_hotove_etapy.md`. V PLAN ostávajú len nehotové bloky a trvalé
    pravidlá; riadky dávok bloku (s ✅ a číslom PR) odchádzajú spolu s blokom.
 3. **Celý priečinok bloku** `SYSTEM/zdroje/bloky/<BLOK>/` → `SYSTEM/archiv/bloky/<BLOK>/` (`git mv`) + **kontrola odkazov**: Grep na starú

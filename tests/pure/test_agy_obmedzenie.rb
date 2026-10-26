@@ -13,7 +13,7 @@ NX_OBM_PATTERNS = [
   /Používaj výhradne vyhľadávanie na webe \(search_web\)/
 ].freeze
 NX_OBM_READ = %q(OBM="$(tr -d '\r' < "$S/obmedzenie.txt")").freeze
-NX_OBM_SCAN =%w[.claude/**/* SYSTEM/**/* scripts/**/*].freeze
+NX_OBM_SCAN = %w[.claude/**/* SYSTEM/**/* scripts/**/*].freeze
 
 # Subory (relativne cesty) pod NX_OBM_SCAN, ktore obsahuju doslovny text bloku; `skip` sa preskoci.
 def nx_obm_copies(root, skip)

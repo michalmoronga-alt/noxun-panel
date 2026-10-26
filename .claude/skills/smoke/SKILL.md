@@ -6,8 +6,8 @@ description: Vedenie smoke bloku s Michalom po uzávere — zápisník SMOKE_ZAP
 # Smoke bloku
 
 Smoke robí Michal **po uzávere bloku** podľa checklistu v záverečnom dokumente bloku (skill `uzaver-bloku`, krok 5). Orchestrátor ho vedie:
-drží zápisník, robí body overiteľné agentom, zapisuje nálezy a zvyšok nechá na Michala. Testuje sa len v testovacom modeli
-(`_dev\ENGINEtests.skp` alebo iný testovací model v `_dev`, nie zákazka), nikdy v zákazke ([AGENTS.md](../../../AGENTS.md), Zákazy).
+drží zápisník, zadáva body overiteľné agentom subagentovi, zapisuje nálezy a zvyšok nechá na Michala. Testuje sa len v testovacom modeli
+(`_dev\ENGINEtests.skp` alebo iný testovací model v `_dev`, nikdy v zákazke; [AGENTS.md](../../../AGENTS.md), Zákazy).
 
 ## Formát checklistu
 
