@@ -64,6 +64,12 @@ a [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md) — **len Gre
   [archiv/bloky/CENY/](archiv/bloky/CENY/), uzáver bloku CENY 30.9.2026, a
   [archiv/bloky/HARDENING/](archiv/bloky/HARDENING/), uzáver bloku 9 · HARDENING 11.10.2026). Staršie mockupy
   v `zdroje/ui20/` sa nepresúvajú.
+- **Externé rešerše — súkromné repo [michalmoronga-alt/Engine-researchs](https://github.com/michalmoronga-alt/Engine-researchs)**
+  (od 26.10.2026) — uložený **research zvonku** (outside-in rozbory cudzích riešení a produktov) a z neho **nápady na vylepšenie
+  a pokračovanie Noxun Engine** so skóre a väzbou na PLAN; index je v jeho `README.md`. Platí preň to isté ako pre `zdroje/`:
+  **nezáväzné, nečítať automaticky** — otvára sa pri výbere ďalšieho bloku alebo keď naň živý dokument výslovne pošle; do PLAN
+  ide len to, čo vyberie Michal. Súkromné je zámerne (podrobné rozbory so screenshotmi do tohto verejného repa nepatria);
+  agent v cloude ho musí najprv pripojiť k sedeniu (prístup cez Michalov účet).
 - **[archiv/](archiv/)** — história a uzavreté rozhodnutia: [KRONIKA.md](archiv/KRONIKA.md)
   (záznam každej dávky), [ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md) (plné
   texty hotových blokov a etáp), [DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md)
