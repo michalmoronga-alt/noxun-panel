@@ -37,10 +37,10 @@ Priečinok [zdroje/bloky/PRAVIDLA/](zdroje/bloky/PRAVIDLA/) — zadanie, návrh 
 - ✅ **P1b** jadro `AGENTS.md` + most `CLAUDE.md` + roly `ORCHESTRATOR.md`, `IMPLEMENTATOR.md` + `POVINNE_CITANIE.md` + strop veľkosti a zákaz histórie (guard) — PR #480.
 - ✅ **P2** roly — karty rolí (`RECENZENT`, `AUDITOR`, `RESERSER`, `ANALYTIK` + doplnené `ORCHESTRATOR`, `IMPLEMENTATOR`), typy agentov generované zo `SYSTEM/pravidla/typy/` s `omitClaudeMd`, typ `analytik`, guard G4 — PR #482.
 - ✅ **P3a** pravidlá oblastí (`.claude/rules/` s `paths:`, POVINNE_CITANIE rozcestník, IMPLEMENTATOR ≤ 8 kB) — PR #483
-- **P3b** postupy — skilly `uzaver-bloku` a `smoke`, ORCHESTRATOR ≤ 8 kB, WORKFLOW mapa bez kópií pravidiel, nálezy hliadky P-2026-10-23-2 a -3.
+- ✅ **P3b** postupy — skilly `uzaver-bloku` a `smoke`, ORCHESTRATOR 9,9 kB (vlastný strop 10 kB), WORKFLOW mapa bez kópií pravidiel, blok OBMEDZENIE NÁSTROJOV v jednom súbore, história zo skillu `antigravity-outside-in` — PR #?
 - **P4** stroje — hooky (commit do main, merge bez pripnutej hlavy, runner bez `-CloseWhenDone`), guardy, `rozpracovane.ps1`, karta priebehu.
 - **P5** hodnotenia po úlohách + karty modelov + router v0 + jedna tabuľka obsadenia (`OBSADENIE.md`, úprava modu usage-bar) · vyhodnotenie pilotu nočnej hliadky pred 5.11.2026.
-- **P6** uzáver bloku + smoke pravidiel.
+- **P6** uzáver bloku + smoke pravidiel · história a dátumy v ostatných skilloch (`codex-audit`, `codex-po-pr`, `predrecenzia`, `retro`, `usage`) + G2 na všetky skilly (hliadka P-2026-10-23-3).
 
 ### 3 · STABILITA
 

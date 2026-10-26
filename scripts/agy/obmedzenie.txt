@@ -1,0 +1,1 @@
+OBMEDZENIE NÁSTROJOV: nepoužívaj terminál, príkazy ani čítanie či zápis súborov — sú zablokované. Používaj výhradne vyhľadávanie na webe (search_web) a čítanie stránok (read_url_content). Nespúšťaj ani nevytváraj subagentov. Ukážky kódu píš len ako text.

@@ -17,6 +17,31 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **P3b · POSTUPY: SKILLY `uzaver-bloku` A `smoke`, ORCHESTRATOR POD STROP, WORKFLOW AKO MAPA (26.10.2026, PR #?, blok 10 · PRAVIDLA, trieda S — len pravidlá,
+  skilly, dokumentácia a testy; kód pluginu, VERSION ani `?v=` bez zmeny).** Postupy, ktoré zbytočne nafukovali rolu orchestrátora, sú v skilloch a
+  popisy hookov v dokumentácii. **Čo sa zmenilo:** nový skill `uzaver-bloku` (postup uzáveru bloku presunutý z ORCHESTRATOR.md + nové kroky: zostavenie
+  smoke checklistu do záverečného dokumentu a upratanie po uzávere — zoznam kandidátov na zmazanie v `_dev` a worktrees zmergovaných vetiev, maže sa až
+  po súhlase Michala, worktree len cez `git worktree remove`) a nový skill `smoke` (vedenie smoke s Michalom: zápisník `SMOKE_ZAPISNIK_<dátum>.md`
+  v priečinku bloku s commitom a pushom po každom sedení, Michal najprv škrtne nerelevantné body, rozdelenie na body overiteľné agentom len v testovacom
+  modeli a ručné, nálezy do DOGFOODING, smoke PASS dokumentačným PR; telo z praxe smoke bloku HARDENING). `ORCHESTRATOR.md` 13902 → **9911 B**
+  (uzáver bloku → skill, opisy hookov `po_merge.js` a `context_meter.js` → `docs/HOOKY.md`, obsah kontroly štartu okna → skill `usage`, Retro jedna veta);
+  **8 kB sa bez straty pravidla nedosiahlo, preto vlastný strop 10 kB** len pre tento súbor (zoznam, čo by sa muselo vypustiť, v `PACKAGE_P3b.md` § 4).
+  `WORKFLOW.md` 36692 → 34179 B (§ 3–§ 8 a § 10: opakované pravidlá nahradené odkazom na ich domov; § 2 a § 9 bez zmeny; nové riadky brán uzáver bloku
+  a export test, opravený stĺpec „Kde je pravidlo"). **Nález hliadky P-2026-10-23-2:** blok OBMEDZENIE NÁSTROJOV pre rešerš `agy` žije v jednom súbore
+  `scripts/agy/obmedzenie.txt`; obal `agy-reserser` aj skill `antigravity-outside-in` ho čítajú z neho (prompt, ktorý obal skladá, je bajt po bajte rovnaký
+  ako pred zmenou; chýbajúci alebo prázdny súbor beh nespustí), diagnostika prázdneho výstupu ostáva len v skille. **Nález P-2026-10-23-3:** história
+  zo skillu `antigravity-outside-in` presunutá sem (nižšie). **Stráže:** strop rolí 14 → 8 kB (ORCHESTRATOR 10 kB), strop `.claude/skills/*/SKILL.md`
+  500 riadkov, G2 (história) pre tri skilly, nový `test_agy_obmedzenie.rb` (jeden domov bloku + čítanie zo súboru + vlastné správanie). Mapa presunu
+  a odchýlky: `SYSTEM/zdroje/bloky/PRAVIDLA/P3b_MAPA.md`. **História presunutá zo skillu `antigravity-outside-in`:** zadanie rešerše outside-in vzniklo
+  3.9.2026 (Michal; pilot na dávkach KOV-C/D a jednorazový sweep architektúry; vzorové prompty `scratchpad/ag_outside_in_kovcd.md`
+  a `ag_outside_in_sweep.md` boli v scratchpade jednej session) · poradie „outside-in rešerš je súčasťou rešerše a krížového auditu bloku, raz pred
+  packages" je rozhodnutie N14 z 26.9.2026 · zákaz behu `agy` v nočných behoch bez obsluhy je rozhodnutie Z8 z 26.9.2026 · ekonomika z pilotu 3.9.2026:
+  dva behy rešerše zaberú ≈ 2,2 % 5-hodinového limitu Gemini, dva paralelné Codex audity vyčerpali jeho kĺzavé okno · poučenie „Gemini Flash nie je thinking
+  model, jeden beh = 1–2 otázky" je od Michala z 3.9.2026 · diagnostika prázdneho výstupu s exit 0 (mäkké zamietnutie nástroja mimo webu) bola overená
+  22.–23.10.2026 na agy 1.4.5. **Smoke pravidiel oblastí po P3a (26.10.2026, main 1a81e9a8, typ `analytik`): PASS** — po Read prvých 3 riadkov
+  `noxun_engine/ui/panel.rb` dostal v systémových pripomienkach hneď po výsledku nástroja obsah `.claude/rules/kod.md` a `.claude/rules/ui.md`, nie
+  `vystupy.md` ani `konstrukcia.md`; pravidlá sa načítali aj v bežiacej session (netreba novú), lebo subagent štartoval po mergi.
+
 - **P3a · PRAVIDLÁ OBLASTÍ V `.claude/rules/` (26.10.2026, PR #483, blok 10 · PRAVIDLA, trieda S — len pravidlá, dokumentácia a testy; kód pluginu,
   VERSION ani `?v=` bez zmeny).** Povinné čítanie podľa oblasti sa načíta samo, keď agent číta alebo upravuje súbor oblasti — rola, ktorej sa
   oblasť netýka, ho nedostane. **Sonda** (docs code.claude.com/docs/en/memory a sub-agents, Claude Code 2.1.310): `paths:` v `.claude/rules/*.md`

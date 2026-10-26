@@ -11,9 +11,13 @@ require_relative '../helper' unless defined?(NxTest)
 NX_PRAV_LIMITS = {
   'AGENTS.md' => [12 * 1024, 150],
   'CLAUDE.md' => [1 * 1024, nil],
-  # Roly: spolocny strop 14 kB; IMPLEMENTATOR.md ma vlastny 8 kB riadok — pravidla oblasti ziju v .claude/rules/, nie v roli.
-  'SYSTEM/pravidla/roly/*.md' => [14 * 1024, nil],
-  'SYSTEM/pravidla/roly/IMPLEMENTATOR.md' => [8 * 1024, nil],
+  # Roly: spolocny strop 8 kB (pravidla oblasti ziju v .claude/rules/, postupy v skilloch). Subor s vlastnym riadkom nizsie
+  # sa meria len podla neho. ORCHESTRATOR.md ma vlastny strop 10 kB: jeho pravidla (merge a brany, predvolene reakcie,
+  # tok bloku, bezpecnost) sa uz nemaju kam presunut bez straty vyznamu.
+  'SYSTEM/pravidla/roly/*.md' => [8 * 1024, nil],
+  'SYSTEM/pravidla/roly/ORCHESTRATOR.md' => [10 * 1024, nil],
+  # Skilly: postup ma zostat citatelny na jedno otvorenie.
+  '.claude/skills/*/SKILL.md' => [nil, 500],
   # POVINNE_CITANIE je rozcestnik: riadky bez cesty + tabulka oblasti; obsah oblasti je v .claude/rules/.
   'SYSTEM/pravidla/POVINNE_CITANIE.md' => [6 * 1024, nil],
   # Subory oblasti: nacitaju sa do kontextu agenta pri praci so subormi oblasti.
@@ -24,7 +28,10 @@ NX_PRAV_LIMITS = {
 }.freeze
 
 # G2 — subory bez historie a vzory historie.
-NX_PRAV_HISTORY_SCAN = %w[AGENTS.md CLAUDE.md SYSTEM/pravidla/**/*.md .claude/rules/**/*.md].freeze
+NX_PRAV_HISTORY_SCAN = %w[
+  AGENTS.md CLAUDE.md SYSTEM/pravidla/**/*.md .claude/rules/**/*.md
+  .claude/skills/uzaver-bloku/**/*.md .claude/skills/smoke/**/*.md .claude/skills/antigravity-outside-in/**/*.md
+].freeze
 NX_PRAV_HISTORY_PATTERNS = {
   'od <dátum>' => /\bod\s+\d{1,2}\.\s?\d{1,2}\./i,
   '(od <č>.<č>.20' => /\(od\s+\d{1,2}\.\s?\d{1,2}\.\s?20/i,
@@ -53,15 +60,17 @@ end
 
 NxTest.test('pravidla G1: AGENTS.md, CLAUDE.md, roly, POVINNE_CITANIE a DEFINICIE su pod stropom') do
   bad = []
+  own = NX_PRAV_LIMITS.keys.reject { |k| k.include?('*') }
   NX_PRAV_LIMITS.each do |pat, (max_bytes, max_lines)|
     files = nx_prav_files([pat])
     NxTest.assert(!files.empty?, "#{pat}: nenasiel som ziadny subor — guard by nic nestrazil")
     files.each do |path|
       rel = path.sub("#{NxTest::ROOT}/", '')
+      next if pat.include?('*') && own.include?(rel) # subor s vlastnym riadkom sa meria len podla neho
       # Bajty bez CR: strop nesmie zavisiet od toho, ci checkout na Windows zmenil konce riadkov na CRLF.
       size = File.binread(path).gsub("\r\n", "\n").bytesize
       lines = File.readlines(path, encoding: 'UTF-8').length
-      bad << "#{rel}: #{size} B (strop #{max_bytes} B)" if size > max_bytes
+      bad << "#{rel}: #{size} B (strop #{max_bytes} B)" if max_bytes && size > max_bytes
       bad << "#{rel}: #{lines} riadkov (strop #{max_lines})" if max_lines && lines > max_lines
     end
   end
