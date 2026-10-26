@@ -40,11 +40,11 @@ oblasti sám podľa tabuľky.** Ak prácu so súbormi oblasti ešte len plánuje
 | Ideš robiť… | Súbor | Načíta sa pri práci so súbormi |
 |---|---|---|
 | zmenu Ruby kódu — core / modules | `.claude/rules/kod.md` | všetky `noxun_engine/**/*.rb`, `noxun_engine.rb` |
-| buildery · observery · undo · geometriu | `.claude/rules/konstrukcia.md` | buildery, zóny, observer, nástroje (`tools/`), `modules/`, `data/recipes/`, akcie panela `ui/panel/actions_*.rb` |
+| buildery · observery · undo · geometriu | `.claude/rules/konstrukcia.md` | buildery, zóny, observery, nástroje (`tools/`), `modules/`, `data/recipes/`, akcie panela a dialógy so `start_operation`; práca s observerom alebo operáciou (`start_operation`) inde → súbor si prečítaj sám |
 | UI — Inspector, Štúdio, HTML, JS, CSS | `.claude/rules/ui.md` | `noxun_engine/ui/**`, `tests/js/**`, fotenie okien (`scripts/ui_foto*`) |
 | materiály · ABS · katalóg · Demos | `.claude/rules/materialy.md` | `core/materials*.rb`, `abs_rules.rb`, `appearance_mapping.rb`, `core/demos/`, dialógy materiálov |
 | kovanie — pravidlá, sety, katalóg | `.claude/rules/kovanie.md` | `core/hardware_*.rb`, `drawer_recipes.rb`, dialógy kovania a pravidiel |
-| výstupy — VEPO, kusovník, nákup, CSV/XLSX | `.claude/rules/vystupy.md` | VEPO, BOM, CP, XLSX, validácia, plán a kľúče dielcov, rozpočet, `sheet_*`, `production_core`, `export_prep`, export test |
+| výstupy — VEPO, kusovník, nákup, CSV/XLSX | `.claude/rules/vystupy.md` | VEPO, BOM, CP, XLSX, CSV kovania, validácia, plán a kľúče dielcov, rozpočet, `sheet_*`, `production_core`, `export_prep`, `studio_dialog`, export test; generátor exportu inde → súbor si prečítaj sám |
 | testy — novú sadu alebo úpravu | `.claude/rules/testy.md` | `tests/**`, `scripts/run_*.ps1`, `scripts/lib/**` |
 | dynamické komponenty (DC) | `.claude/rules/dc.md` | `board_builder.rb`, `cabinet_builder.rb`, `tools/mower.rb`, `docs/DC_PRAVIDLA.md`; práca s DC inde → [docs/DC_PRAVIDLA.md](../../docs/DC_PRAVIDLA.md) vždy |
 

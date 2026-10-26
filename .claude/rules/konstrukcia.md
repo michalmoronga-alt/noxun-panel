@@ -20,6 +20,16 @@ paths:
   - "noxun_engine/core/app_lifecycle.rb"
   - "noxun_engine/core/appliance_binding.rb"
   - "noxun_engine/core/appliance_checks.rb"
+  - "noxun_engine/core/budget_store.rb"
+  - "noxun_engine/core/materials_apply_appearance.rb"
+  - "noxun_engine/core/materials_native_appearance.rb"
+  - "noxun_engine/core/template_previews.rb"
+  - "noxun_engine/main.rb"
+  - "noxun_engine/ui/hardware_catalog_dialog.rb"
+  - "noxun_engine/ui/materials_dialog.rb"
+  - "noxun_engine/ui/rules_dialog.rb"
+  - "noxun_engine/ui/studio_dialog.rb"
+  - "noxun_engine/ui/panel/selection.rb"
   - "noxun_engine/modules/**"
   - "noxun_engine/tools/**"
   - "noxun_engine/data/recipes/**"
@@ -28,8 +38,9 @@ paths:
 
 # Oblasť: buildery · observery · undo · geometria
 
-> Načíta sa samo pri práci s buildermi, observermi a akciami panela, ktoré zapisujú do modelu
-> ([POVINNE_CITANIE.md](../../SYSTEM/pravidla/POVINNE_CITANIE.md)).
+> Načíta sa samo pri práci s buildermi, observermi (`Sketchup::*Observer`) a kódom s operáciou `start_operation`, ktoré zapisujú do modelu
+> ([POVINNE_CITANIE.md](../../SYSTEM/pravidla/POVINNE_CITANIE.md)). Práca s observerom alebo operáciou v súbore mimo `paths:` →
+> prečítaj tento súbor sám (`git grep -lE "Sketchup::[A-Za-z]*Observer|add_observer|start_operation" -- noxun_engine`).
 
 **Pred prácou POVINNE prečítaj:**
 

@@ -12,6 +12,8 @@ paths:
   - "noxun_engine/core/export_settings.rb"
   - "noxun_engine/core/price_refresh.rb"
   - "noxun_engine/core/supplier_settings.rb"
+  - "noxun_engine/core/hardware_sets.rb"
+  - "noxun_engine/ui/studio_dialog.rb"
   - "noxun_engine/ui/production_core.rb"
   - "noxun_engine/ui/export_prep.rb"
   - "scripts/export_test.ps1"
@@ -21,7 +23,8 @@ paths:
 
 # Oblasť: výstupy — VEPO, kusovník, nákup, CSV/XLSX
 
-> Načíta sa samo pri práci so súbormi výstupov ([POVINNE_CITANIE.md](../../SYSTEM/pravidla/POVINNE_CITANIE.md)).
+> Načíta sa samo pri práci so súbormi výstupov ([POVINNE_CITANIE.md](../../SYSTEM/pravidla/POVINNE_CITANIE.md)). Zmena generátora
+> exportu (`*_csv`, `*_xlsx`, VEPO) v súbore mimo `paths:` → prečítaj tento súbor sám.
 
 **Pred prácou POVINNE prečítaj:**
 

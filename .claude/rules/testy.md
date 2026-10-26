@@ -20,23 +20,17 @@ Brány testovania všeobecne: [IMPLEMENTATOR.md, sekcia Testovanie](../../SYSTEM
   vypíše `JS: N sad, M PASS, K FAIL`, exit 1 pri zlyhaní; `-FailFast` skončí po prvom pade.
   **Pasca:** `node tests/js/test_*.js` spustí len PRVÝ súbor, zvyšok sú preň argumenty; CI robí bash slučku
   `for f in tests/js/test_*.js; do node "$f" || exit 1; done`.
-- Počty testov sa do pravidiel nepíšu — patria do PR a KRONIKY; STAV drží jeden riadok posledného behu.
+- STAV drží jeden riadok posledného behu; čísla starších behov patria do PR a KRONIKY.
 
-**In-SU runner `scripts\run_su_tests.ps1`**
+**In-SU runner `scripts\run_su_tests.ps1`** (pravidlá — `-CloseWhenDone` vždy, brána mergu, paralelné behy — sú v IMPLEMENTATOR.md)
 
 - Postup: deploy → inštancia nad kópiou ENGINEtests.skp → poll → výsledok; overuje geometriu plán↔model a undo scenáre.
-  Výsledkový grep až PO dobehu (output sa dopisuje).
-- Agent ho spúšťa **VŽDY s `-CloseWhenDone`** (bez neho len Michalovo ručné spustenie): inštancia po koncovom markeri sama uloží
-  run-kópiu modelu a ukončí sa; runner počká na zánik procesu (max 120 s) a nikdy nezabíja. Teardown po celej sade končí
-  kódom 0xC0000374 až PO zapísaní výsledku — verdikt to nemení.
-- **Paralelné behy sa vylučujú** (`%TEMP%\noxun_su_tests\deploy.lock` + sentinel `last_run.txt`): `exit 2` = iný beh práve beží
-  (počkaj a spusti znova) alebo visiaca inštancia ešte testuje (zavri ju alebo počkaj na dobeh). Výsledky a kópia modelu sú
-  per-beh v `run_*` priečinku.
+- `-CloseWhenDone`: inštancia po koncovom markeri sama uloží run-kópiu modelu a ukončí sa; runner počká na zánik procesu (max 120 s)
+  a nikdy nezabíja. Teardown po celej sade končí kódom 0xC0000374 až PO zapísaní výsledku — verdikt to nemení.
+- Zámok: `%TEMP%\noxun_su_tests\deploy.lock` + sentinel `last_run.txt`. `exit 2` je buď iný beh, alebo visiaca inštancia, ktorá ešte
+  testuje (zavri ju alebo počkaj na dobeh). Výsledky a kópia modelu sú per-beh v `run_*` priečinku.
 - `_dev/` je gitignorované, vo worktree ho nie je: skripty (`run_su_tests.ps1`, `ui_foto.ps1`, `export_test.ps1`) berú model
   z `_dev` aktuálneho checkoutu, a keď tam nie je, z **hlavného checkoutu** (`scripts\lib\nx_paths.ps1`); keď chýba aj tam,
   hláška menuje obe skúšané cesty. `run_su_tests.ps1 -DryRun` len vyhľadá SketchUp a model (nič nespustí).
 - Interaktívny kanál (MCP `execute_ruby`, file-bridge) a diagnostika:
   [NASTROJE_TESTOV.md, Diagnostika MCP](../../SYSTEM/pravidla/NASTROJE_TESTOV.md#mcp).
-
-**NIKDY netestovať v okne so zákazkou** — pred testami over `model.path` / titul okna; testuje sa len v `_dev\ENGINEtests.skp`
-(alebo neuloženom Untitled okne BEZ existujúcich NOXUN korpusov).

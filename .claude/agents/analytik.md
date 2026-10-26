@@ -82,7 +82,7 @@ review PR; výnimka: rešeršér má len svoju kartu); k nemu patrí súbor tvoj
 
 Headless sada `ruby tests/run_all.rb` (lokálne `scripts\run_tests.ps1`) + všetky JS sady jedným príkazom
 `powershell -NoProfile -File scripts\run_js_tests.ps1`. Test v SketchUpe, foto okien a export test:
-[IMPLEMENTATOR.md, Testovanie](SYSTEM/pravidla/roly/IMPLEMENTATOR.md#testovanie) (podrobnosti: `.claude/rules/testy.md`).
+[IMPLEMENTATOR.md, Testovanie](SYSTEM/pravidla/roly/IMPLEMENTATOR.md#testovanie) (podrobnosti sád a runnera: `.claude/rules/testy.md`; foto okien: `ui.md`, export test: `vystupy.md`).
 
 ## Jazyk a jednotky
 

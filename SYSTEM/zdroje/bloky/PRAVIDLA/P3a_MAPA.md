@@ -49,27 +49,27 @@
 |---|---|
 | Automatické testy: headless v CI + `scripts\run_tests.ps1` + Ruby `C:\Ruby32-x64` | R:testy (príkazy v AGENTS.md § Testy ostávajú) |
 | JS sady `run_js_tests.ps1` (výpis, `-FailFast`), pasca `node tests/js/test_*.js`, CI slučka | R:testy |
-| „Počty testov sa do pravidiel nepíšu" | IM § Testovanie (+ R:testy) |
+| „Počty testov sa do pravidiel nepíšu" | IM § Testovanie (jadro; R:testy len o riadku v STAV) |
 | In-SU test je brána mergu (D6) | IM § Testovanie — ostáva (odkaz D6) |
 | Runner: deploy → inštancia → poll → výsledok, overuje geometriu a undo; výsledkový grep až PO dobehu | IM (grep po dobehu) + R:testy (postup) |
 | `-CloseWhenDone` VŽDY; inštancia sa sama ukončí; runner nikdy nezabíja; teardown 0xC0000374 | IM (VŽDY `-CloseWhenDone`) + R:testy (podrobnosti) |
 | paralelné behy sa vylučujú; zámok `deploy.lock`, sentinel `last_run.txt`; `exit 2` | IM (vylučujú sa, `exit 2` = počkaj) + R:testy (zámok a sentinel) |
 | Fotenie okien (každá UI dávka) | R:ui (Fotenie okien) → NASTROJE_TESTOV#foto; IM jedna veta s odkazom |
-| Export test (brána mergu `P == K`) | R:vystupy → NASTROJE_TESTOV#export; IM jedna veta s odkazom |
+| Export test (brána mergu `P == K`; vymedzenie spúšťačov „mení VEPO, CSV kovania, XLSX rozpočtu či ponuky alebo ich cestu") | IM § Testovanie (brána, spúšťače a `P == K` v tele implementátora) · R:vystupy → NASTROJE_TESTOV#export (podrobnosti) |
 | Lokálne hooky — `post_edit_check.ps1`, encoding guard, `scripts/encoding_guard.rb`, CI test | **`docs/HOOKY.md`**; IM jedna veta („pri hláške chybu hneď oprav; vynucuje CI") |
 | Hooky hlavného okna (pripomienka po mergi, ukazovateľ kontextu) | ORCHESTRATOR.md (nemenené; v `docs/HOOKY.md` odkaz, popis v P3b) |
 | Interaktívny kanál MCP `execute_ruby`, file-bridge, mtime pasca, overená slučka, deploy `INSTALL_noxun_engine.ps1` | NASTROJE_TESTOV#mcp (sekcia premenovaná „Interaktívny kanál a diagnostika MCP") |
 | Diagnostika MCP (`skagent_doctor.ps1`, `Debug.report`) | NASTROJE_TESTOV#mcp — ostáva |
 | `_dev/` gitignorované; skripty berú model z `_dev` checkoutu alebo hlavného checkoutu; `-DryRun` | R:testy |
-| Testuje sa VÝHRADNE v ENGINEtests / Untitled bez NOXUN korpusov; NIKDY v okne so zákazkou (overiť `model.path`, bridge len v testovacom okne) | IM § Testovanie — ostáva |
+| Testuje sa VÝHRADNE v ENGINEtests / Untitled bez NOXUN korpusov; NIKDY v okne so zákazkou (overiť `model.path`, bridge len v testovacom okne; vrátane vety „v ňom môžu agenti tvoriť/mazať čokoľvek") | IM § Testovanie — ostáva (celé) |
 
 ## Odchýlky od package P3a
 
 | Odchýlka | Dôvod |
 |---|---|
 | `drawer_recipes.rb` je v `kovanie.md`, nie v `konstrukcia.md` | odsek `drawer_recipes.rb` žije v `docs/architecture/hardware.md`, nie v construction.md (package: „over") |
-| `konstrukcia.md` navyše: `ghost_tool`, `tags`, `edge_check`, `grain_check`, `direction_check`, `hover_edge`, `edge_overlay`, `app_lifecycle`, `appliance_binding`, `appliance_checks`, `tools/**`, `ui/panel/actions_*.rb` | všetko sú odseky construction.md alebo observer/undo lifecycle a akcie panela zapisujúce do modelu (spúšťače D6); package vymenoval kratší zoznam |
-| `materialy.md` navyše `appearance_mapping.rb`; `kovanie.md` navyše `ui/rules_dialog.rb`; `vystupy.md` navyše `price_refresh.rb`, `supplier_settings.rb`, `tests/sketchup/su_export_probe.rb` | odseky v príslušnom súbore `docs/architecture/` (materials.md, hardware.md/STANDARD §6, outputs.md); sonda exportu patrí k export testu |
+| `konstrukcia.md` navyše (po predrecenzii aj súbory so `Sketchup::*Observer`, `add_observer` alebo `start_operation`: `budget_store`, `materials_apply_appearance`, `materials_native_appearance`, `template_previews`, `main.rb`, dialógy hardware/materials/rules/studio, `ui/panel/selection.rb`; POVINNE_CITANIE má vetu „observer alebo operácia inde → prečítaj sám"): `ghost_tool`, `tags`, `edge_check`, `grain_check`, `direction_check`, `hover_edge`, `edge_overlay`, `app_lifecycle`, `appliance_binding`, `appliance_checks`, `tools/**`, `ui/panel/actions_*.rb` | všetko sú odseky construction.md alebo observer/undo lifecycle a akcie panela zapisujúce do modelu (spúšťače D6); package vymenoval kratší zoznam |
+| `materialy.md` navyše `appearance_mapping.rb`; `kovanie.md` navyše `ui/rules_dialog.rb`; `vystupy.md` navyše `hardware_sets.rb` a `ui/studio_dialog.rb` (CSV kovania `purchase_csv`, `do_hw_csv`, XLSX exporty; po predrecenzii), `price_refresh.rb`, `supplier_settings.rb`, `tests/sketchup/su_export_probe.rb` | odseky v príslušnom súbore `docs/architecture/` (materials.md, hardware.md/STANDARD §6, outputs.md); sonda exportu patrí k export testu |
 | `dc.md` vznikol (Grep `dynamic_attributes` nájde `board_builder.rb`, `cabinet_builder.rb`, `tools/mower.rb`); jeho `paths:` majú len tieto 3 súbory + `docs/DC_PRAVIDLA.md` | PC tabuľka dopĺňa vetu, že práca s DC inde vyžaduje DC_PRAVIDLA stále — „vždy a bez výnimky" sa tým nestratilo |
 | `kod.md` neobsahuje `docs/SKETCHUP_PRAVIDLA.md` | pôvodný riadok „zmenu Ruby kódu" ho nemenoval; ostáva v R:konstrukcia |
 | cache-bust v IM checkliste je odkaz na R:ui v backtickoch, nie markdown odkaz | bajtový strop IM 8 kB |

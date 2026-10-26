@@ -85,7 +85,7 @@ review PR; výnimka: rešeršér má len svoju kartu); k nemu patrí súbor tvoj
 
 Headless sada `ruby tests/run_all.rb` (lokálne `scripts\run_tests.ps1`) + všetky JS sady jedným príkazom
 `powershell -NoProfile -File scripts\run_js_tests.ps1`. Test v SketchUpe, foto okien a export test:
-[IMPLEMENTATOR.md, Testovanie](SYSTEM/pravidla/roly/IMPLEMENTATOR.md#testovanie) (podrobnosti: `.claude/rules/testy.md`).
+[IMPLEMENTATOR.md, Testovanie](SYSTEM/pravidla/roly/IMPLEMENTATOR.md#testovanie) (podrobnosti sád a runnera: `.claude/rules/testy.md`; foto okien: `ui.md`, export test: `vystupy.md`).
 
 ## Jazyk a jednotky
 
@@ -263,7 +263,7 @@ nepridáva text na koniec súboru. Nový modul = nový odsek v správnom súbore
   **odsek dotknutého modulu v `docs/architecture/<súbor>.md` aktualizovaný na mieste** → **Grepom prehľadaj tvrdenia o zoznamoch,
   ktoré dávka mení** (typy, ikony, schémy, sekcie — napr. `TYPES`, inventár ikon v UI_DIZAJN §4, história `SCHEMA`, zoznam sekcií
   Štúdia) a oprav každý výskyt → vyriešené D-čísla do `SYSTEM/archiv/DOGFOODING_vyriesene.md` (**plný text + PR do sekcie
-  „Vyriešené (plné texty)" a jeden riadok navrch INDEXU**; `SYSTEM/DOGFOODING.md` drží **len otvorené**) → **prepíš `SYSTEM/STAV.md`
+  „Vyriešené (plné texty)" a jeden riadok navrch INDEXU v tom istom súbore**; `SYSTEM/DOGFOODING.md` drží **len otvorené**) → **prepíš `SYSTEM/STAV.md`
   (okrem triedy D) + APPEND odsek navrch „Záznamy dávok" v `SYSTEM/archiv/KRONIKA.md`** → v `SYSTEM/PLAN.md` ostáva riadok dávky
   v bloku **s ✅ a číslom PR** (presúva sa až s uzáverom bloku).
 - **Checklist dokumentačného PR:** odsek navrch „Záznamy dávok" v KRONIKE **áno**; STAV podľa hlavičky „Údržba"; VERSION ani `?v=` **nie**.
@@ -280,9 +280,9 @@ nepridáva text na koniec súboru. Nový modul = nový odsek v správnom súbore
 - **In-SU test je brána mergu** pri spúšťačoch [DEFINICIE § D6](../DEFINICIE.md#d6) (tam aj kedy ho na finálnej hlave netreba opakovať).
   Runner `scripts\run_su_tests.ps1` spúšťaj **VŽDY s `-CloseWhenDone`**. Paralelné behy sa vylučujú: `exit 2` = iný beh beží alebo
   visí inštancia — počkaj. Výsledkový grep až PO dobehu. Zámok, `_dev` vo worktree a `-DryRun`: `.claude/rules/testy.md`.
-- **Fotenie okien** pri UI dávke: `.claude/rules/ui.md` · **export test** pri výstupoch (brána mergu `P == K`): `.claude/rules/vystupy.md` ·
-  diagnostika MCP a interaktívny kanál (`execute_ruby`, file-bridge): [NASTROJE_TESTOV.md](../NASTROJE_TESTOV.md#mcp).
-- **Lokálne hooky:** hook po Edit/Write hlási syntax a encoding — pri hláške chybu hneď oprav; vynucuje CI
-  (popis: [docs/HOOKY.md](../../../docs/HOOKY.md)).
-- **Testuje sa VÝHRADNE v `_dev\ENGINEtests.skp`** (alebo neuloženom Untitled okne BEZ existujúcich NOXUN korpusov) — **NIKDY v okne
-  so zákazkou**: pred testami over `model.path` / titul okna; bridge zapínaj len v testovacom okne.
+- **Export test je brána mergu** dávky, ktorá mení VEPO, CSV kovania, XLSX rozpočtu či ponuky alebo ich cestu: musí dať `P == K`, resp. len
+  vedomé rozdiely uvedené v PR (`scripts\export_test.ps1`, `.claude/rules/vystupy.md`). **Fotenie okien** pri UI dávke: `.claude/rules/ui.md`.
+  Diagnostika MCP a interaktívny kanál: [NASTROJE_TESTOV.md](../NASTROJE_TESTOV.md#mcp).
+- **Lokálne hooky:** hook po Edit/Write hlási syntax a encoding — pri hláške chybu hneď oprav; vynucuje CI ([docs/HOOKY.md](../../../docs/HOOKY.md)).
+- **Testuje sa VÝHRADNE v `_dev\ENGINEtests.skp`** (alebo neuloženom Untitled okne BEZ existujúcich NOXUN korpusov; v ňom môžu agenti
+  tvoriť/mazať čokoľvek) — **NIKDY v okne so zákazkou**: pred testami over `model.path` / titul okna; bridge zapínaj len v testovacom okne.
