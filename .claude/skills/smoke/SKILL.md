@@ -7,7 +7,7 @@ description: Vedenie smoke bloku s Michalom po uzávere — zápisník SMOKE_ZAP
 
 Smoke robí Michal **po uzávere bloku** podľa checklistu v záverečnom dokumente bloku (skill `uzaver-bloku`, krok 5). Orchestrátor ho vedie:
 drží zápisník, robí body overiteľné agentom, zapisuje nálezy a zvyšok nechá na Michala. Testuje sa len v testovacom modeli
-(`_dev\ENGINEtests.skp` alebo model pripravený pre smoke), nikdy v zákazke ([AGENTS.md](../../../AGENTS.md), Zákazy).
+(`_dev\ENGINEtests.skp` alebo iný testovací model v `_dev`, nie zákazka), nikdy v zákazke ([AGENTS.md](../../../AGENTS.md), Zákazy).
 
 ## Formát checklistu
 
@@ -39,7 +39,8 @@ súborov z `%APPDATA%\NOXUN\Engine`.
      projekte; exporty idú do `_dev`.
    - **Ručné u Michala:** vizuál, UX, dielňa a všetko, čo sa nedá overiť bez ľudského oka.
 3. **Sedenie:** orchestrátor pošle Michalovi malú dávku bodov (jedna skupina alebo okno), Michal odpovie „ok" alebo čo nesedí; po každej
-   odpovedi zapíš stav a dôkaz do zápisníka. Body overiteľné agentom robí orchestrátor sám medzi Michalovými odpoveďami.
+   odpovedi zapíš stav a dôkaz do zápisníka. Body overiteľné agentom zadá orchestrátor subagentovi (overenia robí subagent — ORCHESTRATOR.md, Delegovanie
+   a merge) a jeho výsledok s dôkazom zapíše do zápisníka.
 4. **Po sedení** commit a push zápisníka (viď vyššie).
 
 ## Nálezy a ukončenie

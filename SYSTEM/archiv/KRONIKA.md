@@ -23,13 +23,13 @@
   smoke checklistu do záverečného dokumentu a upratanie po uzávere — zoznam kandidátov na zmazanie v `_dev` a worktrees zmergovaných vetiev, maže sa až
   po súhlase Michala, worktree len cez `git worktree remove`) a nový skill `smoke` (vedenie smoke s Michalom: zápisník `SMOKE_ZAPISNIK_<dátum>.md`
   v priečinku bloku s commitom a pushom po každom sedení, Michal najprv škrtne nerelevantné body, rozdelenie na body overiteľné agentom len v testovacom
-  modeli a ručné, nálezy do DOGFOODING, smoke PASS dokumentačným PR; telo z praxe smoke bloku HARDENING). `ORCHESTRATOR.md` 13902 → **9911 B**
+  modeli a ručné, nálezy do DOGFOODING, smoke PASS dokumentačným PR; telo z praxe smoke bloku HARDENING). `ORCHESTRATOR.md` 13902 → **9938 B**
   (uzáver bloku → skill, opisy hookov `po_merge.js` a `context_meter.js` → `docs/HOOKY.md`, obsah kontroly štartu okna → skill `usage`, Retro jedna veta);
   **8 kB sa bez straty pravidla nedosiahlo, preto vlastný strop 10 kB** len pre tento súbor (zoznam, čo by sa muselo vypustiť, v `PACKAGE_P3b.md` § 4).
   `WORKFLOW.md` 36692 → 34179 B (§ 3–§ 8 a § 10: opakované pravidlá nahradené odkazom na ich domov; § 2 a § 9 bez zmeny; nové riadky brán uzáver bloku
   a export test, opravený stĺpec „Kde je pravidlo"). **Nález hliadky P-2026-10-23-2:** blok OBMEDZENIE NÁSTROJOV pre rešerš `agy` žije v jednom súbore
-  `scripts/agy/obmedzenie.txt`; obal `agy-reserser` aj skill `antigravity-outside-in` ho čítajú z neho (prompt, ktorý obal skladá, je bajt po bajte rovnaký
-  ako pred zmenou; chýbajúci alebo prázdny súbor beh nespustí), diagnostika prázdneho výstupu ostáva len v skille. **Nález P-2026-10-23-3:** história
+  `scripts/agy/obmedzenie.txt`; obal `agy-reserser` aj skill `antigravity-outside-in` ho čítajú z neho (súbor sa číta cez `tr -d '\r'`, lebo checkout s `core.autocrlf=true` ho má s CRLF; prompt, ktorý obal skladá, je
+  bajt po bajte rovnaký ako pred zmenou — overené suchým porovnaním nad súborom s LF aj s CRLF, agy sa nespúšťalo; chýbajúci alebo prázdny súbor beh nespustí), diagnostika prázdneho výstupu ostáva len v skille. **Nález P-2026-10-23-3:** história
   zo skillu `antigravity-outside-in` presunutá sem (nižšie). **Stráže:** strop rolí 14 → 8 kB (ORCHESTRATOR 10 kB), strop `.claude/skills/*/SKILL.md`
   500 riadkov, G2 (história) pre tri skilly, nový `test_agy_obmedzenie.rb` (jeden domov bloku + čítanie zo súboru + vlastné správanie). Mapa presunu
   a odchýlky: `SYSTEM/zdroje/bloky/PRAVIDLA/P3b_MAPA.md`. **História presunutá zo skillu `antigravity-outside-in`:** zadanie rešerše outside-in vzniklo

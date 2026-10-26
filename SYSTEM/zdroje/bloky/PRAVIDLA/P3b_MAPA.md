@@ -65,7 +65,7 @@
 |---|---|
 | krok 1: doslovný blok OBMEDZENIE NÁSTROJOV (v kódovom bloku) | `scripts/agy/obmedzenie.txt` (jediný domov); krok 1 hovorí, že blok sa do promptu nepíše, príkaz behu ho pridá sám |
 | krok 1: „Vzor: `scratchpad/ag_outside_in_kovcd.md` z 3.9. (pilot KOV-C/D) a `ag_outside_in_sweep.md` (jednorazový sweep architektúry)" | história → KRONIKA (súbory boli v scratchpade jednej session) |
-| krok 2: príkaz behu používal premennú `OBM` bez definície | príkaz teraz načíta `OBM="$(cat "$S/obmedzenie.txt")"` a pri chýbajúcom alebo prázdnom súbore sa nespustí (`exit=setup-fail`) |
+| krok 2: príkaz behu používal premennú `OBM` bez definície | príkaz teraz načíta `OBM="$(tr -d '\r' < "$S/obmedzenie.txt")"` (CR z checkoutu s CRLF) a pri chýbajúcom alebo prázdnom súbore sa nespustí (`exit=setup-fail`) |
 | „Čo rieši (Michal 3.9.2026)" | história → KRONIKA; v skille „Čo rieši" bez dátumu |
 | „Miesto v poradí (rozhodnutie N14, 26.9.2026)" | história → KRONIKA; v skille „rozhodnutie N14" |
 | „rozhodnutie Z8, 26.9.2026" | história → KRONIKA; v skille „rozhodnutie Z8" |
@@ -79,7 +79,7 @@
 
 | Pôvodná veta (OBAL) | Nový domov |
 |---|---|
-| krok 3: `OBM='OBMEDZENIE NÁSTROJOV: …'` (doslovný text) | `scripts/agy/obmedzenie.txt`; príkaz: `OBM="$(cat "$S/obmedzenie.txt")"`, pri chýbajúcom alebo prázdnom súbore `SETUP-ZLYHAL` (agy sa nespustí) |
+| krok 3: `OBM='OBMEDZENIE NÁSTROJOV: …'` (doslovný text) | `scripts/agy/obmedzenie.txt`; príkaz: `OBM="$(tr -d '\r' < "$S/obmedzenie.txt")"`, pri chýbajúcom alebo prázdnom súbore `SETUP-ZLYHAL` (agy sa nespustí) |
 | Pasce: „Hláška „a tool required the "command" / "read_file" permission" … alebo prázdny packet = stráž chýba v priečinku behu … alebo sa nenačítala — nahlás, nič nemeň (config je zdieľaný s IDE)" | AOI, Pasce (Prázdny výstup s exit 0) — obal ponecháva odrážku s odkazom a „nahlás, nič nemeň" |
 | krok 4 (meranie packetu, čo vrátiť, `len_web.log`, #640) | **ostáva v obale** — vykonateľný krok |
 
@@ -96,7 +96,7 @@
 
 ## F · Odchýlky od package
 
-1. **ORCHESTRATOR.md má 9911 B, nie ≤ 8 kB — platí vlastný strop 10 kB** (package § 1 bod 3). Do 8192 B by sa muselo vypustiť ≈ 1,7 kB; všetky zvyšné
+1. **ORCHESTRATOR.md má 9938 B, nie ≤ 8 kB — platí vlastný strop 10 kB** (package § 1 bod 3). Do 8192 B by sa muselo vypustiť ≈ 1,7 kB; všetky zvyšné
    sekcie nesú pravidlo, ktoré nemá iný domov: Karta roly — „Režimy" (záložný režim) 380 B + „Dostane automaticky" 299 B + „Povinné čítanie" 348 B
    (spolu 1027 B) · Bezpečnosť externých nástrojov 439 B · Inštalácia mainu (odôvodnenie podmienok) 660 B · tabuľka „Keď Michal neodpovie" ≈ 1,5 kB.
    Ostatné roly sú pod 8 kB. Výnimku z 8 kB predkladá orchestrátor Michalovi.
@@ -109,12 +109,15 @@
 5. **Smoke SM a mapa uzáveru US:** nové skilly nepridávajú pravidlá mimo § 1 package; kroky „zostavenie smoke checklistu" a „upratanie" sú jediné nové, formát bodov
    checklistu (skupiny A, B, C … s ID, značky `[model]` a `[záloha]`) je prevzatý z reálneho checklistu bloku HARDENING.
 6. **Zdroje histórie z AOI** (dátumy, čísla verzií, výsledky pilotu) sú zapísané v KRONIKE, odsek P3b.
+7. **Opravy z predrecenzie:** SM — body overiteľné agentom zadáva orchestrátor subagentovi (nie robí sám, OR Delegovanie); US — uzáver je dávka triedy Ľ
+   (dokumentácia a verzia, bez predrecenzie podľa D4) a po mergi sa inštaluje main; US Upratanie — smoke modely sa nenavrhujú nikdy; SM úvod — testovací model
+   v `_dev`, nie zákazka; OBM sa číta cez `tr -d '\r'` (checkout s CRLF); OR Retro dostalo „(pravidlá: WORKFLOW § 9)" (9938 B, strop 10240).
 
 ## G · Veľkosti (bajty bez CR)
 
 | Súbor | Pred | Po | Strop |
 |---|---|---|---|
-| `SYSTEM/pravidla/roly/ORCHESTRATOR.md` | 13902 | 9911 | 10240 (vlastný riadok, odchýlka 1) |
+| `SYSTEM/pravidla/roly/ORCHESTRATOR.md` | 13902 | 9938 | 10240 (vlastný riadok, odchýlka 1) |
 | `SYSTEM/pravidla/roly/IMPLEMENTATOR.md` | 8170 | 8126 | 8192 |
 | `SYSTEM/WORKFLOW.md` | 36692 | 34179 | — |
 | `.claude/skills/uzaver-bloku/SKILL.md` | — | 4042 (47 r) | 500 riadkov |

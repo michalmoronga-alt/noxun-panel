@@ -30,7 +30,7 @@ parametrami zo skillu `.claude/skills/antigravity-outside-in/SKILL.md` a vráti�
 2. Model zo zadania, inak: `agy models | grep -oE '^gemini-[0-9.]+-flash-high' | sort -V | tail -1`. Model sa vždy píše výslovne cez `--model`.
 3. Beh (stráž `scripts/agy/` sa skopíruje do `$R/.agents/` — agy z nej načíta hook, ktorý pustí len `search_web` a `read_url_content`; volaj z priečinka repa) jedným volaním Bash s timeoutom 600000 ms (priečinok sa medzi volaniami nezachováva):
    ```
-   R="$TEMP/agy_research/<x>"; S="$(git rev-parse --show-toplevel)/scripts/agy"; OBM="$(cat "$S/obmedzenie.txt")"
+   R="$TEMP/agy_research/<x>"; S="$(git rev-parse --show-toplevel)/scripts/agy"; OBM="$(tr -d '\r' < "$S/obmedzenie.txt")"
    mkdir -p "$R/.agents" && cp "$S/hooks.json" "$S/len_web.ps1" "$R/.agents/" && rm -f "$R/.agents/len_web.log" && [ -n "$OBM" ] && cd "$R" || { echo "SETUP-ZLYHAL: príprava stráže alebo scripts/agy/obmedzenie.txt zlyhala, agy sa nespustilo"; exit 1; }
    agy -p "$(printf '%s\n\n' "$OBM"; cat '<cesta k promptu>')" --model <model> --mode plan --print-timeout 9m > "$R/<x>_packet.md" 2> "$R/<x>_err.txt"; echo "exit=$?"
    ```

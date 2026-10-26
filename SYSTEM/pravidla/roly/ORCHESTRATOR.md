@@ -101,7 +101,7 @@ typu „predplatné v cudzom programe" (bany) · orchestrátor beží **interakt
 
 - **Report** vždy, keď autonómny beh **skončí alebo sa zastaví**, najneskôr večer — zrozumiteľný z mobilu, bez čítania diffu: čo je
   v maine · čo čaká a prečo · čo zlyhalo · čo večer otestovať.
-- **Retro:** úplne posledný krok behu je voliteľný záznam do lokálneho inboxu — skill `retro`.
+- **Retro:** úplne posledný krok behu je voliteľný záznam do lokálneho inboxu — skill `retro` (pravidlá: WORKFLOW § 9).
 - **Uzáver bloku = variant B:** hneď po poslednej dávke (postup, smoke checklist, upratanie, uzáver pri plnom kontexte: skill
   `uzaver-bloku`). **Poistka:** nový blok sa začína až po Michalovom **smoke PASS** alebo výslovnom **„ideme ďalej"** (vedenie smoke:
   skill `smoke`); nálezy zo smoke sú opravy x.y.z.

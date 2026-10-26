@@ -12,7 +12,8 @@ NX_OBM_PATTERNS = [
   /nepoužívaj terminál, príkazy ani čítanie či zápis súborov/,
   /Používaj výhradne vyhľadávanie na webe \(search_web\)/
 ].freeze
-NX_OBM_SCAN = %w[.claude/**/* SYSTEM/**/* scripts/**/*].freeze
+NX_OBM_READ = %q(OBM="$(tr -d '\r' < "$S/obmedzenie.txt")").freeze
+NX_OBM_SCAN =%w[.claude/**/* SYSTEM/**/* scripts/**/*].freeze
 
 # Subory (relativne cesty) pod NX_OBM_SCAN, ktore obsahuju doslovny text bloku; `skip` sa preskoci.
 def nx_obm_copies(root, skip)
@@ -45,11 +46,13 @@ end
 NxTest.test('agy OBM: obal agy-reserser cita blok zo suboru (zdroj aj vygenerovany typ)') do
   %w[SYSTEM/pravidla/typy/agy-reserser.md .claude/agents/agy-reserser.md].each do |rel|
     src = File.read(File.join(NxTest::ROOT, rel), encoding: 'UTF-8')
-    NxTest.assert(src.include?('OBM="$(cat "$S/obmedzenie.txt")"'), "#{rel}: prikaz behu nenacitava blok zo suboru obmedzenie.txt")
+    # `tr -d '\r'`: checkout s core.autocrlf=true ma subor s CRLF a CR by sa dostal do promptu.
+    NxTest.assert(src.include?(NX_OBM_READ), "#{rel}: prikaz behu nenacitava blok zo suboru obmedzenie.txt bez CR (#{NX_OBM_READ})")
     NxTest.assert(src.include?('printf \'%s\n\n\' "$OBM"'), "#{rel}: prikaz behu nevklada blok OBM na zaciatok promptu")
   end
   skill = File.read(File.join(NxTest::ROOT, '.claude', 'skills', 'antigravity-outside-in', 'SKILL.md'), encoding: 'UTF-8')
   NxTest.assert(skill.include?('scripts/agy/obmedzenie.txt'), 'skill antigravity-outside-in neodkazuje na scripts/agy/obmedzenie.txt')
+  NxTest.assert(skill.include?(NX_OBM_READ), "skill antigravity-outside-in: prikaz behu nenacitava blok bez CR (#{NX_OBM_READ})")
 end
 
 NxTest.test('agy OBM: straz chyti kopiu textu a nechyti odkaz na subor (vlastne spravanie)') do
