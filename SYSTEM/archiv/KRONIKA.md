@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **DOCS · ODKAZ NA SÚKROMNÉ REPO EXTERNÝCH REŠERŠÍ (26.10.2026, PR #PRCISLO, mimo bloku — len dokumentácia; kód pluginu, VERSION, `?v=` ani STAV
+- **DOCS · ODKAZ NA SÚKROMNÉ REPO EXTERNÝCH REŠERŠÍ (26.10.2026, PR #481, mimo bloku — len dokumentácia; kód pluginu, VERSION, `?v=` ani STAV
   bez zmeny).** Michal založil súkromné repo `michalmoronga-alt/Engine-researchs` pre research zvonku a nápady na vylepšenie a pokračovanie
   Noxun Engine, ktoré z neho vychádzajú (prvý obsah: outside-in rozbor cudzieho produktu po oblastiach so skóre nápadov a väzbou na PLAN).
   Odkaz pribudol do rozcestníka `AGENTS.md` a do vrstiev mapy autorít `SYSTEM/README.md` s pravidlom: nezáväzné ako `zdroje/`, nečítať
