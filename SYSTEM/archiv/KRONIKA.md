@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **P3b · POSTUPY: SKILLY `uzaver-bloku` A `smoke`, ORCHESTRATOR POD STROP, WORKFLOW AKO MAPA (26.10.2026, PR #?, blok 10 · PRAVIDLA, trieda S — len pravidlá,
+- **P3b · POSTUPY: SKILLY `uzaver-bloku` A `smoke`, ORCHESTRATOR POD STROP, WORKFLOW AKO MAPA (26.10.2026, PR #484, blok 10 · PRAVIDLA, trieda S — len pravidlá,
   skilly, dokumentácia a testy; kód pluginu, VERSION ani `?v=` bez zmeny).** Postupy, ktoré zbytočne nafukovali rolu orchestrátora, sú v skilloch a
   popisy hookov v dokumentácii. **Čo sa zmenilo:** nový skill `uzaver-bloku` (postup uzáveru bloku presunutý z ORCHESTRATOR.md + nové kroky: zostavenie
   smoke checklistu do záverečného dokumentu a upratanie po uzávere — zoznam kandidátov na zmazanie v `_dev` a worktrees zmergovaných vetiev, maže sa až
