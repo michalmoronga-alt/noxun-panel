@@ -45,6 +45,9 @@
   a fakty). **Predrecenzia** (Claude + Codex sol): P1 ručná záloha PR bez kvótovej brány · P2 auto-pamäť, retro cez typ `analytik` · P3
   (smoke, karty RECENZENT/ANALYTIK/RESERSER, G4 aj nad `zdroje:`, audítor bez delty, záložný orchestrátor s HANDOFF) — opravené;
   podrobnosti fotenia okien, export testu a diagnostiky MCP presunuté do `SYSTEM/pravidla/NASTROJE_TESTOV.md` (IMPLEMENTATOR.md pod 12 kB).
+  **Delta opráv** (nový slepý recenzent, 26.10.): VERDIKT OK, 4×P3 opravil orchestrátor (exit 2/4 pred `gh pr create` = draft aj v skilloch
+  `usage` a `codex-po-pr`, hlavička `otvor_pr.ps1`, názov riadku Náhradníkov, záložný orchestrátor číta rolu podľa odkazu) + nález hliadky
+  pravidiel P-2026-10-23-1 (typ `agy-reserser`: `--mode plan` nezabráni terminálu).
 
 - **P1b · JADRO AGENTS.md, MOST CLAUDE.md, SÚBORY ORCHESTRÁTORA A IMPLEMENTÁTORA (23.10.2026, PR #480, blok 10 · PRAVIDLA, trieda Ť — len pravidlá a testy;
   kód pluginu, VERSION ani `?v=` bez zmeny).** `CLAUDE.md` (32 kB, ktorý Claude Code čítal celý v každom okne aj subagentovi a Codex ho nečítal vôbec) sa
