@@ -20,7 +20,7 @@ Brány testovania všeobecne: [IMPLEMENTATOR.md, sekcia Testovanie](../../SYSTEM
   vypíše `JS: N sad, M PASS, K FAIL`, exit 1 pri zlyhaní; `-FailFast` skončí po prvom pade.
   **Pasca:** `node tests/js/test_*.js` spustí len PRVÝ súbor, zvyšok sú preň argumenty; CI robí bash slučku
   `for f in tests/js/test_*.js; do node "$f" || exit 1; done`.
-- STAV drží jeden riadok posledného behu; čísla starších behov patria do PR a KRONIKY.
+- STAV drží jeden riadok posledného behu; počty testov každého behu patria do PR a KRONIKY.
 
 **In-SU runner `scripts\run_su_tests.ps1`** (pravidlá — `-CloseWhenDone` vždy, brána mergu, paralelné behy — sú v IMPLEMENTATOR.md)
 
