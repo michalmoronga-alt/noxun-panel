@@ -32,6 +32,8 @@ Tento súbor číta každý agent a nástroj (Claude Code cez most `CLAUDE.md`, 
 - **Glosár pojmov + stolárske poznatky:** [SYSTEM/POJMY.md](SYSTEM/POJMY.md) — jednotný jazyk sedení a fakty domény (postforming,
   formáty, hrúbky, ABS obchodné hodnoty); trvalé poznatky z hlásení zapisovať SEM
 - **Historické dokumenty (uzavreté rozhodnutia, plné texty hotových etáp a vyriešených postrehov):** [SYSTEM/archiv/](SYSTEM/archiv/)
+- **Externé rešerše (súkromné repo):** [michalmoronga-alt/Engine-researchs](https://github.com/michalmoronga-alt/Engine-researchs) — research
+  zvonku a nápady na vylepšenie a pokračovanie Noxun Engine; nezáväzné, kedy čítať: [SYSTEM/README.md](SYSTEM/README.md) (Vrstvy)
 - **Pravidlá SketchUp kódu:** [docs/SKETCHUP_PRAVIDLA.md](docs/SKETCHUP_PRAVIDLA.md) · DC pasce: [docs/DC_PRAVIDLA.md](docs/DC_PRAVIDLA.md) ·
   UI dizajn: [docs/UI_DIZAJN.md](docs/UI_DIZAJN.md) — kompletné a samostatné v tomto repe. (Nadradený `..\CLAUDE.md` existuje len
   v Michalovom lokálnom workspace `C:\APP DEV\RUBY` — mapa ostatných pluginov; pre prácu v tomto repe nie je potrebný.)

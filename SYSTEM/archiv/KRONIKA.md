@@ -17,6 +17,12 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **DOCS · ODKAZ NA SÚKROMNÉ REPO EXTERNÝCH REŠERŠÍ (26.10.2026, PR #481, mimo bloku — len dokumentácia; kód pluginu, VERSION, `?v=` ani STAV
+  bez zmeny).** Michal založil súkromné repo `michalmoronga-alt/Engine-researchs` pre research zvonku a nápady na vylepšenie a pokračovanie
+  Noxun Engine, ktoré z neho vychádzajú (prvý obsah: outside-in rozbor cudzieho produktu po oblastiach so skóre nápadov a väzbou na PLAN).
+  Odkaz pribudol do rozcestníka `AGENTS.md` a do vrstiev mapy autorít `SYSTEM/README.md` s pravidlom: nezáväzné ako `zdroje/`, nečítať
+  automaticky, do PLAN ide len výber Michala. **Prečo samostatné repo:** podrobné rozbory so screenshotmi nepatria do verejného `noxun-panel`.
+
 - **P1b · JADRO AGENTS.md, MOST CLAUDE.md, SÚBORY ORCHESTRÁTORA A IMPLEMENTÁTORA (23.10.2026, PR #480, blok 10 · PRAVIDLA, trieda Ť — len pravidlá a testy;
   kód pluginu, VERSION ani `?v=` bez zmeny).** `CLAUDE.md` (32 kB, ktorý Claude Code čítal celý v každom okne aj subagentovi a Codex ho nečítal vôbec) sa
   **presunul bez zmeny významu** na štyri miesta: jadro pre všetkých agentov a nástroje `AGENTS.md` (projekt, rola → súbor, rozcestník, zákazy, git v skratke,
