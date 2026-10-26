@@ -24,6 +24,26 @@
 - Dôsledok: pamäť musí držať **len odkazy a fakty**, nie pravidlá rolí (veta v ORCHESTRATOR.md, Autonómne bloky). Smoke po mergi
   (PACKAGE_P2 § 3 bod 5) to overí otázkou na obsah MEMORY.md.
 
+## Smoke typov po mergi (PACKAGE_P2 § 3 bod 5)
+
+Nová session nad mainom `8cd582cc` (po PR #482), Claude Code **2.1.310** v desktop aplikácii, 26.10.2026. Každý typ dostal len otázky
+s pokynom odpovedať **z úvodného kontextu, bez nástrojov** (každý použil 1 nástroj — odovzdanie výsledku; nič nečítal).
+
+| Otázka | `analytik` | `slepy-recenzent` | `implementator-lahky` | Očakávané |
+|---|---|---|---|---|
+| (a) posledná veta `AGENTS.md` | ✅ doslova („**Nehlás:** všeobecné rady…") | ✅ doslova | ✅ doslova | áno |
+| (b) prvá veta `ORCHESTRATOR.md` | nemá | nemá | nemá | nie |
+| (c) `~/.claude/CLAUDE.md` (globálne pokyny) | nemá | nemá | nemá | nie |
+| (d) auto-pamäť `MEMORY.md` | **nemá** | **nemá** | **nemá** | zapísať |
+| vložené pravidlá typu | AGENTS + ANALYTIK | AGENTS + DEFINICIE + RECENZENT + IMPLEMENTATOR `#verzia`, `#testovanie` (citoval z každej) | AGENTS + DEFINICIE + IMPLEMENTATOR (citoval triedu Ľ a kartu) | podľa tabuľky nižšie |
+| iný CLAUDE.md alebo pravidlá | žiadne | žiadne | žiadne | žiadne |
+
+**Výsledok: PASS** — každý typ má len svoje pravidlá, nikto nevidí pravidlá orchestrátora ani Michalove globálne pokyny. Mimo tela typu
+majú všetci len systémové pripomienky (git status, e-mail používateľa, atribúcia commitov) a zoznam skillov.
+**Auto-pamäť:** typy s `omitClaudeMd: true` ju v tejto verzii **nevidia** (súhlasí s docs). Pozorovanie z P2 (pamäť viditeľná) bolo na type
+**bez** `omitClaudeMd`; či ju odstraňuje práve toto pole, alebo ju vtedy priniesol harness inak, neoverené — pravidlo „pamäť drží len odkazy
+a fakty" platí ďalej (hlavné okno ju vidí vždy).
+
 ## Predtým (main po P1b) — spoločné pre všetky typy
 
 Každý Claude typ dedil celú hierarchiu CLAUDE.md, ktorú vidí hlavné okno, plus svoje telo:
