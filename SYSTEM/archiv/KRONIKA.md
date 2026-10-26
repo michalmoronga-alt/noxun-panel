@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **P2 · KARTY ROLÍ, TYPY AGENTOV LEN SO SVOJIMI PRAVIDLAMI, ROLA ANALYTIK (23.10.2026, PR #?, blok 10 · PRAVIDLA, trieda Ť — len pravidlá,
+- **P2 · KARTY ROLÍ, TYPY AGENTOV LEN SO SVOJIMI PRAVIDLAMI, ROLA ANALYTIK (23.10.2026, PR #482, blok 10 · PRAVIDLA, trieda Ť — len pravidlá,
   generátor a testy; kód pluginu, VERSION ani `?v=` bez zmeny).** Každý typ subagenta dostane **len pravidlá svojej roly** a typy sa nerozídu
   so súbormi rolí. **Sonda:** pole `omitClaudeMd` overené v docs code.claude.com/docs/en/sub-agents (Claude Code 2.1.301, pole od 2.1.271) —
   subagent štartuje bez používateľského, projektového aj nadradeného CLAUDE.md. Doteraz každý typ dedil ~61 kB: most (AGENTS + **ORCHESTRATOR**),
