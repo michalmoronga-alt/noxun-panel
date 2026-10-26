@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **P3a · PRAVIDLÁ OBLASTÍ V `.claude/rules/` (26.10.2026, PR #?, blok 10 · PRAVIDLA, trieda S — len pravidlá, dokumentácia a testy; kód pluginu,
+- **P3a · PRAVIDLÁ OBLASTÍ V `.claude/rules/` (26.10.2026, PR #483, blok 10 · PRAVIDLA, trieda S — len pravidlá, dokumentácia a testy; kód pluginu,
   VERSION ani `?v=` bez zmeny).** Povinné čítanie podľa oblasti sa načíta samo, keď agent číta alebo upravuje súbor oblasti — rola, ktorej sa
   oblasť netýka, ho nedostane. **Sonda** (docs code.claude.com/docs/en/memory a sub-agents, Claude Code 2.1.310): `paths:` v `.claude/rules/*.md`
   sa spúšťa pri Read/Write/Edit (a čítaní cez Bash), platí aj pre subagentov s `omitClaudeMd`; Grep a Glob medzi spúšťačmi nie sú. **Čo sa

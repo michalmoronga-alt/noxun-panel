@@ -31,7 +31,7 @@ ani nevyexportuje** (rohovú by sklopil na dolnú, úzku rozšíril na 200). **R
 **Blok 10 · PRAVIDLA** — pravidlá a workflow agentov, plugin sa nemení ([PLAN.md](PLAN.md), priečinok [zdroje/bloky/PRAVIDLA/](zdroje/bloky/PRAVIDLA/)); hotové sú dávky P1a (definície na jednom mieste, PR #478), P4a
 (drobnosti workflowu, PR #479), P1b (pravidlá z `CLAUDE.md` presunuté do jadra `AGENTS.md`, súborov rolí `pravidla/roly/` a `pravidla/POVINNE_CITANIE.md`; `CLAUDE.md` je most; stropy veľkosti a zákaz histórie stráži guard, PR #480),
 P2 (karty všetkých rolí, typy agentov generované z kariet bez dedenia `CLAUDE.md`, nová rola analytik, PR #482; smoke typov PASS 26.10.)
-a P3a (pravidlá oblastí v `.claude/rules/` s `paths:`, POVINNE_CITANIE je rozcestník, IMPLEMENTATOR ≤ 8 kB, PR #?); ďalej P3b (postupy). Popri ňom čaká **Michalov smoke bloku 9** (94 bodov v 5 skupinách) a aktualizácia pluginu na 0.18.1 na oboch PC.
+a P3a (pravidlá oblastí v `.claude/rules/` s `paths:`, POVINNE_CITANIE je rozcestník, IMPLEMENTATOR ≤ 8 kB, PR #483); ďalej P3b (postupy). Popri ňom čaká **Michalov smoke bloku 9** (94 bodov v 5 skupinách) a aktualizácia pluginu na 0.18.1 na oboch PC.
 **Zásobník z bloku:** D-154 „Exportovať všetko" · D-151 · D-152 · D-153 (podmienený) · H18b-2 mimo scope. **Luciin PC:** nevieme, či má SketchUp 2026.2 (H11 Q3 bez odpovede).
 **Otázky bez odpovede, platí návrh:** vymenované v [záverečnom dokumente](archiv/HARDENING_ZAVER_2026-10-11.md) (Otvorené body) · pri prvej rohovej v dielni overiť záves Sensys ·
 **na smoke čakajú aj** D-132 (#367), D-133 (#368), D-134 (#369) — sú v checkliste (B25, C19, C20).
