@@ -1,19 +1,20 @@
 ---
 name: smoke
-description: Vedenie smoke bloku s Michalom po uzávere — zápisník SMOKE_ZAPISNIK_<dátum>.md v priečinku bloku (stav bodov PASS/FAIL/VYNECHANÉ/ZOSTÁVA s dôkazom, postrehy S1…), commit a push po každom sedení, Michal najprv škrtne nerelevantné body, rozdelenie bodov na overiteľné agentom (len v testovacom modeli) a ručné u Michala, nálezy do DOGFOODING a opravy x.y.z, smoke PASS dokumentačným PR. Použi, keď Michal začne smoke po uzávere bloku alebo keď sa smoke prenáša do novej session.
+description: Vedenie smoke bloku s Michalom po uzávere — zápisník SMOKE_ZAPISNIK_<dátum>.md v priečinku bloku (stav bodov PASS/FAIL/VYNECHANÉ/ZOSTÁVA s dôkazom, postrehy S1…), commit a push po každom sedení, Michal najprv škrtne nerelevantné body, rozdelenie bodov na overiteľné agentom (len v prostredí podľa AGENTS.md, Zákazy) a ručné u Michala, nálezy do DOGFOODING a opravy x.y.z, smoke PASS dokumentačným PR. Použi, keď Michal začne smoke po uzávere bloku alebo keď sa smoke prenáša do novej session.
 ---
 
 # Smoke bloku
 
 Smoke robí Michal **po uzávere bloku** podľa checklistu v záverečnom dokumente bloku (skill `uzaver-bloku`, krok 5). Orchestrátor ho vedie:
-drží zápisník, zadáva body overiteľné agentom subagentovi, zapisuje nálezy a zvyšok nechá na Michala. Testuje sa len v testovacom modeli
-(`_dev\ENGINEtests.skp` alebo iný testovací model v `_dev`, nikdy v zákazke; [AGENTS.md](../../../AGENTS.md), Zákazy).
+drží zápisník, zadáva body overiteľné agentom subagentovi, zapisuje nálezy a zvyšok nechá na Michala. Body overiteľné agentom (runner,
+export test, foto, bridge) bežia len v prostredí, ktoré povoľuje [AGENTS.md](../../../AGENTS.md), Zákazy pre všetkých — nikdy v zákazke;
+Michalove ručné smoke modely sú jeho a agent v nich nepracuje.
 
 ## Formát checklistu
 
 Body sú **po skupinách s ID**: skupina = písmeno (A, B, C …) podľa oblasti alebo okna, najdôležitejšia prvá (to, čo mení výrobné a cenové
 čísla), v skupine číslo (A1, A2 …); prípravné body majú skupinu P. **ID je stabilné** — bod sa nikdy neprečísluje, vynechaný ostáva s ID.
-Bod = čo urobiť · čo má byť výsledok · zdroj dávky v zátvorke; značka **[model]** = potrebuje testovací model, **[záloha]** = potrebuje zálohu
+Bod = čo urobiť · čo má byť výsledok · zdroj dávky v zátvorke; značka **[model]** = potrebuje model s korpusmi (agent len v prostredí podľa AGENTS.md, Zákazy), **[záloha]** = potrebuje zálohu
 súborov z `%APPDATA%\NOXUN\Engine`.
 
 ## Zápisník

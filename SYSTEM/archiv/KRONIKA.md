@@ -23,7 +23,7 @@
   smoke checklistu do záverečného dokumentu a upratanie po uzávere — zoznam kandidátov na zmazanie v `_dev` a worktrees zmergovaných vetiev, maže sa až
   po súhlase Michala, worktree len cez `git worktree remove`) a nový skill `smoke` (vedenie smoke s Michalom: zápisník `SMOKE_ZAPISNIK_<dátum>.md`
   v priečinku bloku s commitom a pushom po každom sedení, Michal najprv škrtne nerelevantné body, rozdelenie na body overiteľné agentom len v testovacom
-  modeli a ručné, nálezy do DOGFOODING, smoke PASS dokumentačným PR; telo z praxe smoke bloku HARDENING). `ORCHESTRATOR.md` 13902 → **9938 B**
+  prostredí podľa AGENTS.md a ručné, nálezy do DOGFOODING, smoke PASS dokumentačným PR; telo z praxe smoke bloku HARDENING). `ORCHESTRATOR.md` 13902 → **9938 B**
   (uzáver bloku → skill, opisy hookov `po_merge.js` a `context_meter.js` → `docs/HOOKY.md`, obsah kontroly štartu okna → skill `usage`, Retro jedna veta);
   **8 kB sa bez straty pravidla nedosiahlo, preto vlastný strop 10 kB** len pre tento súbor (zoznam, čo by sa muselo vypustiť, v `PACKAGE_P3b.md` § 4).
   `WORKFLOW.md` 36692 → 34179 B (§ 3–§ 8 a § 10: opakované pravidlá nahradené odkazom na ich domov; § 2 a § 9 bez zmeny; nové riadky brán uzáver bloku
@@ -41,6 +41,9 @@
   22.–23.10.2026 na agy 1.4.5. **Smoke pravidiel oblastí po P3a (26.10.2026, main 1a81e9a8, typ `analytik`): PASS** — po Read prvých 3 riadkov
   `noxun_engine/ui/panel.rb` dostal v systémových pripomienkach hneď po výsledku nástroja obsah `.claude/rules/kod.md` a `.claude/rules/ui.md`, nie
   `vystupy.md` ani `konstrukcia.md`; pravidlá sa načítali aj v bežiacej session (netreba novú), lebo subagent štartoval po mergi.
+  **Oprava z review (2× P1):** skill `smoke` už nepovoľuje „iný testovací model v `_dev`" — body overiteľné agentom bežia len v prostredí podľa
+  AGENTS.md, Zákazy pre všetkých (Michalove ručné smoke modely sú jeho); skill `uzaver-bloku` namiesto bezpodmienečného „predrecenzia nie je
+  povinná" odkazuje na D4 vrátane výnimky pre dávku náhradného implementátora.
 
 - **P3a · PRAVIDLÁ OBLASTÍ V `.claude/rules/` (26.10.2026, PR #483, blok 10 · PRAVIDLA, trieda S — len pravidlá, dokumentácia a testy; kód pluginu,
   VERSION ani `?v=` bez zmeny).** Povinné čítanie podľa oblasti sa načíta samo, keď agent číta alebo upravuje súbor oblasti — rola, ktorej sa
