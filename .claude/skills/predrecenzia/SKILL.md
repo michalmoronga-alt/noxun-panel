@@ -32,7 +32,7 @@ povinné pre každý PR — predrecenzia je lacnejšie kolo navyše medzi hotov�
    a kľúčové rozhodnutia z briefu) a rozsah diffu — nie výsledky auditu, nie vlastné hodnotenie orchestrátora, nie zoznam „na čo si dať pozor".
    Medzitým orchestrátor pripravuje PR popis.
    **Druhý recenzent pri dávke Ť** (kedy: `SYSTEM/pravidla/DEFINICIE.md` § D4): **implementátor Claude** → druhým recenzentom je Codex, model roly
-   **bežný audit a delta** z tabuľky Obsadenie rolí, spustený cez companion `task --background --model <model>` (postup ako v bode 7) alebo subagent
+   Codexu z riadku **slepý recenzent** v tabuľke Náhradníci (`SYSTEM/WORKFLOW.md` § 2), spustený cez companion `task --background --model <model>` (postup ako v bode 7) alebo subagent
    `codex:codex-rescue` — model vždy výslovne; **rovnaké zadanie a rovnaký rozsah diffu** ako prvý recenzent, beží súbežne. **Implementátor iného
    providera** (napr. náhradník Codex) → iným providerom je už povinný Claude recenzent, druhý sa nepridáva. Pred druhým recenzentom Codex brána
    `-Gate codex`; reakcia na exit 3: skill `usage`, Prahy a reakcie (riadok Druhý recenzent pri Ť).
@@ -45,7 +45,7 @@ povinné pre každý PR — predrecenzia je lacnejšie kolo navyše medzi hotov�
    `--model` (na predvolený model z `~/.codex/config.toml` sa nespolieha, rozhodnutie N13). Najprv Codex brána
    `& ".claude\skills\usage\usage.ps1" -Label "predrecenzia <dávka>" -Phase before -Gate codex` (exit 3 = ani náhradu nespúšťaj — reakcia
    podľa skillu `usage`), potom cez **PowerShell tool** s tým istým promptom:
-   `$prompt = Get-Content -Raw '<prompt-file>'; node "<companion>" task --background --model <model roly bežný audit a delta> $prompt`.
+   `$prompt = Get-Content -Raw '<prompt-file>'; node "<companion>" task --background --model <model Codexu z riadku slepý recenzent v tabuľke Náhradníci> $prompt`.
    Nájdenie companionu, čakanie so stall guardom a vytiahnutie výsledku: skill `codex-audit`, kroky 1 a 4–5.
 
 **Závažnosť:** **P1** = chybné výrobné dáta alebo ceny, strata či poškodenie dát, pád, zápis do cudzieho dokumentu · **P2** = zlé správanie

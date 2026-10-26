@@ -41,7 +41,7 @@ v kroku 1 **samy čítali** DEFINICIE.md (6,7 kB) a IMPLEMENTATOR.md (12,4 kB).
 
 ## Teraz (po P2) — každý typ zvlášť
 
-Všetky typy majú `omitClaudeMd: true` → nič z tabuľky vyššie. Telo typu skladá `scripts/generuj_typy_agentov.rb` zo zdroja
+Všetky typy majú `omitClaudeMd: true` → nič z tabuľky vyššie okrem auto-pamäte (známe obmedzenie vyššie). Telo typu skladá `scripts/generuj_typy_agentov.rb` zo zdroja
 `SYSTEM/pravidla/typy/<typ>.md` (frontmatter + hlavička) a doslova vložených súborov.
 
 | Typ | Predtým telo | Teraz telo (vložené) | Veľkosť tela | Nedostane |

@@ -37,11 +37,11 @@ Antigravity — outside-in rešerš (nie v nočných behoch bez obsluhy) · slep
 | implementátor — profil Ť (ťažká dávka) | Claude subagent vo worktree — `opus` (= Claude Opus 5.5) | Agent tool, typ `implementator` ([definícia](../.claude/agents/implementator.md): model, effort `high`, `isolation: worktree`), na pozadí; výber profilu: Matica výberu nižšie | report subagenta (vetva, SHA); trailer commitu nesie jeho model |
 | implementátor — profil S (stredná dávka), od 7.10.2026 | Claude subagent vo worktree — `sonnet` | Agent tool, typ `implementator-stredny` ([definícia](../.claude/agents/implementator-stredny.md): effort `high`, `isolation: worktree`), na pozadí | ako pri profile Ť |
 | implementátor — profil Ľ (ľahká dávka), od 7.10.2026 | Claude subagent vo worktree — `sonnet` | Agent tool, typ `implementator-lahky` ([definícia](../.claude/agents/implementator-lahky.md): effort `medium`, `isolation: worktree`), na pozadí | ako pri profile Ť |
-| slepý recenzent | Claude subagent — `opus` (= Claude Opus 5.5) | Agent tool, typ `slepy-recenzent` ([definícia](../.claude/agents/slepy-recenzent.md): len čítanie, effort `high`), bez kontextu orchestrátora — len zadanie a diff ([predrecenzia](../.claude/skills/predrecenzia/SKILL.md)) | posledný riadok výstupu `VERDIKT: …` |
+| slepý recenzent (predrecenzia, delta — kontrola opráv) | Claude subagent — `opus` (= Claude Opus 5.5) | Agent tool, typ `slepy-recenzent` ([definícia](../.claude/agents/slepy-recenzent.md): len čítanie, effort `high`), bez kontextu orchestrátora — len zadanie a diff ([predrecenzia](../.claude/skills/predrecenzia/SKILL.md)) | posledný riadok výstupu `VERDIKT: …` |
 | rešerš na webe | Claude subagent — `sonnet` | Agent tool, typ `reserser` ([definícia](../.claude/agents/reserser.md): effort `medium`, bez zápisu), na pozadí | report so zdrojmi (URL a dátum overenia) |
 | analytik | Claude subagent — `sonnet`; mechanické výťahy `haiku` | Agent tool, typ `analytik` ([definícia](../.claude/agents/analytik.md): effort `medium`, len čítanie); pri mechanickom výťahu s parametrom `model: haiku` | zistenia s dôkazmi (súbor:riadok, PR) |
 | audítor audit-povinných | Codex `gpt-6-astra` | companion `task --background --model gpt-6-astra` ([codex-audit](../.claude/skills/codex-audit/SKILL.md)) · subagent `codex:codex-rescue` (plugin; v zadaní `--model`) | `codex --version` = npm balík z `%APPDATA%\npm`; companion `status <task-id>` |
-| bežný audit a delta | Codex `gpt-6.1-sol` | companion `task --background --model gpt-6.1-sol` · subagent `codex:codex-rescue` (plugin; v zadaní `--model`) | ako pri audítorovi audit-povinných |
+| bežný audit | Codex `gpt-6.1-sol` | companion `task --background --model gpt-6.1-sol` · subagent `codex:codex-rescue` (plugin; v zadaní `--model`) | ako pri audítorovi audit-povinných |
 | review PR | GH Codex (model na strane Codex cloudu) | automaticky pri otvorení PR (nie draft); ďalšie kolá komentárom `@codex review` ([codex-po-pr](../.claude/skills/codex-po-pr/SKILL.md)) | 👀 = kolo beží, 👍 = bez nálezov; nálezy v review threadoch |
 | rešerš outside-in | Antigravity `agy` — Gemini Flash (najvyšší v `agy models`); **nie v nočných behoch** | typ `agy-reserser` ([definícia](../.claude/agents/agy-reserser.md), do ~9 min) · dlhší beh `agy -p … --mode plan` na pozadí ([skill](../.claude/skills/antigravity-outside-in/SKILL.md)) | `agy --version`, `agy models`; web granty v `~/.gemini/config/config.json` |
 | rešerš / krížový audit | Grok Build CLI `grok-4.7` | subagent `grok-build:grok-delegate` (plugin; v zadaní `--model` a „len čítanie"); `/grok-build:review` a `/grok-build:critique` spúšťa Michal; CLI príkaz v repe `agent-register` | `grok --version`; prihlásenie predplatným; `/grok-build:check` |
@@ -74,8 +74,8 @@ na rad, až keď primárny agent roly nemôže a čakanie nepripadá do úvahy (
 | Rola | Prípustný náhradník | Nikdy | Keď nie je náhradník |
 |---|---|---|---|
 | audítor audit-povinných | — | Grok, Antigravity, Sonnet | čaká / rozhodne Michal |
-| bežný audit a delta | slepý recenzent (Claude Opus) = náhradná brána | Antigravity | — |
-| slepý recenzent (predrecenzia) | Codex `gpt-6.1-sol` (keď Claude weekly nestačí) | — | predrecenzia dávky náhradného implementátora Codex čaká — kód Codexu nekontroluje len Codex |
+| bežný audit | slepý recenzent (Claude Opus) = náhradná brána | Antigravity | — |
+| slepý recenzent (predrecenzia, delta) | Codex `gpt-6.1-sol` (keď Claude weekly nestačí; aj druhý recenzent iného providera pri Ť) | — | predrecenzia dávky náhradného implementátora Codex čaká — kód Codexu nekontroluje len Codex |
 | review PR | náhradná brána: slepý subagent + delta | — | — |
 | implementátor (všetky profily) | Codex `gpt-6.1-sol` vo worktree — **len bežné dávky** | Grok (kým neprejde shadow, Matica výberu), Antigravity | audit-povinné a výrobné/cenové dávky čakajú na reset |
 | rešerš / krížový audit | rešeršér Sonnet | — | — |
