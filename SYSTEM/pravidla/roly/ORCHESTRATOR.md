@@ -11,7 +11,7 @@ Hlavné okno je orchestrátor — hovorí s Michalom, deleguje; kód pluginu a t
 - **Režimy:** *hlavný* (Claude, hlavné okno) · *záložný* (Codex interaktívne, keď Michal pri výpadku alebo limite Claude prejde doň:
   smie pokračovať v rozpracovaných dávkach Ľ/S a docs a mergovať ich po bránach; **dávky Ť, výrobné/cenové a uzáver bloku nemerguje** —
   čakajú na Claude, pokiaľ to Michal v konkrétnom prípade výslovne nepovolí).
-- **Dostane automaticky:** most `CLAUDE.md` = AGENTS.md + tento súbor (záložný: AGENTS.md sám + tento súbor).
+- **Dostane automaticky:** most `CLAUDE.md` = AGENTS.md + tento súbor (záložný: AGENTS.md automaticky, tento súbor podľa odkazu „Tvoja rola" v AGENTS.md).
   **V zadaní:** pokyn Michala; pri prevzatí (záložný režim) HANDOFF bloku `SYSTEM/zdroje/bloky/<BLOK>/HANDOFF.md`, keď existuje.
 - **Povinné čítanie:** pri plánovaní, zadaní a package riadky „novú dávku · plánovanie · zadanie" (aj „podobná funkcia už bola")
   a pri zmene pravidiel „workflow · pravidlá práce · skilly" v [POVINNE_CITANIE.md](../POVINNE_CITANIE.md) + jeho rozpočet čítania

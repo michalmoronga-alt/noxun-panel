@@ -52,7 +52,7 @@ Všetky typy majú `omitClaudeMd: true` → nič z tabuľky vyššie okrem auto-
 | `slepy-recenzent` | pravidlá, závažnosť, výstup (3,0 kB) + čítal sám AGENTS, DEFINICIE, sekcie IMPLEMENTATOR | hlavička + **AGENTS.md** + **DEFINICIE.md** + **RECENZENT.md** + IMPLEMENTATOR.md **sekcie Verzia a uzáver dávky a Testovanie** (`#verzia`, `#testovanie`) | 25 358 | ORCHESTRATOR.md, karta, postup a report implementátora |
 | `reserser` | pravidlá a výstup (1,8 kB) | hlavička + **RESERSER.md** (bez jadra — rozhodnutie Michala 22.10., ROLY ❓2) | 3 679 | AGENTS.md, DEFINICIE.md, ORCHESTRATOR.md |
 | `analytik` (nový) | — | hlavička + **AGENTS.md** + **ANALYTIK.md** (ROLY § 6: bez DEFINICIE) | 10 246 | DEFINICIE.md (len odkazom z AGENTS), ORCHESTRATOR.md |
-| `agy-reserser` (obal) | telo obalu (5,0 kB) | to isté telo bez zmeny (obal nie je rola) | 5 144 | všetky pravidlá — obal len spúšťa `agy` |
+| `agy-reserser` (obal) | telo obalu (5,0 kB) | to isté telo, opravené tvrdenie o `--mode plan` (hliadka P-2026-10-23-1; obal nie je rola) | 5 263 | všetky pravidlá — obal len spúšťa `agy` |
 
 ## Overenie: nič potrebné nechýba, nič orchestrátorovo nepribudlo
 
