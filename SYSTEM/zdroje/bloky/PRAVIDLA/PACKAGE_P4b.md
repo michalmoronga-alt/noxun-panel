@@ -81,7 +81,8 @@ a jeho matcher v `settings.json` na `Bash|PowerShell` (+ test).
    nezmenia: `git -C "<hlavný checkout na main>" commit --allow-empty --dry-run -m smoke` → odmietnuté · `git push --dry-run origin HEAD:main` →
    odmietnuté · `gh pr merge 999999 --merge` → odmietnuté · `git push --dry-run origin HEAD:refs/heads/smoke-straz` → povolené ·
    `scripts\run_su_tests.ps1 -DryRun` → povolené · `scripts\run_su_tests.ps1 -NeexistujuciPrepinac` → odmietnuté (pri zlyhaní hooku
-   PowerShell skončí na neznámom parametri). Výsledok do KRONIKY dokumentačným commitom ďalšej dávky.
+   PowerShell skončí na neznámom parametri). Plus **povolený prípad pre subagenta vo worktree**: `git commit --allow-empty --dry-run -m smoke`
+   bez `cd` v jeho worktree → povolené (overí, že `cwd` vo vstupe hooku je worktree subagenta, nie hlavný checkout). Výsledok do KRONIKY dokumentačným commitom ďalšej dávky.
 
 ## 5 · Brány a výsledok (vyplní implementátor)
 
@@ -92,4 +93,4 @@ a jeho matcher v `settings.json` na `Bash|PowerShell` (+ test).
 - **Výsledok (implementátor):** hook `.claude/hooks/straz.js` + `tests/js/test_straz.js`, `po_merge.js` aj pre PowerShell, `settings.json` (PreToolUse `Bash|PowerShell`),
   `docs/HOOKY.md`. Formát odmietnutia: JSON `permissionDecision: "deny"` + exit 0 (dokumentácia hookov Claude Code; dôvod v hlavičke hooku). Odchýlka od § 1: vetva sa zisťuje
   cez `git symbolic-ref -q HEAD` namiesto `rev-parse --abbrev-ref HEAD` (funguje pred prvým commitom, nevráti dvojznačné `heads/main`); odpojená hlava = povolené ako v zadaní.
-  IMPLEMENTATOR.md 8122 B (z 8126), ORCHESTRATOR.md 9997 B.
+  IMPLEMENTATOR.md 8120 B (z 8126), ORCHESTRATOR.md 9997 B.

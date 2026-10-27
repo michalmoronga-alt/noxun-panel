@@ -132,6 +132,11 @@ try {
   deny('push', 'git push -u origin', 'Bash', MAIN);
   deny('push', 'git push > out.log', 'Bash', MAIN);
   deny('push', 'git push origin main', 'PowerShell', WT);
+  deny('push', 'git push origin 2>&1', 'PowerShell', MAIN);                      // 2>&1 nie je refspec
+  deny('push', 'git push -u origin 2>&1 | Select-Object -Last 3', 'PowerShell', MAIN);
+  deny('push', 'git push origin main 2>&1', 'PowerShell', WT);
+  allow('git push origin 2>&1', 'PowerShell', WT);
+  allow('git push origin feat/x 2>&1 | Select-Object -Last 3', 'PowerShell', MAIN);
   allow('git push', 'Bash', WT);                                                 // bare push na feat/x
   allow('git push origin', 'Bash', WT);
   allow('git push', 'Bash', DET);
@@ -169,6 +174,11 @@ try {
   allow('sha=$(git rev-parse HEAD) && gh pr merge 12 --merge --match-head-commit "$sha"', 'Bash');
   allow('$sha = git rev-parse HEAD; gh pr merge 12 --merge --match-head-commit $sha', 'PowerShell');
   allow('gh pr merge --merge --match-head-commit abc', 'Bash', WT, 'merge aktualnej vetvy (bez cisla)');
+  allow('gh pr merge 12 --merge --match-head-commit $(git rev-parse HEAD)', 'Bash', WT, 'hodnota je substitucia bez uvodzoviek');
+  allow('gh pr merge 12 --merge --match-head-commit=$(git rev-parse HEAD)', 'Bash', WT, 'tvar =$(…)');
+  allow('gh pr merge 12 --merge --match-head-commit "$(git rev-parse HEAD)"', 'Bash', WT, 'substitucia v uvodzovkach');
+  allow('gh pr merge 12 --merge --match-head-commit (git rev-parse HEAD)', 'PowerShell', WT, 'PowerShell: (…) ako hodnota');
+  allow('gh pr merge 12 --merge --match-head-commit $(git rev-parse HEAD)', 'PowerShell', WT, 'PowerShell: $(…) ako hodnota');
   allow('gh pr merge --help', 'Bash');
   allow('gh pr merge 12 --help', 'Bash');
   allow('gh pr view 12', 'Bash');
@@ -212,6 +222,8 @@ try {
   state.diffCalls.length = 0;
   allow('gh pr merge --merge --match-head-commit abc', 'Bash', WT, 'G7: bez cisla PR sa nekontroluje');
   eq(state.diffCalls.length, 0, 'bez cisla PR sa gh pr diff nevola');
+  allow('gh pr merge --merge --match-head-commit $sha 2>&1', 'PowerShell', WT, 'PowerShell: bez cisla PR a s 2>&1');
+  eq(state.diffCalls.length, 0, 'PowerShell: 2>&1 nie je cislo PR (gh pr diff 1 sa nevola)');
   eq(code('gh pr merge 12 --merge', 'Bash'), 'pin', 'bez pripnutia je dovod pin, nie g7');
   eq(state.diffCalls.length, 0, 'pri odmietnuti pin sa gh pr diff nevola');
   deny('g7', 'gh pr merge https://github.com/o/r/pull/77 --merge --match-head-commit abc', 'Bash');
@@ -276,7 +288,12 @@ try {
   const words = (c, sh) => M.tokenize(c, sh || 'bash').map((t) => (t.t === 'w' ? t.v : '<' + t.v + '>'));
   eq(words('git commit -m "a b" \'c d\''), ['git', 'commit', '-m', 'a b', 'c d'], 'uvodzovky');
   eq(words('a && b || c; d | e'), ['a', '<&&>', 'b', '<||>', 'c', '<;>', 'd', '<|>', 'e'], 'oddelovace');
-  eq(words('sha=$(git rev-parse HEAD) && x'), ['sha=', '<(>', 'git', 'rev-parse', 'HEAD', '<)>', '<&&>', 'x'], 'podshell $(…)');
+  eq(words('sha=$(git rev-parse HEAD) && x'), ['sha=$(git rev-parse HEAD)', '<&&>', 'x'], 'substitucia $(…) je cast slova');
+  eq(words('a --m $(git rev-parse HEAD) b'), ['a', '--m', '$(git rev-parse HEAD)', 'b'], 'substitucia ako hodnota');
+  eq(words('a --m=$(f "x y" $(g)) b'), ['a', '--m=$(f "x y" $(g))', 'b'], 'vnorena substitucia s uvodzovkami');
+  eq(words('(cd x && y); z'), ['<(>', 'cd', 'x', '<&&>', 'y', '<)>', '<;>', 'z'], 'bash: podshell ( … ) ostava oddelovac');
+  eq(words('a --m (git rev-parse HEAD) b', 'powershell'), ['a', '--m', '(git rev-parse HEAD)', 'b'], 'PowerShell: ( … ) je vyraz');
+  eq(words('a --m $(git rev-parse HEAD) 2>&1', 'powershell'), ['a', '--m', '$(git rev-parse HEAD)', '2>&1'], 'PowerShell: $(…) a 2>&1');
   eq(words('git commit -F - <<\'EOF\'\nbody git push origin main\nEOF\ngit status'), ['git', 'commit', '-F', '-', '<\n>', 'git', 'status'], 'heredoc telo sa vynecha');
   eq(words('echo a # komentar\nb'), ['echo', 'a', '<\n>', 'b'], 'komentar');
   eq(words('echo a#b'), ['echo', 'a#b'], '# uprostred slova nie je komentar');

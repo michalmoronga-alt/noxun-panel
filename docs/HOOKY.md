@@ -33,7 +33,7 @@ chýba `git` alebo `gh`, sieť, timeout, neznámy priečinok) príkaz **pustí**
 spúšťania procesov). Falošné odmietnutie je horšie než prepustenie, preto sa text v úvodzovkách a v telách heredoc / PowerShell here-string
 (správa commitu, `--body`, `echo`, `grep "git push origin main"`) za príkaz nepovažuje a posudzuje sa len prvé slovo každého jednoduchého
 príkazu. Známe medze (prepustí sa): aliasy gitu, `eval` / `Invoke-Expression`, premenná ako priečinok, vetva po `git switch` / `checkout` v tom
-istom príkaze. Stráž nie je neprekonateľná a nemusí byť: čo prejde, zastaví CI a ochrana vetvy. Michalovo ručné spustenie z terminálu stráž nevidí
+istom príkaze. Vetvu zisťuje v cieľovom priečinku príkazu, takže commit a push do `main` odmietne v ľubovoľnom repe (aj `git -C <iné repo>`). Stráž nie je neprekonateľná a nemusí byť: čo prejde, zastaví CI a ochrana vetvy. Michalovo ručné spustenie z terminálu stráž nevidí
 (zámer). Codex a Grok hook nemajú, pravidlá pre ne ostávajú v texte ([AGENTS.md](../AGENTS.md)). Formát odmietnutia: JSON
 `hookSpecificOutput.permissionDecision: "deny"` s `permissionDecisionReason` na stdout, exit 0 (dôvod výberu je v hlavičke hooku).
 Testy: `tests/js/test_straz.js`.

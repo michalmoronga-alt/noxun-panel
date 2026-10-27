@@ -248,22 +248,21 @@ súbory nezapisuj.
   v bloku **s ✅ a číslom PR** (presúva sa až s uzáverom bloku).
 - **Checklist dokumentačného PR:** odsek navrch „Záznamy dávok" v KRONIKE **áno**; STAV podľa hlavičky „Údržba"; VERSION ani `?v=` **nie**.
 - **Číslo PR** (PLAN, KRONIKA, STAV, `DOGFOODING_vyriesene`): pred `gh pr create` sa píše `PR #?`; číslo doplní `scripts\otvor_pr.ps1`
-  (PR aj samostatný commit s číslom; `-CoAuthor` povinný). Kvótová brána: **exit 3 aj neznámy stav kvóty (exit 2/4) = draft PR**.
-  Ručný postup ako záloha: hlavička skriptu.
+  (PR aj commit s číslom; `-CoAuthor` povinný). Kvóta: **exit 3 aj neznámy stav kvóty (exit 2/4) = draft PR**; ručný postup: hlavička skriptu.
 
 > **Vložená sekcia `testovanie` zo súboru `SYSTEM/pravidla/roly/IMPLEMENTATOR.md`** (odkazy v nej sú relatívne k tomu súboru).
 
 ## Testovanie
 
 - **Headless a JS sady:** príkazy sú v [AGENTS.md](../../../AGENTS.md#testy); písanie a spúšťanie sád, pasca `node tests/js/test_*.js`:
-  `.claude/rules/testy.md`. Počty testov sa do pravidiel nepíšu (patria do PR a KRONIKY).
+  `.claude/rules/testy.md`. Počty testov patria do PR a KRONIKY, nie do pravidiel.
 - **In-SU test je brána mergu** pri spúšťačoch [DEFINICIE § D6](../DEFINICIE.md#d6) (tam aj kedy ho na finálnej hlave netreba opakovať).
   Runner `scripts\run_su_tests.ps1` spúšťaj **VŽDY s `-CloseWhenDone`**. Paralelné behy sa vylučujú: `exit 2` = iný beh beží alebo
   visí inštancia — počkaj. Výsledkový grep až PO dobehu. Zámok, `_dev` vo worktree a `-DryRun`: `.claude/rules/testy.md`.
 - **Export test je brána mergu** dávky, ktorá mení VEPO, CSV kovania, XLSX rozpočtu či ponuky alebo ich cestu: musí dať `P == K`, resp. len
   vedomé rozdiely uvedené v PR (`scripts\export_test.ps1`, `.claude/rules/vystupy.md`). **Fotenie okien** pri UI dávke: `.claude/rules/ui.md`.
-  Diagnostika MCP: [NASTROJE_TESTOV.md](../NASTROJE_TESTOV.md#mcp).
-- **Lokálne hooky** ([docs/HOOKY.md](../../../docs/HOOKY.md)): hlásenie po Edit/Write oprav hneď; pred príkazom stráž odmietne commit
-  a push do `main` a runner bez `-CloseWhenDone`. Vynucuje CI.
+  Diagnostika MCP a interaktívny kanál: [NASTROJE_TESTOV.md](../NASTROJE_TESTOV.md#mcp).
+- **Lokálne hooky** ([docs/HOOKY.md](../../../docs/HOOKY.md)): hlásenie po Edit/Write oprav hneď; hook pred príkazom
+  odmietne commit a push do `main` a runner bez `-CloseWhenDone` (poistka: ochrana vetvy na GitHube).
 - **Testuje sa VÝHRADNE v `_dev\ENGINEtests.skp`** (alebo neuloženom Untitled okne BEZ existujúcich NOXUN korpusov; v ňom môžu agenti
   tvoriť/mazať čokoľvek) — **NIKDY v okne so zákazkou**: pred testami over `model.path` / titul okna; bridge zapínaj len v testovacom okne.

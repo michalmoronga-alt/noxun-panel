@@ -32,7 +32,7 @@
 //
 // Príkaz v .claude/settings.json (PreToolUse, matcher „Bash|PowerShell“, timeout 15 s):
 //   node -e "try{require(<projekt>/.claude/hooks/straz.js).run()}catch(e){}"
-// Sieťové volanie je len pri merge s číslom PR: `gh pr diff <N>` (8 s); zisťovanie vetvy `git rev-parse` (3 s).
+// Sieťové volanie je len pri merge s číslom PR: `gh pr diff <N>` (8 s); zisťovanie vetvy `git symbolic-ref` (3 s).
 // Opis hooku: docs/HOOKY.md · Testy: tests/js/test_straz.js
 'use strict';
 const cp = require('child_process');
@@ -203,11 +203,17 @@ function tokenize(cmd, shell) {
     if (c === '|') { if (s[i + 1] === '|') { sep('||'); i += 2; } else { sep('|'); i++; } continue; }
     if (c === '&') {
       if (s[i + 1] === '&') { sep('&&'); i += 2; continue; }
+      if (/[<>]$/.test(cur)) { cur += c; has = true; i++; continue; }          // 2>&1 (aj v PowerShelli)
       if (ps) { push(); out.push({ t: 'w', v: '&', q: false }); i++; continue; }
-      if (/[<>]$/.test(cur) || s[i + 1] === '>') { cur += c; has = true; i++; continue; }   // 2>&1, &>
+      if (s[i + 1] === '>') { cur += c; has = true; i++; continue; }           // &>
       sep('&'); i++; continue;
     }
-    if (c === '(') { if (cur.endsWith('$')) { cur = cur.slice(0, -1); has = cur.length > 0 || q; } sep('('); i++; continue; }
+    if (c === '(') {
+      // Substitúcia `$( … )` (aj PowerShell `( … )` a `@( … )`) je hodnota argumentu, nie samostatný príkaz:
+      // `--match-head-commit $(git rev-parse HEAD)` je platné pripnutie. Preskočí sa celá a ostane súčasťou slova.
+      if (ps || cur.endsWith('$')) { const j = skipSubst(s, i + 1); cur += s.slice(i, j); has = true; i = j; continue; }
+      sep('('); i++; continue;                                                 // podshell v bashi
+    }
     if (c === ')') { sep(')'); i++; continue; }
     if (!ps && c === '<' && s[i + 1] === '<' && s[i + 2] !== '<') {          // heredoc
       i += 2;
@@ -251,7 +257,7 @@ function stripRedirects(words) {
 
 // Priečinok z cesty: null = neznámy (premenná, ~, prázdny základ pri relatívnej ceste).
 function resolveDir(base, p) {
-  if (typeof p !== 'string' || /[$%~]/.test(p) || p === '-') return null;
+  if (typeof p !== 'string' || /[$%~()]/.test(p) || p === '-') return null;
   let x = p;
   if (process.platform === 'win32') {
     const m = /^\/([a-zA-Z])(?:\/(.*))?$/.exec(x);
