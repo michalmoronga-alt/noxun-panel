@@ -31,7 +31,7 @@
 # -UsageScript (iny skript brany).
 # Exit: 0 = hotovo (alebo -WhatIf), 1 = chyba (vypis hovori v akom stave ostal PR/vetva).
 # Rucny postup ostava ako zaloha: najprv usage.ps1 -Gate codex (exit 3, 2 alebo 4 = gh pr create --draft),
-# potom gh pr create a `PR #?` -> cislo samostatnym commitom.
+# potom gh pr create a `PR #?` -> cislo samostatnym commitom, v ktorom sa karta priebehu prepne na `Stav: v review (PR #N)`.
 # ASCII, bez ternary / ?? / ?. (PS 5.1 aj pwsh).
 [CmdletBinding(SupportsShouldProcess = $true)]
 param(
@@ -164,7 +164,8 @@ $number = ([regex]::Match($url, '/pull/(\d+)')).Groups[1].Value
 $commitSha = ''
 try {
   $changed = @(Update-NxPrNumber $repo $baseRef $number)
-  $cards = @(Update-NxCardState $repo $baseRef $number)
+  $cards = @()
+  try { $cards = @(Update-NxCardState $repo $baseRef $number) } catch { Write-Host ('POZOR: karta priebehu sa neprepla na `v review` (' + $_.Exception.Message + ') - commit s cislom PR pokracuje, kartu uprav rucne.') }
   if ($changed.Count -gt 0 -or $cards.Count -gt 0) {
     $files = @($changed | ForEach-Object { $_.file }) + $cards
     $r = Git-Nx (@('add', '--') + $files)

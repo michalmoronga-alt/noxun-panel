@@ -26,7 +26,7 @@ GitHub Codex review (rola **review PR** v tabuľke Obsadenie rolí, `SYSTEM/WORK
    (PR popis po slovensky v súbore, nie here-string; `-WhatIf` = suchý beh) — skript spraví kvótovú bránu (exit 3 aj neznámy stav kvóty = draft), pushne vetvu, `gh pr create` a hneď **doplní číslo PR**
    namiesto `PR #?` (PLAN, KRONIKA, záznam dávky `kronika/`, STAV, `DOGFOODING_vyriesene`; len na riadkoch pridaných vetvou) samostatným commitom a pushne ho; v tom istom commite nastaví v karte priebehu
    `Stav: v review (PR #N)` a `Ďalší krok: review PR #N, merge robí orchestrátor`.
-   **Záloha ručne:** kvótová brána z kroku 0 (exit 3 aj neznámy stav kvóty, exit 2/4 = `--draft`) + `git push` + `gh pr create` (`--body-file`) a samostatný commit s číslom. Tento commit **pred mergom skontroluje orchestrátor** (pri čistom
+   **Záloha ručne:** kvótová brána z kroku 0 (exit 3 aj neznámy stav kvóty, exit 2/4 = `--draft`) + `git push` + `gh pr create` (`--body-file`) a samostatný commit s číslom, v ktorom sa karta priebehu prepne na `Stav: v review (PR #N)`. Tento commit **pred mergom skontroluje orchestrátor** (pri čistom
    kole 1 inak žiadna delta nebeží; keď delta beží, patrí do nej). Potom čakaj na review podľa sekcie „Čakanie na review“ (Bash na pozadí,
    nie `sleep` naslepo); medzitým pokračuj v inej práci. **Prvé kolo (po `gh pr create`) beží automaticky — ďalšie NIE.**
 2. **Keď čakanie skončí, over stav:**
@@ -109,7 +109,7 @@ platí, a pošle jednu notifikáciu; nástroj Monitor je na prúd viacerých uda
   for i in $(seq 1 40); do
     sha=$(gh pr view <N> --json headRefOid -q .headRefOid)
     s=$(gh api "repos/michalmoronga-alt/noxun-panel/issues/<N>/comments?per_page=100" --jq '[.[]|select(.body|contains("codex-review-state:v1"))]|last|(.body // "")|capture("v1 (?<j>[{].*?[}]) -->").j|fromjson|.code_review|"\(.commit_sha) \(.status)"' 2>/dev/null)
-    [ "${s%% *}" = "$sha" ] && [ "${s##* }" != running ] && { echo "review dobehlo: $s"; break; }
+    [ -n "$sha" ] && [ -n "$s" ] && [ "${s%% *}" = "$sha" ] && [ "${s##* }" != running ] && { echo "review dobehlo: $s"; break; }
     sleep 30
   done
   echo "koniec: ${s:-bez znacky}"

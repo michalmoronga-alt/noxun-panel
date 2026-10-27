@@ -5,7 +5,7 @@ Trieda: S
 Vetva: feat/p4c-prevzatie
 Základ: 93cae30d44cfb6f1cf5886d45f4aeef880593790 (main, z ktorého vznikla vetva s packageom; do vetvy zlúčený main 80ef311455f90f74d75fae4b7b20ac74a5f59e15 po P4b)
 Stav: aktívna
-Ďalší krok: počkať na zelené CI pushnutej hlavy po oprave z predrecenzie a vrátiť report orchestrátorovi (STOP pred PR).
+Ďalší krok: počkať na zelené CI pushnutej hlavy po delta-oprave a vrátiť report orchestrátorovi (STOP pred PR).
 Robil: Claude · Sonnet 5.5 (implementator-stredny)
 
 ## Hotové kroky
@@ -19,7 +19,8 @@ Robil: Claude · Sonnet 5.5 (implementator-stredny)
 - [x] testy: guard karty, `rozpracovane.ps1`, `session_digest.rb`, headless 5470/0/0 a JS 165 sád PASS
 - [x] záznam KRONIKY `kronika/P4c.md`, PLAN, STAV
 - [x] predrecenzia (hlava 9a187aff): opravené P2 1–3 a P3 4–10 (G10 s run-id, sha hlavy PR zo `gh pr view`, karta mimo bloku, stav `v review`, zastarané tvrdenia o KRONIKE, stráž `session_digest.rb`, § 6 packageu)
-- [ ] CI pushnutej hlavy zelené, report, návrh PR popisu
+- [x] delta-kontrola: 4× P3 opravené (prázdny sha/stav v slučke, plný SHA v G10, try okolo karty v otvor_pr, záloha spomína kartu)
+- [ ] CI pushnutej hlavy zelené, report
 
 ## Otvorené otázky
 
