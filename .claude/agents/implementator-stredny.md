@@ -65,6 +65,7 @@ review PR; výnimka: rešeršér má len svoju kartu); k nemu patrí súbor tvoj
 ## Zákazy pre všetkých
 
 - **Žiadne priame commity do `main`.** Merge robí len orchestrátor po bránach ([ORCHESTRATOR.md](SYSTEM/pravidla/roly/ORCHESTRATOR.md)).
+  Commit a push do `main` stráži hook ([docs/HOOKY.md](docs/HOOKY.md)); Codex a Grok ho nemajú, pravidlo platí aj pre nich.
 - **Testuje sa VÝHRADNE v testovacom projekte `_dev\ENGINEtests.skp`** (alebo neuloženom Untitled okne BEZ existujúcich NOXUN
   korpusov) — **NIKDY v okne so zákazkou** (podrobnosti:
   [IMPLEMENTATOR.md, Testovanie](SYSTEM/pravidla/roly/IMPLEMENTATOR.md#testovanie)).
@@ -217,7 +218,7 @@ Slepá predrecenzia pred PR (skill `predrecenzia`) je **povinná** pri dávke:
 1. Dokumenty riadkov svojho zásahu v POVINNE_CITANIE.md prečítaj PRED prácou; súbor oblasti `.claude/rules/` sa v Claude Code načíta
    sám, keď otvoríš súbor oblasti (inak ho prečítaj podľa tabuľky). Potom celé zadanie.
 2. Vetva podľa AGENTS.md (Git v skratke) z čerstvého `origin/main`.
-3. Implementácia a testy: headless + všetky JS sady; in-SU (runner vždy s `-CloseWhenDone`) pri spúšťačoch
+3. Implementácia a testy: headless + všetky JS sady; in-SU runner pri spúšťačoch
    [DEFINICIE § D6](../DEFINICIE.md#d6) (sekcia Testovanie).
 4. Uzáver podľa checklistu v sekcii Verzia a uzáver dávky. Číslo PR najprv `PR #?`.
 5. Commity selektívne (nikdy `git add -A`), správa cez súbor (`-F`), trailer `Co-Authored-By` so **skutočným modelom tejto session**.
@@ -267,21 +268,21 @@ nepridáva text na koniec súboru. Nový modul = nový odsek v správnom súbore
   v bloku **s ✅ a číslom PR** (presúva sa až s uzáverom bloku).
 - **Checklist dokumentačného PR:** odsek navrch „Záznamy dávok" v KRONIKE **áno**; STAV podľa hlavičky „Údržba"; VERSION ani `?v=` **nie**.
 - **Číslo PR** (PLAN, KRONIKA, STAV, `DOGFOODING_vyriesene`): pred `gh pr create` sa píše `PR #?`; číslo doplní `scripts\otvor_pr.ps1`
-  (PR aj samostatný commit s číslom; `-CoAuthor` povinný). Kvótová brána: **exit 3 aj neznámy stav kvóty (exit 2/4) = draft PR**.
-  Ručný postup ako záloha: hlavička skriptu.
+  (PR aj samostatný commit s číslom; `-CoAuthor` povinný). Kvóta: **exit 3 aj neznámy stav kvóty (exit 2/4) = draft PR**; ručný postup ako záloha: hlavička skriptu.
 
 <a id="testovanie"></a>
 
 ## Testovanie
 
 - **Headless a JS sady:** príkazy sú v [AGENTS.md](../../../AGENTS.md#testy); písanie a spúšťanie sád, pasca `node tests/js/test_*.js`:
-  `.claude/rules/testy.md`. Počty testov sa do pravidiel nepíšu (patria do PR a KRONIKY).
-- **In-SU test je brána mergu** pri spúšťačoch [DEFINICIE § D6](../DEFINICIE.md#d6) (tam aj kedy ho na finálnej hlave netreba opakovať).
+  `.claude/rules/testy.md`. Počty testov patria do PR a KRONIKY, nie do pravidiel.
+- **In-SU test je brána mergu** pri spúšťačoch [DEFINICIE § D6](../DEFINICIE.md#d6) (tam aj výnimka pre finálnu hlavu).
   Runner `scripts\run_su_tests.ps1` spúšťaj **VŽDY s `-CloseWhenDone`**. Paralelné behy sa vylučujú: `exit 2` = iný beh beží alebo
   visí inštancia — počkaj. Výsledkový grep až PO dobehu. Zámok, `_dev` vo worktree a `-DryRun`: `.claude/rules/testy.md`.
 - **Export test je brána mergu** dávky, ktorá mení VEPO, CSV kovania, XLSX rozpočtu či ponuky alebo ich cestu: musí dať `P == K`, resp. len
   vedomé rozdiely uvedené v PR (`scripts\export_test.ps1`, `.claude/rules/vystupy.md`). **Fotenie okien** pri UI dávke: `.claude/rules/ui.md`.
   Diagnostika MCP a interaktívny kanál: [NASTROJE_TESTOV.md](../NASTROJE_TESTOV.md#mcp).
-- **Lokálne hooky:** hook po Edit/Write hlási syntax a encoding — pri hláške chybu hneď oprav; vynucuje CI ([docs/HOOKY.md](../../../docs/HOOKY.md)).
+- **Lokálne hooky** ([docs/HOOKY.md](../../../docs/HOOKY.md)): hlásenie po Edit/Write oprav hneď; hook pred príkazom
+  odmietne commit a push do `main` a runner bez `-CloseWhenDone` (poistka: ochrana vetvy na GitHube).
 - **Testuje sa VÝHRADNE v `_dev\ENGINEtests.skp`** (alebo neuloženom Untitled okne BEZ existujúcich NOXUN korpusov; v ňom môžu agenti
-  tvoriť/mazať čokoľvek) — **NIKDY v okne so zákazkou**: pred testami over `model.path` / titul okna; bridge zapínaj len v testovacom okne.
+  tvoriť/mazať čokoľvek) — **NIKDY v okne so zákazkou**: pred testami over `model.path` / titul okna; bridge len v testovacom okne.

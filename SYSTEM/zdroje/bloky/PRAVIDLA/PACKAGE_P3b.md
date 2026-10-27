@@ -91,5 +91,5 @@
 - **Výsledok (implementátor):** mapa presunu [P3b_MAPA.md](P3b_MAPA.md) (vrátane odchýlok a veľkostí). **ORCHESTRATOR.md má 9938 B (z 13902), 8 kB sa bez
   straty pravidla nedosiahlo** — platí vlastný strop 10 kB (samostatný riadok v `test_pravidla_velkost.rb`). Na 8192 B by sa muselo vypustiť ≈ 1,7 kB z toho,
   čo nemá iný domov: Karta roly — Režimy (záložný režim), Dostane automaticky a Povinné čítanie (spolu 1027 B) · Bezpečnosť externých nástrojov (439 B) ·
-  Inštalácia mainu — odôvodnenie podmienok (≈ 660 B) · tabuľka „Keď Michal neodpovie" (≈ 1,5 kB). Rozhoduje Michal. WORKFLOW.md 36692 → 34179 B.
+  Inštalácia mainu — odôvodnenie podmienok (≈ 660 B) · tabuľka „Keď Michal neodpovie" (≈ 1,5 kB). Michal potvrdil 10 kB (27.10.2026). WORKFLOW.md 36692 → 34179 B.
 

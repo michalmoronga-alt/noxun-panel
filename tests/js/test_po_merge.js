@@ -1,5 +1,5 @@
 // Testy pripomienky po mergi (.claude/hooks/po_merge.js, P4a, 23.10.2026).
-// Je to Claude Code hook, nie kód pluginu: PostToolUse na Bash — keď príkaz obsahuje
+// Je to Claude Code hook, nie kód pluginu: PostToolUse na Bash a PowerShell — keď príkaz obsahuje
 // `gh pr merge <N>`, vloží agentovi konštatovanie: či PR menil plugin, čo je nasadené v SketchUpe
 // (značka %TEMP%\noxun_nasadene.txt z INSTALL_noxun_engine.ps1) a či je inštalácia mainu potrebná.
 // `gh` a `git diff` sú stubnuté (opts.runGh, opts.pluginDiff); procesové testy bežia bez `gh` v PATH.
@@ -139,6 +139,8 @@ try {
   silent(inp('ls -la'), 'bezny prikaz');
   silent({ hook_event_name: 'PostToolUse', tool_name: 'Bash', tool_input: {} }, 'bez command');
   silent(inp('gh pr merge 123', { tool_name: 'Edit' }), 'ina nastroj');
+  ok(typeof M.decide(inp('gh pr merge 123 --merge', { tool_name: 'PowerShell' }), { runGh: stub(view(['SYSTEM/PLAN.md'])), markerPath: marker({}), pluginDiff: diffStub('same') }) === 'string',
+    'nastroj PowerShell: merge sa konstatuje tiez');
   silent(inp('gh pr merge 123', { hook_event_name: 'PreToolUse' }), 'ina udalost');
   silent(inp('gh pr merge 123', { agent_id: 'a1b2' }), 'subagent');
   eq(M.decide(null, {}), null, 'bez vstupu');
@@ -223,8 +225,8 @@ try {
 
   // --- zápis v .claude/settings.json ---------------------------------------------------
   const settings = JSON.parse(fs.readFileSync(path.join(ROOT, '.claude', 'settings.json'), 'utf8'));
-  const entry = settings.hooks.PostToolUse.find((h) => h.matcher === 'Bash');
-  ok(entry && entry.hooks.length === 1, 'PostToolUse s matcherom Bash je zapisany');
+  const entry = settings.hooks.PostToolUse.find((h) => h.matcher === 'Bash|PowerShell');
+  ok(entry && entry.hooks.length === 1, 'PostToolUse s matcherom Bash|PowerShell je zapisany');
   const h = entry.hooks[0];
   eq(h.type, 'command', 'typ command');
   ok(!('if' in h), 'pole if sa nepouziva (zivo neoverene, moze minut zlozeny prikaz) - hook filtruje sam');
