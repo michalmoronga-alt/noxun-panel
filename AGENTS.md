@@ -46,6 +46,7 @@ review PR; výnimka: rešeršér má len svoju kartu); k nemu patrí súbor tvoj
 ## Zákazy pre všetkých
 
 - **Žiadne priame commity do `main`.** Merge robí len orchestrátor po bránach ([ORCHESTRATOR.md](SYSTEM/pravidla/roly/ORCHESTRATOR.md)).
+  Commit a push do `main` stráži hook ([docs/HOOKY.md](docs/HOOKY.md)); Codex a Grok ho nemajú, pravidlo platí aj pre nich.
 - **Testuje sa VÝHRADNE v testovacom projekte `_dev\ENGINEtests.skp`** (alebo neuloženom Untitled okne BEZ existujúcich NOXUN
   korpusov) — **NIKDY v okne so zákazkou** (podrobnosti:
   [IMPLEMENTATOR.md, Testovanie](SYSTEM/pravidla/roly/IMPLEMENTATOR.md#testovanie)).

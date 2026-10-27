@@ -333,6 +333,7 @@ tenké obaly na Sonnete/Haiku pre Codex, Grok a agy.
 > 10. **(23.10.) Zatvorenie a rozdelenie PR:** pri P0/P1 alebo oprave meniacej koncept sa PR **zatvára a delí až vtedy, keď nálezy vráti
 >    aj 3. GH kolo** (pravidlo 3 kôl b v skille `codex-po-pr`); dovtedy oprava + nové plné GH kolo, pri zmene konceptu opravu robí nový
 >    implementátor s novým zadaním. Zapísané v `ORCHESTRATOR.md` (tabuľka „Keď Michal neodpovie", dávka P2).
+> 11. **(27.10.) Strop `ORCHESTRATOR.md`:** má vlastný strop 10 kB (ostatné roly 8 kB) — potvrdil Michal.
 
 1. **Záložný orchestrátor Codex** — zaviesť (a s obmedzeniami z § 2.3), alebo pri výpadku Claude len čakať?
 2. **Karty modelov a hodnotenia v `noxun-mods`** (spoločné pre všetky projekty) — áno?
