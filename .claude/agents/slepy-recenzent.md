@@ -63,6 +63,7 @@ review PR; výnimka: rešeršér má len svoju kartu); k nemu patrí súbor tvoj
 ## Zákazy pre všetkých
 
 - **Žiadne priame commity do `main`.** Merge robí len orchestrátor po bránach ([ORCHESTRATOR.md](SYSTEM/pravidla/roly/ORCHESTRATOR.md)).
+  Commit a push do `main` stráži hook ([docs/HOOKY.md](docs/HOOKY.md)); Codex a Grok ho nemajú, pravidlo platí aj pre nich.
 - **Testuje sa VÝHRADNE v testovacom projekte `_dev\ENGINEtests.skp`** (alebo neuloženom Untitled okne BEZ existujúcich NOXUN
   korpusov) — **NIKDY v okne so zákazkou** (podrobnosti:
   [IMPLEMENTATOR.md, Testovanie](SYSTEM/pravidla/roly/IMPLEMENTATOR.md#testovanie)).
@@ -261,7 +262,8 @@ súbory nezapisuj.
   visí inštancia — počkaj. Výsledkový grep až PO dobehu. Zámok, `_dev` vo worktree a `-DryRun`: `.claude/rules/testy.md`.
 - **Export test je brána mergu** dávky, ktorá mení VEPO, CSV kovania, XLSX rozpočtu či ponuky alebo ich cestu: musí dať `P == K`, resp. len
   vedomé rozdiely uvedené v PR (`scripts\export_test.ps1`, `.claude/rules/vystupy.md`). **Fotenie okien** pri UI dávke: `.claude/rules/ui.md`.
-  Diagnostika MCP a interaktívny kanál: [NASTROJE_TESTOV.md](../NASTROJE_TESTOV.md#mcp).
-- **Lokálne hooky:** hook po Edit/Write hlási syntax a encoding — pri hláške chybu hneď oprav; vynucuje CI ([docs/HOOKY.md](../../../docs/HOOKY.md)).
+  Diagnostika MCP: [NASTROJE_TESTOV.md](../NASTROJE_TESTOV.md#mcp).
+- **Lokálne hooky** ([docs/HOOKY.md](../../../docs/HOOKY.md)): hlásenie po Edit/Write oprav hneď; pred príkazom stráž odmietne commit
+  a push do `main` a runner bez `-CloseWhenDone`. Vynucuje CI.
 - **Testuje sa VÝHRADNE v `_dev\ENGINEtests.skp`** (alebo neuloženom Untitled okne BEZ existujúcich NOXUN korpusov; v ňom môžu agenti
   tvoriť/mazať čokoľvek) — **NIKDY v okne so zákazkou**: pred testami over `model.path` / titul okna; bridge zapínaj len v testovacom okne.

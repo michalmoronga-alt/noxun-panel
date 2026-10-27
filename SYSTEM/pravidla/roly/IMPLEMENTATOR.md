@@ -24,7 +24,7 @@
 1. Dokumenty riadkov svojho zásahu v POVINNE_CITANIE.md prečítaj PRED prácou; súbor oblasti `.claude/rules/` sa v Claude Code načíta
    sám, keď otvoríš súbor oblasti (inak ho prečítaj podľa tabuľky). Potom celé zadanie.
 2. Vetva podľa AGENTS.md (Git v skratke) z čerstvého `origin/main`.
-3. Implementácia a testy: headless + všetky JS sady; in-SU (runner vždy s `-CloseWhenDone`) pri spúšťačoch
+3. Implementácia a testy: headless + všetky JS sady; in-SU runner pri spúšťačoch
    [DEFINICIE § D6](../DEFINICIE.md#d6) (sekcia Testovanie).
 4. Uzáver podľa checklistu v sekcii Verzia a uzáver dávky. Číslo PR najprv `PR #?`.
 5. Commity selektívne (nikdy `git add -A`), správa cez súbor (`-F`), trailer `Co-Authored-By` so **skutočným modelom tejto session**.
@@ -88,7 +88,8 @@ nepridáva text na koniec súboru. Nový modul = nový odsek v správnom súbore
   visí inštancia — počkaj. Výsledkový grep až PO dobehu. Zámok, `_dev` vo worktree a `-DryRun`: `.claude/rules/testy.md`.
 - **Export test je brána mergu** dávky, ktorá mení VEPO, CSV kovania, XLSX rozpočtu či ponuky alebo ich cestu: musí dať `P == K`, resp. len
   vedomé rozdiely uvedené v PR (`scripts\export_test.ps1`, `.claude/rules/vystupy.md`). **Fotenie okien** pri UI dávke: `.claude/rules/ui.md`.
-  Diagnostika MCP a interaktívny kanál: [NASTROJE_TESTOV.md](../NASTROJE_TESTOV.md#mcp).
-- **Lokálne hooky:** hook po Edit/Write hlási syntax a encoding — pri hláške chybu hneď oprav; vynucuje CI ([docs/HOOKY.md](../../../docs/HOOKY.md)).
+  Diagnostika MCP: [NASTROJE_TESTOV.md](../NASTROJE_TESTOV.md#mcp).
+- **Lokálne hooky** ([docs/HOOKY.md](../../../docs/HOOKY.md)): hlásenie po Edit/Write oprav hneď; pred príkazom stráž odmietne commit
+  a push do `main` a runner bez `-CloseWhenDone`. Vynucuje CI.
 - **Testuje sa VÝHRADNE v `_dev\ENGINEtests.skp`** (alebo neuloženom Untitled okne BEZ existujúcich NOXUN korpusov; v ňom môžu agenti
   tvoriť/mazať čokoľvek) — **NIKDY v okne so zákazkou**: pred testami over `model.path` / titul okna; bridge zapínaj len v testovacom okne.

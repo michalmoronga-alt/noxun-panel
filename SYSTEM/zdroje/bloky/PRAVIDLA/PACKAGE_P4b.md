@@ -89,4 +89,7 @@ a jeho matcher v `settings.json` na `Bash|PowerShell` (+ test).
   slepý recenzent dostane tento package a `git diff main...HEAD`: falošné odmietnutia, fail-open, pokrytie povolených prípadov.
 - Pred PR **STOP** a report orchestrátorovi; PR až na pokyn cez `scripts\otvor_pr.ps1`.
 - **Mimo rozsahu:** ochrana vetvy na GitHube (G8 — Michal), hooky iných nástrojov (Codex, Grok), P4c, hodnotenia (P5).
-- **Výsledok (implementátor):** …
+- **Výsledok (implementátor):** hook `.claude/hooks/straz.js` + `tests/js/test_straz.js`, `po_merge.js` aj pre PowerShell, `settings.json` (PreToolUse `Bash|PowerShell`),
+  `docs/HOOKY.md`. Formát odmietnutia: JSON `permissionDecision: "deny"` + exit 0 (dokumentácia hookov Claude Code; dôvod v hlavičke hooku). Odchýlka od § 1: vetva sa zisťuje
+  cez `git symbolic-ref -q HEAD` namiesto `rev-parse --abbrev-ref HEAD` (funguje pred prvým commitom, nevráti dvojznačné `heads/main`); odpojená hlava = povolené ako v zadaní.
+  IMPLEMENTATOR.md 8122 B (z 8126), ORCHESTRATOR.md 9997 B.
