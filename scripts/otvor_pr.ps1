@@ -14,7 +14,8 @@
 #   3. `git push origin HEAD` (vetva musi byt na GitHube);
 #   4. `gh pr create` (--base, --title, --body-file, pri brane alebo -Draft aj --draft);
 #   5. v suboroch zmenenych vetvou voci base nahradi `PR #?` cislom PR - len v SYSTEM/PLAN.md,
-#      SYSTEM/STAV.md, SYSTEM/archiv/KRONIKA.md, SYSTEM/archiv/DOGFOODING_vyriesene.md a len
+#      SYSTEM/STAV.md, SYSTEM/archiv/KRONIKA.md, SYSTEM/archiv/DOGFOODING_vyriesene.md,
+#      SYSTEM/zdroje/bloky/*/kronika/*.md (zaznam davky bloku) a len
 #      na riadkoch, ktore vetva pridala (inde je `PR #?` text pravidla), samostatny commit
 #      `docs: doplnit cislo PR #N` s trailerom Co-Authored-By: <CoAuthor>, push;
 #   6. vypise URL, cislo PR, ci je draft, SHA commitu s cislom.
