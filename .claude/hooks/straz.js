@@ -32,7 +32,9 @@
 // (lacný textový test, bez spúšťania procesov).
 // Známe medze (prepustí sa): aliasy gitu (`git ci`), príkaz vnútri `eval` / `Invoke-Expression`, premenná
 // ako priečinok (`cd $d`), po `git switch` / `checkout` / `rebase` v tom istom príkaze sa vetva nepredpovedá,
-// príkaz vnorený hlbšie než dve úrovne, `git push origin feat/$(…)` sa posudzuje podľa textu bez substitúcie.
+// príkaz vnorený hlbšie než dve úrovne, `git push origin feat/$(…)` sa posudzuje podľa textu bez substitúcie,
+// PowerShell `if($x){git push origin main}` / `if ($x){git push origin main}` (bez medzery pred alebo za zátvorkou) a
+// `$out = git push origin main 2>&1` (priradenie bez zátvoriek) sa prepúšťajú.
 //
 // Príkaz v .claude/settings.json (PreToolUse, matcher „Bash|PowerShell“, timeout 15 s):
 //   node -e "try{require(<projekt>/.claude/hooks/straz.js).run()}catch(e){}"
@@ -54,7 +56,7 @@ const RUNNER = 'run_su_tests.ps1';
 const WRAPPERS = new Set(['env', 'time', 'command', 'builtin', 'exec', 'nohup', 'sudo', 'nice', '!', '{', '}', 'then', 'do', 'else', 'elif',
   'if', 'while', 'until', '&', 'call']);
 const CONTROL = new Set(['if', 'elseif', 'while', 'until', 'foreach', 'for', 'switch']);
-const CD_NAMES =new Set(['cd', 'chdir', 'set-location', 'sl', 'pushd', 'push-location']);
+const CD_NAMES = new Set(['cd', 'chdir', 'set-location', 'sl', 'pushd', 'push-location']);
 const POP_NAMES = new Set(['popd', 'pop-location']);
 const BRANCH_CHANGERS = new Set(['switch', 'checkout', 'rebase']);
 const PUSH_VALUE_OPTS = new Set(['-o', '--push-option', '--repo', '--receive-pack', '--exec']);

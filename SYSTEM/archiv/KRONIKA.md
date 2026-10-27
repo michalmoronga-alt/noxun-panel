@@ -26,7 +26,7 @@
   (text v úvodzovkách, heredoc a `$(cat <<'EOF' …)` s úvodzovkami v tele sa za príkaz nepovažuje); pri každej vlastnej chybe príkaz prejde (CI a ochrana vetvy sú posledná
   brána). Formát odmietnutia: JSON `permissionDecision: "deny"` s dôvodom, exit 0 (dokumentácia hookov Claude Code). Vetva sa zisťuje cez `git symbolic-ref -q HEAD`
   (funguje aj pred prvým commitom). `po_merge.js` reaguje aj na nástroj PowerShell. Opis hooku v `docs/HOOKY.md`; v `AGENTS.md`, `ORCHESTRATOR.md`, `IMPLEMENTATOR.md`
-  (dve zmienky o `-CloseWhenDone` zjednotené na jednu, 8126 B) a skille `codex-po-pr` len jedna veta s odkazom. `ORCHESTRATOR.md` 9997 B. Rozhodnutie Michala 27.10.2026:
+  (dve zmienky o `-CloseWhenDone` zjednotené na jednu, 8118 B) a skille `codex-po-pr` len jedna veta s odkazom. `ORCHESTRATOR.md` 9997 B. Rozhodnutie Michala 27.10.2026:
   vlastný strop 10 kB pre `ORCHESTRATOR.md` zapísaný do `NAVRH_STRUKTURY.md` § 9 bod 11. **Testy:** nová JS sada `test_straz.js` (každý zákaz s povoleným párom, procesové testy,
   skutočný dočasný repozitár, zápis v `settings.json`), `test_po_merge.js` doplnený o PowerShell; Ruby 5459/0/0, JS 165 sád PASS, encoding guard PASS; in-SU netreba. **Zostáva:** živý
   smoke po mergi (orchestrátor v hlavnom okne, `PACKAGE_P4b.md` § 4) a dávka P4c (prevzatie práce).

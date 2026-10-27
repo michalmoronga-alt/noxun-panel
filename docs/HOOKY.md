@@ -34,7 +34,8 @@ spúšťania procesov). Falošné odmietnutie je horšie než prepustenie, preto
 (správa commitu, `--body`, `echo`, `grep "git push origin main"`) za príkaz nepovažuje a posudzuje sa len prvé slovo každého jednoduchého
 príkazu; vnútro substitúcií `$( … )`, PowerShell `( … )`, podmienok a blokov `{ … }` sa posudzuje samostatne. Známe medze (prepustí sa): aliasy
 gitu, `eval` / `Invoke-Expression`, premenná ako priečinok, vetva po `git switch` / `checkout` v tom istom príkaze, príkaz vnorený hlbšie než
-dve úrovne, refspec zložený z textu a substitúcie (`feat/$(…)`). Vetvu zisťuje v cieľovom priečinku príkazu, takže commit a push do `main` odmietne v ľubovoľnom repe (aj `git -C <iné repo>`). Stráž nie je neprekonateľná a nemusí byť: čo prejde, zastaví CI a ochrana vetvy. Michalovo ručné spustenie z terminálu stráž nevidí
+dve úrovne, refspec zložený z textu a substitúcie (`feat/$(…)`), PowerShell `if($x){git push origin main}` / `if ($x){git push origin main}` (bez
+medzery pred alebo za zátvorkou) a `$out = git push origin main 2>&1` (priradenie bez zátvoriek). Vetvu zisťuje v cieľovom priečinku príkazu, takže commit a push do `main` odmietne v ľubovoľnom repe (aj `git -C <iné repo>`). Stráž nie je neprekonateľná a nemusí byť: čo prejde, zastaví CI a ochrana vetvy. Michalovo ručné spustenie z terminálu stráž nevidí
 (zámer). Codex a Grok hook nemajú, pravidlá pre ne ostávajú v texte ([AGENTS.md](../AGENTS.md)). Formát odmietnutia: JSON
 `hookSpecificOutput.permissionDecision: "deny"` s `permissionDecisionReason` na stdout, exit 0 (dôvod výberu je v hlavičke hooku).
 Testy: `tests/js/test_straz.js`.

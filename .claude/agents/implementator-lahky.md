@@ -275,8 +275,8 @@ nepridáva text na koniec súboru. Nový modul = nový odsek v správnom súbore
 ## Testovanie
 
 - **Headless a JS sady:** príkazy sú v [AGENTS.md](../../../AGENTS.md#testy); písanie a spúšťanie sád, pasca `node tests/js/test_*.js`:
-  `.claude/rules/testy.md`. Počty testov patria do PR a KRONIKY.
-- **In-SU test je brána mergu** pri spúšťačoch [DEFINICIE § D6](../DEFINICIE.md#d6) (tam aj kedy ho na finálnej hlave netreba opakovať).
+  `.claude/rules/testy.md`. Počty testov patria do PR a KRONIKY, nie do pravidiel.
+- **In-SU test je brána mergu** pri spúšťačoch [DEFINICIE § D6](../DEFINICIE.md#d6) (tam aj výnimka pre finálnu hlavu).
   Runner `scripts\run_su_tests.ps1` spúšťaj **VŽDY s `-CloseWhenDone`**. Paralelné behy sa vylučujú: `exit 2` = iný beh beží alebo
   visí inštancia — počkaj. Výsledkový grep až PO dobehu. Zámok, `_dev` vo worktree a `-DryRun`: `.claude/rules/testy.md`.
 - **Export test je brána mergu** dávky, ktorá mení VEPO, CSV kovania, XLSX rozpočtu či ponuky alebo ich cestu: musí dať `P == K`, resp. len
@@ -285,4 +285,4 @@ nepridáva text na koniec súboru. Nový modul = nový odsek v správnom súbore
 - **Lokálne hooky** ([docs/HOOKY.md](../../../docs/HOOKY.md)): hlásenie po Edit/Write oprav hneď; hook pred príkazom
   odmietne commit a push do `main` a runner bez `-CloseWhenDone` (poistka: ochrana vetvy na GitHube).
 - **Testuje sa VÝHRADNE v `_dev\ENGINEtests.skp`** (alebo neuloženom Untitled okne BEZ existujúcich NOXUN korpusov; v ňom môžu agenti
-  tvoriť/mazať čokoľvek) — **NIKDY v okne so zákazkou**: pred testami over `model.path` / titul okna; bridge zapínaj len v testovacom okne.
+  tvoriť/mazať čokoľvek) — **NIKDY v okne so zákazkou**: pred testami over `model.path` / titul okna; bridge len v testovacom okne.
