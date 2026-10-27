@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **P4b · STRÁŽE: HOOK PRED PRÍKAZOM (27.10.2026, PR #?, blok 10 · PRAVIDLA, trieda S — len hooky, ich testy, nastavenie Claude Code a dokumentácia; kód pluginu, VERSION ani `?v=` bez zmeny).**
+- **P4b · STRÁŽE: HOOK PRED PRÍKAZOM (27.10.2026, PR #485, blok 10 · PRAVIDLA, trieda S — len hooky, ich testy, nastavenie Claude Code a dokumentácia; kód pluginu, VERSION ani `?v=` bez zmeny).**
   Čo sa nesmie stať ani raz, zastaví stroj skôr, než príkaz zbehne. **Čo sa zmenilo:** nový hook `.claude/hooks/straz.js` (PreToolUse, matcher `Bash|PowerShell`,
   hlavné okno aj subagenti) odmietne: commit do `main` (aj `git -C <dir> commit`, `cd <dir> &&`, `Set-Location`), push do `main` (`origin main`, `HEAD:main`, `x:refs/heads/main`,
   aj s `+` / `--force*` / `--dry-run`, bare push na `main`), `gh pr merge` bez `--match-head-commit`, merge PR, ktorého pridané riadky v `PLAN.md`, `STAV.md`, `KRONIKA.md`

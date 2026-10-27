@@ -33,7 +33,7 @@ ani nevyexportuje** (rohovú by sklopil na dolnú, úzku rozšíril na 200). **R
 P2 (karty všetkých rolí, typy agentov generované z kariet bez dedenia `CLAUDE.md`, nová rola analytik, PR #482; smoke typov PASS 26.10.)
 P3a (pravidlá oblastí v `.claude/rules/` s `paths:`, POVINNE_CITANIE je rozcestník, IMPLEMENTATOR ≤ 8 kB, PR #483; smoke oblastí PASS 26.10.)
 a P3b (postupy uzáveru bloku a smoke sú skilly, ORCHESTRATOR pod vlastný strop 10 kB, WORKFLOW ako mapa, blok OBMEDZENIE NÁSTROJOV v jednom súbore, PR #484)
-a P4b (hook pred príkazom odmietne commit a push do `main`, merge bez pripnutej hlavy, merge so zástupným číslom PR a runner bez `-CloseWhenDone`; živý smoke po mergi, PR #?); ďalej P4c (prevzatie práce). Popri ňom čaká **Michalov smoke bloku 9** (94 bodov v 5 skupinách) a aktualizácia pluginu na 0.18.1 na oboch PC.
+a P4b (hook pred príkazom odmietne commit a push do `main`, merge bez pripnutej hlavy, merge so zástupným číslom PR a runner bez `-CloseWhenDone`; živý smoke po mergi, PR #485); ďalej P4c (prevzatie práce). Popri ňom čaká **Michalov smoke bloku 9** (94 bodov v 5 skupinách) a aktualizácia pluginu na 0.18.1 na oboch PC.
 **Zásobník z bloku:** D-154 „Exportovať všetko" · D-151 · D-152 · D-153 (podmienený) · H18b-2 mimo scope. **Luciin PC:** nevieme, či má SketchUp 2026.2 (H11 Q3 bez odpovede).
 **Otázky bez odpovede, platí návrh:** vymenované v [záverečnom dokumente](archiv/HARDENING_ZAVER_2026-10-11.md) (Otvorené body) · pri prvej rohovej v dielni overiť záves Sensys ·
 **na smoke čakajú aj** D-132 (#367), D-133 (#368), D-134 (#369) — sú v checkliste (B25, C19, C20).
