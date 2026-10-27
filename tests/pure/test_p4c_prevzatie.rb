@@ -226,7 +226,12 @@ NxTest.test('p4c: pravidla odkazuju na kartu priebehu, G10 a zaznam davky po sub
   krok5 = po[/^5\. \*\*Merge robí orchestrátor\*\*.*?^6\. /m].to_s
   NxTest.assert(krok5.include?('RAZ') && krok5.index('gh pr view <N> --json headRefOid') < krok5.index('--commit "$sha"') && krok5.index('--commit "$sha"') < krok5.index('--match-head-commit "$sha"'),
                 'codex-po-pr krok 5: sha nacitana raz pred overovanim branami, ta ista pri mergi')
-  NxTest.assert(krok5.scan('gh pr view <N> --json headRefOid').length == 1, 'codex-po-pr krok 5: sha sa nenacitava druhy raz tesne pred mergom')
+  NxTest.assert(krok5.scan('sha=$(gh pr view').length == 1, 'codex-po-pr krok 5: sha sa nenacitava druhy raz tesne pred mergom (len porovnanie)')
+  NxTest.assert(krok5.include?('"$(gh pr view <N> --json headRefOid -q .headRefOid)" = "$sha"'), 'codex-po-pr krok 5: pred mergom porovnanie hlavy bez prepisu sha')
+  NxTest.refute(krok5.include?('gh pr checks'), 'codex-po-pr krok 5: CI brana je cez gh run list --commit, nie gh pr checks')
+  NxTest.assert(po.include?('s=$(gh api "$api"') && po.include?('t=$(gh api "$api"'), 'codex-po-pr: slucka pouziva $api')
+  NxTest.refute(po.include?('req_t=$(gh api') || po.include?('env_t=$(gh api'), 'codex-po-pr: env aj req jednym volanim gh api')
+  NxTest.assert(po.include?('|| { sleep 30; continue; }'), 'codex-po-pr: pri zlyhani volania sa iteracia preskoci')
   NxTest.assert(po.include?('chatgpt-codex-connector[bot]') && po.include?('create an environment') && po.include?('kolo nebeží'), 'codex-po-pr: slucka rozpozna odpoved bota create an environment')
 end
 

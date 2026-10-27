@@ -71,9 +71,9 @@ GitHub Codex review (rola **review PR** v tabuľke Obsadenie rolí, `SYSTEM/WORK
    Ak nález vedome neopravuješ, odpovedz prečo.
 5. **Merge robí orchestrátor** — až keď AKTUÁLNA hlava vetvy prešla oboma bránami. **Hlavu načítaj RAZ na začiatku overovania** —
    `sha=$(gh pr view <N> --json headRefOid -q .headRefOid)` — a obe brány (CI: `gh run list --branch <vetva> --commit "$sha"`; review: `commit_sha` = `"$sha"`)
-   vzťahuj na túto uloženú hodnotu; merge použije tú istú premennú. Ak `gh pr view` pred mergom vráti iné SHA (medzitým prišiel push), brány over odznova:
+   vzťahuj na túto uloženú hodnotu; merge použije tú istú premennú. Tesne pred mergom hlavu len porovnaj, premennú neprepisuj: `[ "$(gh pr view <N> --json headRefOid -q .headRefOid)" = "$sha" ]`; ak nesedí (medzitým prišiel push), brány over odznova:
    - **Review kolo uzavreté pre aktuálny head:** buď (a) head dostal 👍 / po dokončení **vyžiadaného kola** (`completed` v súhrnnom komentári) nepribudli nové thready a všetky existujúce majú reply (oprava s hashom / zdôvodnenie), alebo (b) predchádzajúce kolo malo LEN P2/P3 a fix delta prešla **internou verifikáciou** (pravidlo delta-verifikácie, krok 3; pri triede D bránu splní kontrola opravy orchestrátorom — odsek Trieda D nižšie) — pri audit-povinnej či výrobnej/cenovej dávke **len ak prešla predrecenziou**; bez predrecenzie sa tam vyžaduje nové plné GH kolo, **okrem** 3. kola podľa výnimky (a) pravidla 3 kôl nižšie a **okrem kvótovej náhradnej brány** (Codex pod prahom podľa skillu `usage`, krok 3: slepý recenzent s reprodukciami + interná delta-verifikácia — vtedy platí v každom kole a PR to prizná; pri audit-povinnej či výrobnej/cenovej dávke alebo oprave P0/P1 len s Michalovým súhlasom), alebo (c) draft otvorený pre kvótu (krok 0) prešiel náhradnou bránou (pri audit-povinnej či výrobnej/cenovej dávke alebo oprave P0/P1 len s Michalovým súhlasom). CI býva hotové skôr než review, takže „CI zelené po pushi opráv" samo osebe NIKDY nestačí na merge. **Brána „žiadne nové thready" platí LEN pre reálne vyžiadané kolo** — ticho po nevyžiadanom kole je ticho Codexu, nie súhlas.
-   - **CI zelené** na aktuálnom head commite (`gh pr checks <N>`).
+   - **CI zelené** na uloženej hlave: `id=$(gh run list --branch <vetva> --commit "$sha" --json databaseId -q '.[0].databaseId')` → `gh run watch $id --exit-status` (nie cez súhrn kontrol PR: ten ukazuje aj novú hlavu).
    - **Commit s číslom PR** (krok 1) orchestrátor skontroloval — mení len číslo PR a stav karty priebehu.
    **Draft otvorený pre kvótu** treba pred mergom prepnúť `gh pr ready` (GitHub draft nezmerguje) — **tým sa spustí kolo Codexu**. Ak je kvóta stále
    pod prahom (`-Gate codex` exit 3), **na výsledok kola sa nečaká** — náhradná brána už prebehla; neskorší nález z tohto kola rieši **nový fix PR**.
@@ -111,10 +111,10 @@ platí, a pošle jednu notifikáciu; nástroj Monitor je na prúd viacerých uda
   api="repos/michalmoronga-alt/noxun-panel/issues/<N>/comments?per_page=100"
   for i in $(seq 1 40); do
     sha=$(gh pr view <N> --json headRefOid -q .headRefOid)
-    s=$(gh api "repos/michalmoronga-alt/noxun-panel/issues/<N>/comments?per_page=100" --jq '[.[]|select(.body|contains("codex-review-state:v1"))]|last|(.body // "")|capture("v1 (?<j>[{].*?[}]) -->").j|fromjson|.code_review|"\(.commit_sha) \(.status)"' 2>/dev/null)
+    s=$(gh api "$api" --jq '[.[]|select(.body|contains("codex-review-state:v1"))]|last|(.body // "")|capture("v1 (?<j>[{].*?[}]) -->").j|fromjson|.code_review|"\(.commit_sha) \(.status)"' 2>/dev/null)
     [ -n "$sha" ] && [ -n "$s" ] && [ "${s%% *}" = "$sha" ] && [ "${s##* }" != running ] && { echo "review dobehlo: $s"; break; }
-    env_t=$(gh api "$api" --jq '[.[]|select(.user.login=="chatgpt-codex-connector[bot]" and (.body|contains("create an environment")))]|last|.created_at // empty' 2>/dev/null)
-    req_t=$(gh api "$api" --jq '[.[]|select(.user.type=="User" and (.body|contains("@codex review")))]|last|.created_at // empty' 2>/dev/null)
+    t=$(gh api "$api" --jq '([.[]|select(.user.login=="chatgpt-codex-connector[bot]" and (.body|contains("create an environment")))]|last|.created_at // "") + "|" + ([.[]|select(.user.type=="User" and (.body|contains("@codex review")))]|last|.created_at // "")' 2>/dev/null) || { sleep 30; continue; }
+    env_t=${t%%|*}; req_t=${t##*|}   # prázdne req_t = v PR nik kolo nevyžiadal (volanie zlyhalo => iterácia sa preskočila)
     [ -n "$env_t" ] && [[ "$env_t" > "$req_t" ]] && { echo "kolo nebeží (bot: create an environment) — vyžiadaj @codex review"; break; }
     sleep 30
   done
