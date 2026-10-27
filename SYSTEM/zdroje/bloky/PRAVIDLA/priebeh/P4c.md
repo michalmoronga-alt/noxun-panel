@@ -4,8 +4,8 @@ Zadanie: [PACKAGE_P4c.md](../PACKAGE_P4c.md)
 Trieda: S
 Vetva: feat/p4c-prevzatie
 Základ: 93cae30d44cfb6f1cf5886d45f4aeef880593790 (main, z ktorého vznikla vetva s packageom; do vetvy zlúčený main 80ef311455f90f74d75fae4b7b20ac74a5f59e15 po P4b)
-Stav: aktívna
-Ďalší krok: počkať na zelené CI pushnutej hlavy po delta-oprave a vrátiť report orchestrátorovi (STOP pred PR).
+Stav: v review (PR #486)
+Ďalší krok: review PR #486, merge robí orchestrátor
 Robil: Claude · Sonnet 5.5 (implementator-stredny)
 
 ## Hotové kroky

@@ -1,4 +1,4 @@
-- **P4c · PREVZATIE PRÁCE (27.10.2026, PR #?, blok 10 · PRAVIDLA, trieda S — len skripty, pravidlá, skilly, šablóny, dokumentácia a testy; kód pluginu, VERSION ani `?v=` bez zmeny).**
+- **P4c · PREVZATIE PRÁCE (27.10.2026, PR #486, blok 10 · PRAVIDLA, trieda S — len skripty, pravidlá, skilly, šablóny, dokumentácia a testy; kód pluginu, VERSION ani `?v=` bez zmeny).**
   Rozpracovanú dávku vie prevziať iný implementátor (aj iný provider) len z vetvy a karty a orchestrátor po výpadku jedným príkazom vidí, čo je rozpracované. **Čo sa zmenilo:**
   (1) šablóna **karty priebehu** `SYSTEM/pravidla/sablony/PRIEBEH.md` (zadanie, trieda, vetva a základný SHA, `Stav:`, `Ďalší krok:`, hotové kroky, otvorené otázky, brány, kto robil); implementátor
   ju zakladá pri prvom commite dávky ako `SYSTEM/zdroje/bloky/<BLOK>/priebeh/<DAVKA>.md` (dávka mimo bloku v `SYSTEM/zdroje/opravy/priebeh/`), v každom ďalšom commite aktualizuje a pushuje (dávka
