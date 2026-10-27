@@ -1,6 +1,7 @@
 # Kronika dávok (append-only)
 
 > **Kanonická história práce.** Uzáver každej dávky/etapy = JEDEN nový odsek navrch sekcie „Záznamy dávok" — nič sa tu neprepisuje ani nemaže.
+> Záznam dávky **bloku** je samostatný súbor `SYSTEM/zdroje/bloky/<BLOK>/kronika/<DAVKA>.md` (rovnaký tvar ako odsek nižšie); pri uzávere bloku sa zlúči sem a priečinok `kronika/` ide s blokom do archívu. Odsek navrch píšu už len opravy mimo bloku.
 > Číta sa len pri otázke **„prečo je X takto?"**; na „kde sme teraz" slúži [../STAV.md](../STAV.md), na „čo sa ide robiť" [../PLAN.md](../PLAN.md).
 > Obsah je presunutý (nie skopírovaný) zo sekcií „Kde sme" a „Hotové etapy" zrušenej roadmapy `SYSTEM/04_ROADMAP.md` (11.8.2026) — prozaické texty sú pôvodné, upravené sú výhradne relatívne cesty odkazov.
 

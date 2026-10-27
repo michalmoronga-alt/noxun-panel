@@ -74,7 +74,7 @@ a [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md) — **len Gre
   [UI_DIZAJN_dennik_do_v0.17.md](archiv/UI_DIZAJN_dennik_do_v0.17.md) (plné znenie `docs/UI_DIZAJN.md` s denníkom dávok do v0.17.4),
   staršie analýzy a vízie. V archíve sa
   **existujúce záznamy neprepisujú** — pribúdať však pribúda priebežne, presne ako káže
-  checklist uzáveru v pravidla/roly/IMPLEMENTATOR.md: záznam dávky navrch KRONIKY, vyriešené D-číslo navrch
+  checklist uzáveru v pravidla/roly/IMPLEMENTATOR.md: záznam dávky (súbor `kronika/` bloku, oprava mimo bloku navrch KRONIKY), vyriešené D-číslo navrch
   indexu v DOGFOODING_vyriesene.md, hotový blok plným textom do ROADMAP_hotove_etapy.md
   a pri uzávere bloku jeho celý priečinok (debata, mockup, zadania, briefy, smoke checklist) do `archiv/bloky/<BLOK>/`.
   [archiv/retro/](archiv/retro/) drží **spracované retro vyhodnotenia** (`VYHODNOTENIE_<dátum>.md` — postrehy, návrhy a rozhodnutia

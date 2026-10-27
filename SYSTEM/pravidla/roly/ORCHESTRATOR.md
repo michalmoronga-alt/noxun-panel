@@ -77,7 +77,7 @@ typu „predplatné v cudzom programe" (bany) · orchestrátor beží **interakt
 
 ## Kvóty a štart okna (skill `usage`)
 
-- **Štart okna = jedna kontrola:** `powershell -NoProfile -File scripts\start_okna.ps1` (obsah a čítanie výstupu: skill `usage`, Kedy volať).
+- **Štart okna = jedna kontrola:** `powershell -NoProfile -File scripts\start_okna.ps1` (obsah a čítanie výstupu: skill `usage`, Kedy volať); končí výpisom rozpracovanej práce (`scripts\rozpracovane.ps1`: PR, vetvy s kartou priebehu, HANDOFF) — pri výpadku sa pokračuje z neho.
 - **Pred každým drahým krokom** (Codex audit, spustenie implementačného subagenta či predrecenzie, `gh pr create`, `@codex review`) stav
   kvót (skill `usage`). **Prahy a reakcie** majú jediný domov v skille `usage`, sekcia **„Prahy a reakcie"**; náhradníci podľa tabuľky
   Náhradníci vo [WORKFLOW.md](../../WORKFLOW.md) § 2. Plánovanie blokov rešpektuje okná resetu.

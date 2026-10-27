@@ -15,5 +15,8 @@ paths:
   (Grep `^### <súbor>`; súbory mapy majú 47–257 kB, celé sa nečítajú),
 - dotknuté § [SYSTEM/STANDARD.md](../../SYSTEM/STANDARD.md) (Grep `^## <číslo>.` / `^### <číslo>`; celý má 170 kB).
 
+Architektúra sa udržiava priebežne: dávka, ktorá mení modul, prepíše JEHO odsek v `docs/architecture/` (nikdy nie text na koniec
+súboru); nový modul = nový odsek aj nový riadok v tabuľke rozcestníka (guard test to stráži).
+
 Uzáver kódovej dávky (VERSION, odsek modulu v `docs/architecture/`, STAV, KRONIKA):
 [IMPLEMENTATOR.md, Verzia a uzáver dávky](../../SYSTEM/pravidla/roly/IMPLEMENTATOR.md#verzia).

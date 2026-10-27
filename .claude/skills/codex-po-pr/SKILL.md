@@ -1,6 +1,6 @@
 ---
 name: codex-po-pr
-description: Po odoslaní PR — budík ~10 min, kontrola Codex GH review (nálezy sú v review threadoch, nie komentoch), oprava nálezov pôvodným implementátorom, kontrola opravy novým slepým subagentom, reply s commit hashom; po splnení brán (CI zelené + review vybavené) merge robí orchestrátor, main nainštaluje len keď PR menil plugin alebo je nasadené niečo iné než main (hook po mergi to konštatuje) a výsledok ide do reportu.
+description: Po odoslaní PR — čakanie na Codex GH review podľa stavu v jeho súhrnnom komentári (nie pevný čas), kontrola Codex GH review (nálezy sú v review threadoch, nie komentoch), oprava nálezov pôvodným implementátorom, kontrola opravy novým slepým subagentom, reply s commit hashom; po splnení brán (CI zelené + review vybavené) merge robí orchestrátor, main nainštaluje len keď PR menil plugin alebo je nasadené niečo iné než main (hook po mergi to konštatuje) a výsledok ide do reportu.
 ---
 
 # Codex review po PR
@@ -26,10 +26,10 @@ GitHub Codex review (rola **review PR** v tabuľke Obsadenie rolí, `SYSTEM/WORK
    (PR popis po slovensky v súbore, nie here-string; `-WhatIf` = suchý beh) — skript spraví kvótovú bránu (exit 3 aj neznámy stav kvóty = draft), pushne vetvu, `gh pr create` a hneď **doplní číslo PR**
    namiesto `PR #?` (PLAN, KRONIKA, STAV, `DOGFOODING_vyriesene`; len na riadkoch pridaných vetvou) samostatným commitom, ktorý mení len číslo, a pushne ho.
    **Záloha ručne:** kvótová brána z kroku 0 (exit 3 aj neznámy stav kvóty, exit 2/4 = `--draft`) + `git push` + `gh pr create` (`--body-file`) a samostatný commit s číslom. Tento commit **pred mergom skontroluje orchestrátor** (pri čistom
-   kole 1 inak žiadna delta nebeží; keď delta beží, patrí do nej). Potom nastav budík — Bash `sleep 600` s `run_in_background: true`;
-   medzitým pokračuj v inej práci. **Prvé kolo (po `gh pr create`) beží automaticky — ďalšie NIE.**
-2. **Po budíku over stav:**
-   - `gh pr view <N> --comments` — ak 👀 a nič viac, review ešte beží → krátky druhý budík (~3 min).
+   kole 1 inak žiadna delta nebeží; keď delta beží, patrí do nej). Potom čakaj na review podľa sekcie „Čakanie na review“ (Bash na pozadí,
+   nie `sleep` naslepo); medzitým pokračuj v inej práci. **Prvé kolo (po `gh pr create`) beží automaticky — ďalšie NIE.**
+2. **Keď čakanie skončí, over stav:**
+   - `gh pr view <N> --comments` — ak 👀 a nič viac, review ešte beží → čakaj znova (sekcia „Čakanie na review“).
    - Nálezy (review thready):
      ```
      gh api graphql -f query='query { repository(owner:"michalmoronga-alt", name:"noxun-panel") { pullRequest(number:<N>) { reviewThreads(first:50) { nodes { isResolved path line comments(first:10) { nodes { databaseId author { login } body } } } } } } }'
@@ -55,7 +55,7 @@ GitHub Codex review (rola **review PR** v tabuľke Obsadenie rolí, `SYSTEM/WORK
    ```
    gh pr comment <N> --body "@codex review"
    ```
-   Budík ~10 min počítaj **od vyžiadania**, nie od pushu. Bez tohto komentára by si čakal na kolo, ktoré nikdy nezačalo — a „žiadne nové thready" by neznamenalo nič.
+   Čakanie počítaj **od vyžiadania**, nie od pushu. Bez tohto komentára by si čakal na kolo, ktoré nikdy nezačalo — a „žiadne nové thready" by neznamenalo nič.
    **Kvótová brána pred každým ďalším kolom (skill `usage`):** pred každým `@codex review` spusti `& ".claude\skills\usage\usage.ps1" -Gate codex`
    (číta len Codex) — **exit 3 = kolo NEVYŽIADAŠ** a ďalej podľa triedy dávky (skill `usage`, Prahy a reakcie). Pri **náhradnej bráne** (slepý recenzent
    s reprodukciami + interná delta-verifikácia; vzor 31.8., 9.9. a PR #363 13.9.2026) do PR zapíšeš komentár, že GH kolo nahradila z dôvodu kvóty.
@@ -69,7 +69,7 @@ GitHub Codex review (rola **review PR** v tabuľke Obsadenie rolí, `SYSTEM/WORK
    ```
    Ak nález vedome neopravuješ, odpovedz prečo.
 5. **Merge robí orchestrátor** — až keď AKTUÁLNA hlava vetvy prešla oboma bránami:
-   - **Review kolo uzavreté pre aktuálny head:** buď (a) head dostal 👍 / po budíku **z vyžiadaného kola** nepribudli nové thready a všetky existujúce majú reply (oprava s hashom / zdôvodnenie), alebo (b) predchádzajúce kolo malo LEN P2/P3 a fix delta prešla **internou verifikáciou** (pravidlo delta-verifikácie, krok 3; pri triede D bránu splní kontrola opravy orchestrátorom — odsek Trieda D nižšie) — pri audit-povinnej či výrobnej/cenovej dávke **len ak prešla predrecenziou**; bez predrecenzie sa tam vyžaduje nové plné GH kolo, **okrem** 3. kola podľa výnimky (a) pravidla 3 kôl nižšie a **okrem kvótovej náhradnej brány** (Codex pod prahom podľa skillu `usage`, krok 3: slepý recenzent s reprodukciami + interná delta-verifikácia — vtedy platí v každom kole a PR to prizná; pri audit-povinnej či výrobnej/cenovej dávke alebo oprave P0/P1 len s Michalovým súhlasom), alebo (c) draft otvorený pre kvótu (krok 0) prešiel náhradnou bránou (pri audit-povinnej či výrobnej/cenovej dávke alebo oprave P0/P1 len s Michalovým súhlasom). CI býva hotové skôr než review, takže „CI zelené po pushi opráv" samo osebe NIKDY nestačí na merge. **Brána „žiadne nové thready" platí LEN pre reálne vyžiadané kolo** — ticho po nevyžiadanom kole je ticho Codexu, nie súhlas.
+   - **Review kolo uzavreté pre aktuálny head:** buď (a) head dostal 👍 / po dokončení **vyžiadaného kola** (`completed` v súhrnnom komentári) nepribudli nové thready a všetky existujúce majú reply (oprava s hashom / zdôvodnenie), alebo (b) predchádzajúce kolo malo LEN P2/P3 a fix delta prešla **internou verifikáciou** (pravidlo delta-verifikácie, krok 3; pri triede D bránu splní kontrola opravy orchestrátorom — odsek Trieda D nižšie) — pri audit-povinnej či výrobnej/cenovej dávke **len ak prešla predrecenziou**; bez predrecenzie sa tam vyžaduje nové plné GH kolo, **okrem** 3. kola podľa výnimky (a) pravidla 3 kôl nižšie a **okrem kvótovej náhradnej brány** (Codex pod prahom podľa skillu `usage`, krok 3: slepý recenzent s reprodukciami + interná delta-verifikácia — vtedy platí v každom kole a PR to prizná; pri audit-povinnej či výrobnej/cenovej dávke alebo oprave P0/P1 len s Michalovým súhlasom), alebo (c) draft otvorený pre kvótu (krok 0) prešiel náhradnou bránou (pri audit-povinnej či výrobnej/cenovej dávke alebo oprave P0/P1 len s Michalovým súhlasom). CI býva hotové skôr než review, takže „CI zelené po pushi opráv" samo osebe NIKDY nestačí na merge. **Brána „žiadne nové thready" platí LEN pre reálne vyžiadané kolo** — ticho po nevyžiadanom kole je ticho Codexu, nie súhlas.
    - **CI zelené** na aktuálnom head commite (`gh pr checks <N>`).
    - **Commit s číslom PR** (krok 1) orchestrátor skontroloval — mení len číslo PR.
    **Draft otvorený pre kvótu** treba pred mergom prepnúť `gh pr ready` (GitHub draft nezmerguje) — **tým sa spustí kolo Codexu**. Ak je kvóta stále
@@ -94,6 +94,27 @@ sa ďalšie GH kolo po P2/P3 ani nevyžaduje — pravidlo sa teda týka hlavne k
   5. merge po zelenom CI na finálnej hlave (brána (b) v kroku 5).
 - **(b) P0/P1 alebo oprava mení koncept** (dátový kontrakt, tok, návrh riešenia) → PR bol zle narezaný — **zavri ho a rozdeľ na menšie celky**, neiteruj
   (lekcie PR #93 s 10 kolami, #243, #278). To isté platí, keď P1 alebo zmenu konceptu nájde slepá delta v bode (a).
+
+## Čakanie na review
+
+Čakanie sa končí **udalosťou, nie časom**. Bash na pozadí (`run_in_background: true`) so slučkou na najviac ~20 min skončí, keď podmienka
+platí, a pošle jednu notifikáciu; nástroj Monitor je na prúd viacerých udalostí, na jednu udalosť stačí slučka.
+
+- **Podmienka nestojí len na `pulls/<N>/reviews` a 👍** — Codex pracuje aj bez nich. Codex vedie **súhrnný komentár** (issue comment) so
+  značkou `codex-review-state:v1` a JSON-om `"code_review":{"commit_sha":"…","status":"running"}`. Čakaj na posledný komentár s touto
+  značkou, v ktorom `commit_sha` je hlava, na ktorú čakáš, a `status` nie je `running` (`completed`). Kým značka chýba, review ešte nezačalo.
+- Tvar slučky (`sha` = hlava vetvy; limit 40 × 30 s):
+  ```
+  sha=$(git rev-parse HEAD)
+  for i in $(seq 1 40); do
+    s=$(gh api "repos/michalmoronga-alt/noxun-panel/issues/<N>/comments?per_page=100" --jq '[.[]|select(.body|contains("codex-review-state:v1"))]|last|(.body // "")|capture("v1 (?<j>[{].*?[}]) -->").j|fromjson|.code_review|"\(.commit_sha) \(.status)"' 2>/dev/null)
+    [ "${s%% *}" = "$sha" ] && [ "${s##* }" != running ] && { echo "review dobehlo: $s"; break; }
+    sleep 30
+  done
+  ```
+- Po `completed` sú nálezy v `pulls/<N>/comments` (značka `codex-code-review-finding:v1`) — ďalej krok 2.
+- Stav `running` nie je chyba (veľký PR môže bežať aj hodinu): po limite čakaj znova; ak je review po ~60 min stále `running`, vyžiadaj
+  `@codex review`. Ak značka po limite chýba, over ručne (👀, odpoveď „create an environment“ — sekcia Pasce).
 
 ## Pasce
 

@@ -30,8 +30,8 @@ Záložný orchestrátor uzáver bloku nemerguje (ORCHESTRATOR.md, Karta roly).
 5. **Zostavenie smoke checklistu** do záverečného dokumentu (sekcia „Smoke checklist bloku"): zlúč sekcie „Smoke" zo všetkých packages
    bloku a čakajúce D-čísla, odstráň duplicity, body zoraď **po skupinách s ID** a na konci doplň tabuľku „zdroj → čísla bodov" na kontrolu
    úplnosti. Formát skupín a bodov: skill `smoke`.
-6. **V1_VIZIA, README, STAV, KRONIKA** — aktualizuj podľa checklistu uzáveru dávky v IMPLEMENTATOR.md (STAV sa prepisuje, KRONIKA dostane odsek
-   navrch). Skupina „smoke po uzávere" v `SYSTEM/DOGFOODING.md` je dočasná — založ ju s prvým nálezom a zanikne s posledným.
+6. **V1_VIZIA, README, STAV, KRONIKA** — aktualizuj podľa checklistu uzáveru dávky v IMPLEMENTATOR.md (STAV sa prepisuje; do KRONIKY sa navrch sekcie „Záznamy dávok“ zlúčia súbory dávok bloku z `SYSTEM/archiv/bloky/<BLOK>/kronika/` v poradí mergov,
+   najnovší hore, a uzáver dostane vlastný odsek). Skupina „smoke po uzávere" v `SYSTEM/DOGFOODING.md` je dočasná — založ ju s prvým nálezom a zanikne s posledným.
 7. PR, review a merge ako pri každej dávke (skill `codex-po-pr`; číslo PR doplní `scripts\otvor_pr.ps1`). Uzáver mení `VERSION` a `?v=`,
    preto je po mergi potrebná **inštalácia mainu** (ORCHESTRATOR.md, Inštalácia mainu).
 
