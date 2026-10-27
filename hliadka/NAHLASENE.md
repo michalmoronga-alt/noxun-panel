@@ -8,3 +8,7 @@
 | 2026-10-23 | P-2026-10-23-1 | pravidlá | agy-reserser.md:15; antigravity-outside-in/SKILL.md:42 | --mode plan „zakazuje shell" vs. „nezabráni terminálu" | nové |
 | 2026-10-23 | P-2026-10-23-2 | pravidlá | agy-reserser.md:30; antigravity-outside-in/SKILL.md:32 | blok OBMEDZENIE NÁSTROJOV doslovne 2× | nové |
 | 2026-10-23 | P-2026-10-23-3 | pravidlá | CLAUDE.md; antigravity-outside-in/SKILL.md:66 | história a dátumy v pravidle (nové: „overené 22.10.2026, agy 1.4.5") | nové |
+| 2026-10-27 | P-2026-10-27-1 | pravidlá | WORKFLOW.md:34 vs :38-39,49 | „Aktuálne (26.9.2026)" vs. riadky od 6.10./7.10.2026 | nové |
+| 2026-10-27 | P-2026-10-27-2 | pravidlá | .claude/agents/*.md (vložené odkazy); reserser.md:21 | relatívne odkazy vo vložených rolách mŕtve z .claude/agents/ | nové |
+| 2026-10-27 | P-2026-10-27-3 | pravidlá | WORKFLOW.md, codex-po-pr:44,50,84 | história, dátumy a PR # v záväznom texte (K4) | nové |
+| 2026-10-27 | P-2026-10-27-4 | pravidlá | .claude/agents/implementator*.md, slepy-recenzent.md | typy agentov 22–23 kB (cieľ 8 kB), 3× rovnaký obsah | nové |
