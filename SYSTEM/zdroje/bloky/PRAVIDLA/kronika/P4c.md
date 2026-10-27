@@ -18,7 +18,7 @@
   stráž `session_digest.rb` voči repu (veľkosť písmen na Windows, worktree aj hlavný checkout) a `github_pat_…`, nový odsek v `.claude/rules/ui.md`, § 6 packageu. **Prvé použitie nového tvaru:** táto dávka má kartu `priebeh/P4c.md` a tento záznam ako súbor. **Testy:** nový `tests/pure/test_p4c_prevzatie.rb` (polia karty
   zhodné so `rozpracovane.ps1`, `rozpracovane.ps1` nad dočasným repom so stubom `gh` — PR, vetvy s kartou, bez karty, HANDOFF, bez `gh`, zlyhané `gh`, repo bez `origin/main`; číslo PR v súbore
   `kronika/`; `session_digest.rb` nad fixtúrou), `test_straz.js` doplnený; Ruby 5471/0/0, JS 165 sád PASS, encoding guard PASS; in-SU netreba. V bežiacej session orchestrátora
-  sa nové nastavenie hookov nenačítalo (2 pokusy po mergi), preto smoke v novej session. **Živý smoke P4b (27.10.2026): PASS 12/12** (nová session z `main` `a895edf0`, `PACKAGE_P4b.md` § 4 bod 2;
+  sa nové nastavenie hookov nenačítalo (2 pokusy po mergi), preto smoke v novej session. **Živý smoke P4b (27.10.2026): PASS 11/11** (nová session z `main` `a895edf0`, `PACKAGE_P4b.md` § 4 bod 2;
   odmietnutie = zamietnutie nástroja s dôvodom po slovensky):
 
   | Príkaz | Nástroj | Očakávané | Skutočné |

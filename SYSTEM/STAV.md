@@ -41,7 +41,7 @@ a P4c (prevzatie práce: karta priebehu a `rozpracovane.ps1`, zelené CI pred �
 
 ## Ďalší krok
 
-**Blok PRAVIDLA:** P5 — hodnotenia po úlohách (podľa [PLAN.md](PLAN.md)); živý smoke hooku P4b PASS 12/12 (27.10., `kronika/P4c.md`).
+**Blok PRAVIDLA:** P5 — hodnotenia po úlohách (podľa [PLAN.md](PLAN.md)); živý smoke hooku P4b PASS 11/11 (27.10., `kronika/P4c.md`).
 **Michal:** smoke bloku 9 podľa [HARDENING_ZAVER_2026-10-11.md](archiv/HARDENING_ZAVER_2026-10-11.md)** — skupiny A Exporty a čísla (28) · B Inspector (25) · C Štúdio (20) · D Ochrana dát a dve okná (10) ·
 E SketchUp a štart (11, vrátane Koniec SketchUpu na 2026.2). Pred ním aktualizovať plugin na oboch PC a zavrieť všetky okná SketchUpu. Nálezy zo smoke = opravy x.y.z (dočasná skupina
 v [DOGFOODING.md](DOGFOODING.md)). Potom nový blok podľa výberu Michala. **Test na reálnej zákazke po V1.**
