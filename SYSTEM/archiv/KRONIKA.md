@@ -17,6 +17,82 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **P3b · POSTUPY: SKILLY `uzaver-bloku` A `smoke`, ORCHESTRATOR POD STROP, WORKFLOW AKO MAPA (26.10.2026, PR #484, blok 10 · PRAVIDLA, trieda S — len pravidlá,
+  skilly, dokumentácia a testy; kód pluginu, VERSION ani `?v=` bez zmeny).** Postupy, ktoré zbytočne nafukovali rolu orchestrátora, sú v skilloch a
+  popisy hookov v dokumentácii. **Čo sa zmenilo:** nový skill `uzaver-bloku` (postup uzáveru bloku presunutý z ORCHESTRATOR.md + nové kroky: zostavenie
+  smoke checklistu do záverečného dokumentu a upratanie po uzávere — zoznam kandidátov na zmazanie v `_dev` a worktrees zmergovaných vetiev, maže sa až
+  po súhlase Michala, worktree len cez `git worktree remove`) a nový skill `smoke` (vedenie smoke s Michalom: zápisník `SMOKE_ZAPISNIK_<dátum>.md`
+  v priečinku bloku s commitom a pushom po každom sedení, Michal najprv škrtne nerelevantné body, rozdelenie na body overiteľné agentom len v testovacom
+  prostredí podľa AGENTS.md a ručné, nálezy do DOGFOODING, smoke PASS dokumentačným PR; telo z praxe smoke bloku HARDENING). `ORCHESTRATOR.md` 13902 → **9938 B**
+  (uzáver bloku → skill, opisy hookov `po_merge.js` a `context_meter.js` → `docs/HOOKY.md`, obsah kontroly štartu okna → skill `usage`, Retro jedna veta);
+  **8 kB sa bez straty pravidla nedosiahlo, preto vlastný strop 10 kB** len pre tento súbor (zoznam, čo by sa muselo vypustiť, v `PACKAGE_P3b.md` § 4).
+  `WORKFLOW.md` 36692 → 34179 B (§ 3–§ 8 a § 10: opakované pravidlá nahradené odkazom na ich domov; § 2 a § 9 bez zmeny; nové riadky brán uzáver bloku
+  a export test, opravený stĺpec „Kde je pravidlo"). **Nález hliadky P-2026-10-23-2:** blok OBMEDZENIE NÁSTROJOV pre rešerš `agy` žije v jednom súbore
+  `scripts/agy/obmedzenie.txt`; obal `agy-reserser` aj skill `antigravity-outside-in` ho čítajú z neho (súbor sa číta cez `tr -d '\r'`, lebo checkout s `core.autocrlf=true` ho má s CRLF; prompt, ktorý obal skladá, je
+  bajt po bajte rovnaký ako pred zmenou — overené suchým porovnaním nad súborom s LF aj s CRLF, agy sa nespúšťalo; chýbajúci alebo prázdny súbor beh nespustí), diagnostika prázdneho výstupu ostáva len v skille. **Nález P-2026-10-23-3:** história
+  zo skillu `antigravity-outside-in` presunutá sem (nižšie). **Stráže:** strop rolí 14 → 8 kB (ORCHESTRATOR 10 kB), strop `.claude/skills/*/SKILL.md`
+  500 riadkov, G2 (história) pre tri skilly, nový `test_agy_obmedzenie.rb` (jeden domov bloku + čítanie zo súboru + vlastné správanie). Mapa presunu
+  a odchýlky: `SYSTEM/zdroje/bloky/PRAVIDLA/P3b_MAPA.md`. **História presunutá zo skillu `antigravity-outside-in`:** zadanie rešerše outside-in vzniklo
+  3.9.2026 (Michal; pilot na dávkach KOV-C/D a jednorazový sweep architektúry; vzorové prompty `scratchpad/ag_outside_in_kovcd.md`
+  a `ag_outside_in_sweep.md` boli v scratchpade jednej session) · poradie „outside-in rešerš je súčasťou rešerše a krížového auditu bloku, raz pred
+  packages" je rozhodnutie N14 z 26.9.2026 · zákaz behu `agy` v nočných behoch bez obsluhy je rozhodnutie Z8 z 26.9.2026 · ekonomika z pilotu 3.9.2026:
+  dva behy rešerše zaberú ≈ 2,2 % 5-hodinového limitu Gemini, dva paralelné Codex audity vyčerpali jeho kĺzavé okno · poučenie „Gemini Flash nie je thinking
+  model, jeden beh = 1–2 otázky" je od Michala z 3.9.2026 · diagnostika prázdneho výstupu s exit 0 (mäkké zamietnutie nástroja mimo webu) bola overená
+  22.–23.10.2026 na agy 1.4.5. **Smoke pravidiel oblastí po P3a (26.10.2026, main 1a81e9a8, typ `analytik`): PASS** — po Read prvých 3 riadkov
+  `noxun_engine/ui/panel.rb` dostal v systémových pripomienkach hneď po výsledku nástroja obsah `.claude/rules/kod.md` a `.claude/rules/ui.md`, nie
+  `vystupy.md` ani `konstrukcia.md`; pravidlá sa načítali aj v bežiacej session (netreba novú), lebo subagent štartoval po mergi.
+  **Oprava z review (2× P1):** skill `smoke` už nepovoľuje „iný testovací model v `_dev`" — body overiteľné agentom bežia len v prostredí podľa
+  AGENTS.md, Zákazy pre všetkých (Michalove ručné smoke modely sú jeho); skill `uzaver-bloku` namiesto bezpodmienečného „predrecenzia nie je
+  povinná" odkazuje na D4 vrátane výnimky pre dávku náhradného implementátora.
+
+- **P3a · PRAVIDLÁ OBLASTÍ V `.claude/rules/` (26.10.2026, PR #483, blok 10 · PRAVIDLA, trieda S — len pravidlá, dokumentácia a testy; kód pluginu,
+  VERSION ani `?v=` bez zmeny).** Povinné čítanie podľa oblasti sa načíta samo, keď agent číta alebo upravuje súbor oblasti — rola, ktorej sa
+  oblasť netýka, ho nedostane. **Sonda** (docs code.claude.com/docs/en/memory a sub-agents, Claude Code 2.1.310): `paths:` v `.claude/rules/*.md`
+  sa spúšťa pri Read/Write/Edit (a čítaní cez Bash), platí aj pre subagentov s `omitClaudeMd`; Grep a Glob medzi spúšťačmi nie sú. **Čo sa
+  zmenilo:** nových 8 súborov oblastí (`kod`, `konstrukcia`, `ui`, `materialy`, `kovanie`, `vystupy`, `testy`, `dc`; každý ≤ 6 kB, s `paths:`);
+  `POVINNE_CITANIE.md` je rozcestník s tabuľkou oblastí (8 → 6 kB, Codex a Grok si súbor oblasti čítajú sami podľa tabuľky);
+  `IMPLEMENTATOR.md` 12 → 8 kB (cache-bust → `ui.md`, podrobnosti testov → `testy.md`, hooky → nový `docs/HOOKY.md`, interaktívny kanál MCP →
+  NASTROJE_TESTOV, pravidlo STAV pri dokumentačnom PR → hlavička „Údržba" v STAV, ručný postup čísla PR → hlavička `otvor_pr.ps1`); typy agentov
+  pregenerované. **Stráže:** strop `.claude/rules/*.md` 6 kB a IMPLEMENTATOR 8 kB (G1), `.claude/rules/**` v skene histórie (G2), nový
+  `test_pravidla_oblasti.rb` (každý súbor má `paths:`, každý glob trafí súbor, POVINNE_CITANIE menuje každý súbor, vlastné správanie).
+  Mapa presunu a odchýlky: `SYSTEM/zdroje/bloky/PRAVIDLA/P3a_MAPA.md`. **Smoke typov po P2 (26.10.2026, main po PR #482, Claude Code 2.1.310): PASS** —
+  `analytik`, `slepy-recenzent` a `implementator-lahky` majú len pravidlá svojej roly (poznajú poslednú vetu `AGENTS.md`, nie prvú vetu
+  `ORCHESTRATOR.md` ani `~/.claude/CLAUDE.md`); auto-pamäť `MEMORY.md` typy s `omitClaudeMd` nevidia; podrobnosti
+  v `SYSTEM/zdroje/bloky/PRAVIDLA/P2_KTO_CO_DOSTANE.md`, sekcia „Smoke typov po mergi". Smoke samotných oblastí (typ `analytik` otvorí
+  `noxun_engine/ui/panel.rb` a hlási `ui.md`, nie `vystupy.md`) nasleduje po mergi v novej session.
+
+- **P2 · KARTY ROLÍ, TYPY AGENTOV LEN SO SVOJIMI PRAVIDLAMI, ROLA ANALYTIK (23.10.2026, PR #482, blok 10 · PRAVIDLA, trieda Ť — len pravidlá,
+  generátor a testy; kód pluginu, VERSION ani `?v=` bez zmeny).** Každý typ subagenta dostane **len pravidlá svojej roly** a typy sa nerozídu
+  so súbormi rolí. **Sonda:** pole `omitClaudeMd` overené v docs code.claude.com/docs/en/sub-agents (Claude Code 2.1.301, pole od 2.1.271) —
+  subagent štartuje bez používateľského, projektového aj nadradeného CLAUDE.md. Doteraz každý typ dedil ~61 kB: most (AGENTS + **ORCHESTRATOR**),
+  starý 35 kB `CLAUDE.md` hlavného checkoutu (nadradený priečinok worktree), mapu workspace a Michalove globálne pokyny. **Karty rolí**
+  (šablóna ROLY § 1) v `SYSTEM/pravidla/roly/`: nové `RECENZENT.md`, `AUDITOR.md`, `RESERSER.md`, `ANALYTIK.md` (obsah = dnešné telá typov
+  a skilly, nie nové pravidlá); `IMPLEMENTATOR.md` dostal kartu so všetkými kolónkami a **postup dávky** (z tiel troch typov, jedno znenie aj pre
+  Codex/Grok), `ORCHESTRATOR.md` kolónky šablóny a režim *záložný* (Michal 19.10.). **Generátor** `scripts/generuj_typy_agentov.rb` (`--check`)
+  skladá `.claude/agents/<typ>.md` zo zdroja `SYSTEM/pravidla/typy/<typ>.md` (frontmatter + hlavička + zoznam `zdroje:`, ktorý do výstupu nejde)
+  a doslova vložených súborov podľa ROLY § 6: implementátori AGENTS + DEFINICIE + IMPLEMENTATOR · recenzent AGENTS + DEFINICIE + RECENZENT
+  + sekcie IMPLEMENTATOR Verzia a Testovanie · rešeršér len RESERSER · analytik AGENTS + ANALYTIK · obal `agy-reserser` len svoje telo;
+  všetky s `omitClaudeMd: true`. Zdroj typu je mimo `.claude/agents/`, aby výstup bol celý generovaný (G4 porovnáva celý súbor) a pomocný
+  zoznam `zdroje:` sa nedostal do frontmatteru Claude Code. **Nový typ `analytik`** (Sonnet, effort medium, len čítanie; mechanické výťahy
+  s `model: haiku` pri volaní — Michal 22.10., ROLY ❓6) + riadok v tabuľke Obsadenie rolí a v § 1 WORKFLOW. **Rozhodnutie Michala 23.10.:**
+  PR sa pri P0/P1 alebo zmene konceptu zatvára a delí až po 3. kole s nálezmi (pravidlo 3 kôl b) — riadok „P0/P1 v review" v ORCHESTRATOR.md
+  zosúladený, WORKFLOW diagram a `codex-po-pr` už súhlasili; zápis v NAVRH_STRUKTURY § 9 bod 10. Popis pripomienky po mergi presunutý
+  z IMPLEMENTATOR.md do ORCHESTRATOR.md (týka sa hlavného okna; IMPLEMENTATOR.md je tesne pod stropom 14 kB). **Guard G4** v
+  `test_agent_definitions.rb`: typy = výstup generátora, všetky s `omitClaudeMd: true`, žiadny s podpisovou vetou ORCHESTRATOR.md, zdroj ↔ typ
+  1:1, test vlastného správania generátora (kotva, LF, determinizmus, ručná úprava, typ bez zdroja). G3 (`test_definicie.rb`) prehľadáva
+  ručné zdroje `pravidla/typy/` namiesto generovaných typov (DEFINICIE v nich je zámerne doslova). Nové karty v G1 a v limite riadka
+  `test_docs_navigacia.rb`; AGENTS.md, POVINNE_CITANIE, README, WORKFLOW (Z9, retro), skilly `predrecenzia`, `codex-audit`, `retro`
+  odkazujú na karty. Kto čo dostal predtým a teraz: [P2_KTO_CO_DOSTANE.md](../zdroje/bloky/PRAVIDLA/P2_KTO_CO_DOSTANE.md). Obsadenie sa
+  nepresúva (mod usage-bar ho číta z WORKFLOW § 2) — `OBSADENIE.md` prechádza do P5. **Smoke po mergi** (orchestrátor, nová session; typ `analytik`
+  odpovedá len z úvodného kontextu, bez nástrojov): pozná poslednú vetu AGENTS.md, nepozná prvú vetu ORCHESTRATOR.md ani `~/.claude/CLAUDE.md`;
+  či vidí `MEMORY.md` auto-pamäte, sa zapíše (docs tvrdia nie, v session implementátora P2 ju mal — známe obmedzenie, pamäť drží len odkazy
+  a fakty). **Predrecenzia** (Claude + Codex sol): P1 ručná záloha PR bez kvótovej brány · P2 auto-pamäť, retro cez typ `analytik` · P3
+  (smoke, karty RECENZENT/ANALYTIK/RESERSER, G4 aj nad `zdroje:`, audítor bez delty, záložný orchestrátor s HANDOFF) — opravené;
+  podrobnosti fotenia okien, export testu a diagnostiky MCP presunuté do `SYSTEM/pravidla/NASTROJE_TESTOV.md` (IMPLEMENTATOR.md pod 12 kB).
+  **Delta opráv** (nový slepý recenzent, 26.10.): VERDIKT OK, 4×P3 opravil orchestrátor (exit 2/4 pred `gh pr create` = draft aj v skilloch
+  `usage` a `codex-po-pr`, hlavička `otvor_pr.ps1`, názov riadku Náhradníkov, záložný orchestrátor číta rolu podľa odkazu) + nález hliadky
+  pravidiel P-2026-10-23-1 (typ `agy-reserser`: `--mode plan` nezabráni terminálu).
+
 - **P1b · JADRO AGENTS.md, MOST CLAUDE.md, SÚBORY ORCHESTRÁTORA A IMPLEMENTÁTORA (23.10.2026, PR #480, blok 10 · PRAVIDLA, trieda Ť — len pravidlá a testy;
   kód pluginu, VERSION ani `?v=` bez zmeny).** `CLAUDE.md` (32 kB, ktorý Claude Code čítal celý v každom okne aj subagentovi a Codex ho nečítal vôbec) sa
   **presunul bez zmeny významu** na štyri miesta: jadro pre všetkých agentov a nástroje `AGENTS.md` (projekt, rola → súbor, rozcestník, zákazy, git v skratke,

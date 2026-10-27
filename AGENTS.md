@@ -2,13 +2,17 @@
 
 SketchUp Ruby plugin — parametrický nábytkársky systém (korpusy, zóny, čelá, materiály/ABS, kovanie, výstupy).
 GitHub: https://github.com/michalmoronga-alt/noxun-panel
-Tento súbor číta každý agent a nástroj (Claude Code cez most `CLAUDE.md`, Codex, Grok, review PR); k nemu patrí súbor tvojej roly.
+Tento súbor číta každý agent a nástroj (hlavné okno Claude Code cez most `CLAUDE.md`, typy agentov vo svojom tele, Codex, Grok,
+review PR; výnimka: rešeršér má len svoju kartu); k nemu patrí súbor tvojej roly.
 
 ## Tvoja rola
 
 - **orchestrátor** (hlavné okno) → [SYSTEM/pravidla/roly/ORCHESTRATOR.md](SYSTEM/pravidla/roly/ORCHESTRATOR.md)
 - **implementátor** → [SYSTEM/pravidla/roly/IMPLEMENTATOR.md](SYSTEM/pravidla/roly/IMPLEMENTATOR.md)
-- **slepý recenzent, audítor, rešeršér** → typ agenta v `.claude/agents/` a zadanie od orchestrátora
+- **slepý recenzent** → [RECENZENT.md](SYSTEM/pravidla/roly/RECENZENT.md) · **audítor** → [AUDITOR.md](SYSTEM/pravidla/roly/AUDITOR.md) ·
+  **rešeršér** → [RESERSER.md](SYSTEM/pravidla/roly/RESERSER.md) · **analytik** → [ANALYTIK.md](SYSTEM/pravidla/roly/ANALYTIK.md)
+- Claude typy agentov (`.claude/agents/`) majú pravidlá svojej roly vložené v tele — generuje ich `scripts/generuj_typy_agentov.rb`
+  zo `SYSTEM/pravidla/typy/`; ručne sa needitujú.
 - **review PR** → sekcia [Code Review Rules](#code-review-rules) nižšie
 - Každá rola: [SYSTEM/pravidla/DEFINICIE.md](SYSTEM/pravidla/DEFINICIE.md) — jediné znenie definícií brán a tried (D1–D6).
 - Každá rola podľa druhu práce: riadok svojho zásahu v [SYSTEM/pravidla/POVINNE_CITANIE.md](SYSTEM/pravidla/POVINNE_CITANIE.md)
@@ -35,6 +39,8 @@ Tento súbor číta každý agent a nástroj (Claude Code cez most `CLAUDE.md`, 
 - **Pravidlá SketchUp kódu:** [docs/SKETCHUP_PRAVIDLA.md](docs/SKETCHUP_PRAVIDLA.md) · DC pasce: [docs/DC_PRAVIDLA.md](docs/DC_PRAVIDLA.md) ·
   UI dizajn: [docs/UI_DIZAJN.md](docs/UI_DIZAJN.md) — kompletné a samostatné v tomto repe. (Nadradený `..\CLAUDE.md` existuje len
   v Michalovom lokálnom workspace `C:\APP DEV\RUBY` — mapa ostatných pluginov; pre prácu v tomto repe nie je potrebný.)
+- **Pravidlá oblastí** `.claude/rules/` — načítajú sa samé pri práci so súbormi oblasti; mimo Claude Code (Codex, Grok) podľa tabuľky
+  v [POVINNE_CITANIE.md](SYSTEM/pravidla/POVINNE_CITANIE.md#pravidlá-oblastí-clauderules).
 - **Skilly** (postupy krok za krokom): `.claude/skills/`.
 
 ## Zákazy pre všetkých
@@ -60,7 +66,7 @@ Tento súbor číta každý agent a nástroj (Claude Code cez most `CLAUDE.md`, 
 
 Headless sada `ruby tests/run_all.rb` (lokálne `scripts\run_tests.ps1`) + všetky JS sady jedným príkazom
 `powershell -NoProfile -File scripts\run_js_tests.ps1`. Test v SketchUpe, foto okien a export test:
-[IMPLEMENTATOR.md, Testovanie](SYSTEM/pravidla/roly/IMPLEMENTATOR.md#testovanie).
+[IMPLEMENTATOR.md, Testovanie](SYSTEM/pravidla/roly/IMPLEMENTATOR.md#testovanie) (podrobnosti sád a runnera: `.claude/rules/testy.md`; foto okien: `ui.md`, export test: `vystupy.md`).
 
 ## Jazyk a jednotky
 

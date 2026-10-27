@@ -330,6 +330,9 @@ tenké obaly na Sonnete/Haiku pre Codex, Grok a agy.
 > 9. **(22.10.) Roly a router:** oddeliť **rolu** (čo robí a čo dostane) · **obsadenie** (ktorý model) · **router** (koho teraz) ·
 >    7 rolí (orchestrátor, implementátor, recenzent, audítor, rešeršér, analytik, review PR) · záložný orchestrátor je režim, nie rola ·
 >    router v0 pevný (pravidlá + kvóty), učiaci v1 až s dátami. Karty rolí, typy úloh a návrh obsadenia: [ROLY.md](ROLY.md) — schvaľuje Michal pred úvodným PR bloku.
+> 10. **(23.10.) Zatvorenie a rozdelenie PR:** pri P0/P1 alebo oprave meniacej koncept sa PR **zatvára a delí až vtedy, keď nálezy vráti
+>    aj 3. GH kolo** (pravidlo 3 kôl b v skille `codex-po-pr`); dovtedy oprava + nové plné GH kolo, pri zmene konceptu opravu robí nový
+>    implementátor s novým zadaním. Zapísané v `ORCHESTRATOR.md` (tabuľka „Keď Michal neodpovie", dávka P2).
 
 1. **Záložný orchestrátor Codex** — zaviesť (a s obmedzeniami z § 2.3), alebo pri výpadku Claude len čakať?
 2. **Karty modelov a hodnotenia v `noxun-mods`** (spoločné pre všetky projekty) — áno?
