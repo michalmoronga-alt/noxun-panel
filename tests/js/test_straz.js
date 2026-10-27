@@ -108,6 +108,33 @@ try {
   allow('Write-Host "git commit"', 'PowerShell', MAIN);
   allow('git status; git log -3', 'PowerShell', MAIN);
 
+  // príkazy vnútri substitúcií, podmienok a blokov (vnútro $( … ) a ( … ) sa posudzuje ako príkaz)
+  deny('push', 'if ($LASTEXITCODE -eq 0) { git push origin main }', 'PowerShell', WT);
+  deny('push', 'if ($ok) {git push origin main}', 'PowerShell', WT);
+  deny('commit', 'if (Test-Path x) { git commit -m x }', 'PowerShell', MAIN);
+  deny('commit', 'if ($a) { git status } else { git commit -m x }', 'PowerShell', MAIN);
+  deny('runner', 'if ($ok) { scripts/run_su_tests.ps1 }', 'PowerShell', WT);
+  deny('push', '(git push origin main)', 'PowerShell', WT);
+  deny('push', '$out = (git push origin main 2>&1)', 'PowerShell', WT);
+  deny('push', 'foreach ($b in 1,2) { git push origin main }', 'PowerShell', WT);
+  deny('push', 'out=$(git push origin main 2>&1); echo "$out"', 'Bash', WT);
+  deny('commit', 'echo $(git commit -m x)', 'Bash', MAIN);
+  deny('commit', 'echo "$(git commit -m x)"', 'Bash', MAIN);
+  deny('commit', `x=$(cd ${fw(MAIN)} && git commit -m x)`, 'Bash', WT);
+  deny('push', 'git push origin $(git branch --show-current)', 'Bash', MAIN);       // refspec = substitucia: podla aktualnej vetvy
+  deny('push', 'git push origin (git branch --show-current)', 'PowerShell', MAIN);
+  allow('git push origin $(git branch --show-current)', 'Bash', WT);
+  allow('if ($LASTEXITCODE -eq 0) { git push origin feat/x }', 'PowerShell', MAIN);
+  allow('if (Test-Path x) { git commit -m x }', 'PowerShell', WT);
+  allow('if ($ok) { scripts/run_su_tests.ps1 -CloseWhenDone }', 'PowerShell', WT);
+  allow('(git status)', 'PowerShell', MAIN);
+  allow('$sha = (git rev-parse HEAD); git commit -m x', 'PowerShell', WT);
+  allow('out=$(git status 2>&1); git commit -m x', 'Bash', WT);
+  allow('echo $(git status)', 'Bash', MAIN);
+  allow('foreach ($b in 1,2) { git push origin $b }', 'PowerShell', MAIN);
+  allow('git push origin feat/$(date +%s)', 'Bash', MAIN);
+  allow('$h = @{a=1}; git commit -m "${x}"', 'PowerShell', WT);
+
   // --- 2. push do main --------------------------------------------------------------------------
   allow('git push origin feat/x', 'Bash', MAIN);
   allow('git push -u origin feat/x', 'Bash', WT);
@@ -291,6 +318,9 @@ try {
   eq(words('sha=$(git rev-parse HEAD) && x'), ['sha=$(git rev-parse HEAD)', '<&&>', 'x'], 'substitucia $(…) je cast slova');
   eq(words('a --m $(git rev-parse HEAD) b'), ['a', '--m', '$(git rev-parse HEAD)', 'b'], 'substitucia ako hodnota');
   eq(words('a --m=$(f "x y" $(g)) b'), ['a', '--m=$(f "x y" $(g))', 'b'], 'vnorena substitucia s uvodzovkami');
+  eq(words('if ($a) {git push}', 'powershell'), ['if', '($a)', '{', 'git', 'push', '}'], 'PowerShell: blok { … } sa rozdeli');
+  eq(words('$h = @{a=1}; "${x}" stash@{0}', 'powershell'), ['$h', '=', '@{a=1}', '<;>', '${x}', 'stash@{0}'], 'PowerShell: @{ } a ${ } ostavaju slovom');
+  eq(M.tokenize('x=$(git status) y', 'bash')[0].subs, ['git status'], 'vnutro substitucie sa zapamata');
   eq(words('(cd x && y); z'), ['<(>', 'cd', 'x', '<&&>', 'y', '<)>', '<;>', 'z'], 'bash: podshell ( … ) ostava oddelovac');
   eq(words('a --m (git rev-parse HEAD) b', 'powershell'), ['a', '--m', '(git rev-parse HEAD)', 'b'], 'PowerShell: ( … ) je vyraz');
   eq(words('a --m $(git rev-parse HEAD) 2>&1', 'powershell'), ['a', '--m', '$(git rev-parse HEAD)', '2>&1'], 'PowerShell: $(…) a 2>&1');

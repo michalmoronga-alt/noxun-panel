@@ -93,4 +93,4 @@ a jeho matcher v `settings.json` na `Bash|PowerShell` (+ test).
 - **Výsledok (implementátor):** hook `.claude/hooks/straz.js` + `tests/js/test_straz.js`, `po_merge.js` aj pre PowerShell, `settings.json` (PreToolUse `Bash|PowerShell`),
   `docs/HOOKY.md`. Formát odmietnutia: JSON `permissionDecision: "deny"` + exit 0 (dokumentácia hookov Claude Code; dôvod v hlavičke hooku). Odchýlka od § 1: vetva sa zisťuje
   cez `git symbolic-ref -q HEAD` namiesto `rev-parse --abbrev-ref HEAD` (funguje pred prvým commitom, nevráti dvojznačné `heads/main`); odpojená hlava = povolené ako v zadaní.
-  IMPLEMENTATOR.md 8120 B (z 8126), ORCHESTRATOR.md 9997 B.
+  IMPLEMENTATOR.md 8126 B (bez zmeny), ORCHESTRATOR.md 9997 B.

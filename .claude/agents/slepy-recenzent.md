@@ -248,14 +248,14 @@ súbory nezapisuj.
   v bloku **s ✅ a číslom PR** (presúva sa až s uzáverom bloku).
 - **Checklist dokumentačného PR:** odsek navrch „Záznamy dávok" v KRONIKE **áno**; STAV podľa hlavičky „Údržba"; VERSION ani `?v=` **nie**.
 - **Číslo PR** (PLAN, KRONIKA, STAV, `DOGFOODING_vyriesene`): pred `gh pr create` sa píše `PR #?`; číslo doplní `scripts\otvor_pr.ps1`
-  (PR aj commit s číslom; `-CoAuthor` povinný). Kvóta: **exit 3 aj neznámy stav kvóty (exit 2/4) = draft PR**; ručný postup: hlavička skriptu.
+  (PR aj samostatný commit s číslom; `-CoAuthor` povinný). Kvóta: **exit 3 aj neznámy stav kvóty (exit 2/4) = draft PR**; ručný postup ako záloha: hlavička skriptu.
 
 > **Vložená sekcia `testovanie` zo súboru `SYSTEM/pravidla/roly/IMPLEMENTATOR.md`** (odkazy v nej sú relatívne k tomu súboru).
 
 ## Testovanie
 
 - **Headless a JS sady:** príkazy sú v [AGENTS.md](../../../AGENTS.md#testy); písanie a spúšťanie sád, pasca `node tests/js/test_*.js`:
-  `.claude/rules/testy.md`. Počty testov patria do PR a KRONIKY, nie do pravidiel.
+  `.claude/rules/testy.md`. Počty testov patria do PR a KRONIKY.
 - **In-SU test je brána mergu** pri spúšťačoch [DEFINICIE § D6](../DEFINICIE.md#d6) (tam aj kedy ho na finálnej hlave netreba opakovať).
   Runner `scripts\run_su_tests.ps1` spúšťaj **VŽDY s `-CloseWhenDone`**. Paralelné behy sa vylučujú: `exit 2` = iný beh beží alebo
   visí inštancia — počkaj. Výsledkový grep až PO dobehu. Zámok, `_dev` vo worktree a `-DryRun`: `.claude/rules/testy.md`.

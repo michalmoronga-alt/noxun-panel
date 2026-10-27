@@ -24,11 +24,15 @@
 // chybe (zlý JSON, chýba git/gh, sieť, timeout, neznámy priečinok) príkaz PUSTÍ (fail-open), nič nevypíše a skončí
 // exit 0. Falošné odmietnutie je horšie než prepustenie: text v reťazcoch a v telách heredoc / PowerShell
 // here-string (správa commitu, --body, echo, grep "git push origin main") sa za príkaz nepovažuje. Príkaz sa rozloží
-// na jednoduché príkazy (`;`, `&&`, `||`, `|`, `&`, nový riadok, zátvorky) a posudzuje sa len prvé slovo každého z nich
-// (po prefixoch `VAR=x`, `&`, `env`, `time`, `sudo` …); `bash -c "…"` a `powershell -Command "…"` sa rozoberú
-// jedenkrát vnorene. Nesúvisiaci príkaz opustí hneď (lacný textový test, bez spúšťania procesov).
+// na jednoduché príkazy (`;`, `&&`, `||`, `|`, `&`, nový riadok, bashový podshell `( … )`) a posudzuje sa len prvé slovo
+// každého z nich (po prefixoch `VAR=x`, `&`, `env`, `time`, `sudo`, v PowerShelli aj `if (…)`, `{`, `}` …).
+// Substitúcia `$( … )` (v PowerShelli aj `( … )`) ostáva súčasťou slova (hodnota argumentu, napr.
+// `--match-head-commit $(git rev-parse HEAD)`), no jej vnútro sa navyše posúdi samostatne ako príkaz.
+// `bash -c "…"` a `powershell -Command "…"` sa rozoberú vnorene (najviac dve úrovne). Nesúvisiaci príkaz opustí hneď
+// (lacný textový test, bez spúšťania procesov).
 // Známe medze (prepustí sa): aliasy gitu (`git ci`), príkaz vnútri `eval` / `Invoke-Expression`, premenná
-// ako priečinok (`cd $d`), po `git switch` / `checkout` / `rebase` v tom istom príkaze sa vetva nepredpovedá.
+// ako priečinok (`cd $d`), po `git switch` / `checkout` / `rebase` v tom istom príkaze sa vetva nepredpovedá,
+// príkaz vnorený hlbšie než dve úrovne, `git push origin feat/$(…)` sa posudzuje podľa textu bez substitúcie.
 //
 // Príkaz v .claude/settings.json (PreToolUse, matcher „Bash|PowerShell“, timeout 15 s):
 //   node -e "try{require(<projekt>/.claude/hooks/straz.js).run()}catch(e){}"
@@ -47,9 +51,10 @@ const PROTECTED_BRANCH = 'main';
 const G7_FILES = ['SYSTEM/PLAN.md', 'SYSTEM/STAV.md', 'SYSTEM/archiv/KRONIKA.md', 'SYSTEM/archiv/DOGFOODING_vyriesene.md'];
 const PLACEHOLDER = 'PR #?';
 const RUNNER = 'run_su_tests.ps1';
-const WRAPPERS = new Set(['env', 'time', 'command', 'builtin', 'exec', 'nohup', 'sudo', 'nice', '!', '{', 'then', 'do', 'else', 'elif',
+const WRAPPERS = new Set(['env', 'time', 'command', 'builtin', 'exec', 'nohup', 'sudo', 'nice', '!', '{', '}', 'then', 'do', 'else', 'elif',
   'if', 'while', 'until', '&', 'call']);
-const CD_NAMES = new Set(['cd', 'chdir', 'set-location', 'sl', 'pushd', 'push-location']);
+const CONTROL = new Set(['if', 'elseif', 'while', 'until', 'foreach', 'for', 'switch']);
+const CD_NAMES =new Set(['cd', 'chdir', 'set-location', 'sl', 'pushd', 'push-location']);
 const POP_NAMES = new Set(['popd', 'pop-location']);
 const BRANCH_CHANGERS = new Set(['switch', 'checkout', 'rebase']);
 const PUSH_VALUE_OPTS = new Set(['-o', '--push-option', '--repo', '--receive-pack', '--exec']);
@@ -137,7 +142,8 @@ function tokenize(cmd, shell) {
   let has = false;
   let q = false;
   let i = 0;
-  const push = () => { if (has) out.push({ t: 'w', v: cur, q }); cur = ''; has = false; q = false; };
+  let subs = [];                                  // vnútorné texty substitúcií aktuálneho slova (posudzujú sa samostatne)
+  const push = () => { if (has) out.push({ t: 'w', v: cur, q, subs }); cur = ''; has = false; q = false; subs = []; };
   const sep = (v) => { push(); out.push({ t: 's', v }); };
   while (i < n) {
     const c = s[i];
@@ -180,7 +186,7 @@ function tokenize(cmd, shell) {
       has = true; q = true; i++;
       while (i < n) {
         const ch = s[i];
-        if (ch === '$' && s[i + 1] === '(') { const j = skipSubst(s, i + 2); cur += s.slice(i, j); i = j; continue; }
+        if (ch === '$' && s[i + 1] === '(') { const j = skipSubst(s, i + 2); cur += s.slice(i, j); subs.push(s.slice(i + 2, s[j - 1] === ')' ? j - 1 : j)); i = j; continue; }
         if (!ps && ch === '`') { const j = s.indexOf('`', i + 1); const e = j < 0 ? n : j + 1; cur += s.slice(i, e); i = e; continue; }
         if (ps) {
           if (ch === '`' && i + 1 < n) { cur += s[i + 1]; i += 2; continue; }
@@ -208,10 +214,15 @@ function tokenize(cmd, shell) {
       if (s[i + 1] === '>') { cur += c; has = true; i++; continue; }           // &>
       sep('&'); i++; continue;
     }
+    if (ps && c === '{' && !has) { out.push({ t: 'w', v: '{', q: false, subs: [] }); i++; continue; }   // blok { … } (nie @{ } ani ${x})
+    if (ps && c === '}' && (cur.match(/\{/g) || []).length <= (cur.match(/\}/g) || []).length) {
+      push(); out.push({ t: 'w', v: '}', q: false, subs: [] }); i++; continue;
+    }
     if (c === '(') {
       // Substitúcia `$( … )` (aj PowerShell `( … )` a `@( … )`) je hodnota argumentu, nie samostatný príkaz:
-      // `--match-head-commit $(git rev-parse HEAD)` je platné pripnutie. Preskočí sa celá a ostane súčasťou slova.
-      if (ps || cur.endsWith('$')) { const j = skipSubst(s, i + 1); cur += s.slice(i, j); has = true; i = j; continue; }
+      // `--match-head-commit $(git rev-parse HEAD)` je platné pripnutie. Ostane súčasťou slova, no jej vnútro sa
+      // navyše posúdi samostatne (segment() → nested()), aby `out=$(git push origin main)` neprešlo.
+      if (ps || cur.endsWith('$')) { const j = skipSubst(s, i + 1); cur += s.slice(i, j); subs.push(s.slice(i + 1, s[j - 1] === ')' ? j - 1 : j)); has = true; i = j; continue; }
       sep('('); i++; continue;                                                 // podshell v bashi
     }
     if (c === ')') { sep(')'); i++; continue; }
@@ -366,16 +377,16 @@ function gitSeg(words, st) {
     return branchOf(st, dir) === PROTECTED_BRANCH ? deny('commit') : null;
   }
   if (sub !== 'push') return null;
-  const pos = [];
+  const pos = [];                                // pozičné argumenty (slová): repozitár a refspecy
   let tags = false;
   let follow = false;
   for (let k = 0; k < args.length; k++) {
     const v = args[k].v;
-    if (v === '--') { for (k++; k < args.length; k++) pos.push(args[k].v); break; }
+    if (v === '--') { for (k++; k < args.length; k++) pos.push(args[k]); break; }
     if (v === '--tags') tags = true;
     else if (v === '--follow-tags') follow = true;
     if (!args[k].q && v.length > 1 && v[0] === '-') { if (PUSH_VALUE_OPTS.has(v)) k++; continue; }
-    pos.push(v);
+    pos.push(args[k]);
   }
   const refspecs = pos.slice(1);
   const current = () => (st.branchChanged ? null : branchOf(st, dir));
@@ -383,8 +394,10 @@ function gitSeg(words, st) {
     if (tags && !follow) return null;
     return current() === PROTECTED_BRANCH ? deny('push') : null;
   }
-  for (const r of refspecs) {
-    const spec = r.replace(/^\+/, '');
+  for (const w of refspecs) {
+    // refspec je celý jedna substitúcia (`$(git branch --show-current)`): cieľ sa nedá zistiť → ako bare push, podľa aktuálnej vetvy
+    if (w.subs && w.subs.length === 1 && /^\$?\([\s\S]*\)$/.test(w.v)) { if (current() === PROTECTED_BRANCH) return deny('push'); continue; }
+    const spec = w.v.replace(/^\+/, '');
     const colon = spec.indexOf(':');
     let dest = (colon >= 0 ? spec.slice(colon + 1) : spec).replace(/^refs\/heads\//, '');
     if (colon < 0 && dest === 'HEAD') dest = current() || '';
@@ -435,12 +448,24 @@ function nested(inner, shell, st) {
 }
 
 function segment(words0, shell, st) {
+  // vnútro substitúcií `$( … )` a PowerShell `( … )` v ľubovoľnom slove sa posúdi ako samostatný príkaz
+  for (const w of words0) {
+    for (const inner of w.subs || []) {
+      const r = nested(inner, shell, st);
+      if (r) return r;
+    }
+  }
   const words = words0.slice();
+  let control = false;                           // PowerShell: za if/while/foreach… ide podmienka ( … ), nie príkaz
   while (words.length) {
     const f = words[0];
-    if (!f.q && (/^[A-Za-z_][A-Za-z0-9_]*=/.test(f.v) || WRAPPERS.has(f.v.toLowerCase()))) words.shift();
+    if (!f.q && /^[A-Za-z_][A-Za-z0-9_]*=/.test(f.v)) words.shift();
+    else if (!f.q && shell === 'powershell' && CONTROL.has(f.v.toLowerCase())) { words.shift(); control = true; }
+    else if (!f.q && WRAPPERS.has(f.v.toLowerCase())) { words.shift(); control = false; }
+    else if (control && f.v[0] === '(') { words.shift(); control = false; }
     else break;
   }
+  while (words.length && words[words.length - 1].v === '}' && !words[words.length - 1].q) words.pop();   // koniec bloku { … }
   if (!words.length) return null;
   const first = words[0].v;
   const name = cmdName(first);
@@ -484,6 +509,7 @@ function walk(items, shell, st) {
     return segment(w, shell, st);
   };
   for (const it of items) {
+    if (it.t === 'w' && !it.q && (it.v === '{' || it.v === '}')) { const r = flush(); if (r) return r; continue; }   // hranica bloku
     if (it.t === 'w') { words.push(it); continue; }
     const r = flush();
     if (r) return r;
