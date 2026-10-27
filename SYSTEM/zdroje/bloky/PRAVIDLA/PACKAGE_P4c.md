@@ -70,7 +70,21 @@ Rozpracovanú dávku vie prevziať iný implementátor (aj iný provider) **len 
 
 ## 5 · Sonda čakania (vyplní orchestrátor pred štartom)
 
-- …
+Sonda pri čakaní na review PR #485 (P4b, 27.10.2026, Claude Code 2.1.308):
+
+- **Na jednu udalosť („review dobehlo") odporúča nástroj Monitor sám Bash na pozadí s podmienkovou slučkou** (`run_in_background`,
+  slučka skončí pri splnení podmienky → jedna notifikácia); Monitor je na prúd viacerých udalostí (max 30 min, potom znova zapnúť).
+  Skill teda: Bash na pozadí so slučkou `for i in $(seq 1 40); do …; sleep 30; done` (limit ~20 min) — žiadny `sleep 600` naslepo.
+- **Podmienka nesmie stáť len na `pulls/<N>/reviews` a 👍:** prvý pokus čakal na nový review alebo 👍 a uplynul 20 min bez udalosti,
+  hoci Codex pracoval. Codex vedie **súhrnný komentár** (issue comment so značkou `<!-- codex-review-state:v1 {...} -->`), v ktorom je
+  strojovo čitateľný stav `"code_review":{"commit_sha":"…","has_any_findings":…,"status":"running"}`. Overená podmienka čakania: posledný
+  komentár so značkou `codex-review-state:v1`, `status` ≠ `running` (a `commit_sha` = hlava, ktorú čakáme); potom nálezy v review threadoch
+  (`pulls/<N>/comments`) ako doteraz. Kým značka chýba, čakať ďalej (review ešte nezačalo); po limite overiť ručne (👀, odpoveď „create an
+  environment").
+- Druhé a tretie čakanie na značku: kolo 1 PR #485 bolo v stave `running` od 06:31 do ~07:39 (≈ 68 min, 1. PR v bloku so 1000+
+  riadkami JS); po 62 min orchestrátor vyžiadal `@codex review` a stav prešiel na `completed` (`has_any_findings: true`, 3 thready) o 5 min
+  neskôr. Skill preto: limit čakania ~20 min, potom znova (stav `running` nie je chyba); po ~60 min v `running` vyžiadať `@codex review`.
+  Pri `completed` sú nálezy v `pulls/<N>/comments` so značkou `codex-code-review-finding:v1`.
 
 ## 6 · Výsledok (vyplní implementátor)
 
