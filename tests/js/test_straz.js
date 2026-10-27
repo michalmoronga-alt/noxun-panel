@@ -228,7 +228,6 @@ try {
   allow('gh pr merge 12 --merge --match-head-commit $(git rev-parse HEAD)', 'PowerShell', WT, 'PowerShell: $(…) ako hodnota');
   allow('gh pr merge 12 --disable-auto', 'Bash', WT, 'zrusenie auto-merge nie je merge');
   allow('gh pr merge --disable-auto 12', 'PowerShell', WT);
-  allow('gh pr merge 12 --disable-auto', 'Bash', WT, 'G7 sa pri --disable-auto nekontroluje');
   deny('pin', 'gh pr merge 12 --auto --disable-auto-x', 'Bash');
   allow('gh pr merge --help', 'Bash');
   allow('gh pr merge 12 --help', 'Bash');

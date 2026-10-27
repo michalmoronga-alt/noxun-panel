@@ -36,7 +36,9 @@
 // ako priečinok (`cd $d`), po `git switch` / `checkout` / `rebase` v tom istom príkaze sa vetva nepredpovedá,
 // príkaz vnorený hlbšie než dve úrovne, `git push origin feat/$(…)` sa posudzuje podľa textu bez substitúcie,
 // PowerShell `if($x){git push origin main}` / `if ($x){git push origin main}` (bez medzery pred alebo za zátvorkou) a
-// `$out = git push origin main 2>&1` (priradenie bez zátvoriek) sa prepúšťajú.
+// `$out = git push origin main 2>&1` (priradenie bez zátvoriek) sa prepúšťajú; `--disable-auto` sa hľadá v každom slove, takže
+// `gh pr merge 12 --merge -b "--disable-auto"` aj `--body --disable-auto` prejdú; vnútri `"$( … )"` v úvodzovkách sa `<<<` stále
+// berie ako heredoc, takže pri novom riadku v takej substitúcii sa zvyšok príkazu neposúdi.
 //
 // Príkaz v .claude/settings.json (PreToolUse, matcher „Bash|PowerShell“, timeout 15 s):
 //   node -e "try{require(<projekt>/.claude/hooks/straz.js).run()}catch(e){}"
