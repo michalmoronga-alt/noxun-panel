@@ -39,7 +39,7 @@ Priečinok [zdroje/bloky/PRAVIDLA/](zdroje/bloky/PRAVIDLA/) — zadanie, návrh 
 - ✅ **P3a** pravidlá oblastí (`.claude/rules/` s `paths:`, POVINNE_CITANIE rozcestník, IMPLEMENTATOR ≤ 8 kB) — PR #483
 - ✅ **P3b** postupy — skilly `uzaver-bloku` a `smoke`, ORCHESTRATOR 9,9 kB (vlastný strop 10 kB), WORKFLOW mapa bez kópií pravidiel, blok OBMEDZENIE NÁSTROJOV v jednom súbore, história zo skillu `antigravity-outside-in` — PR #484
 - ✅ **P4b** stráže — hook pred príkazom (commit a push do `main`, merge bez pripnutej hlavy, zástupné číslo PR pri merge, runner bez `-CloseWhenDone`), `po_merge.js` aj pre PowerShell — PR #485
-- **P4c** prevzatie práce — karta priebehu, `rozpracovane.ps1`, G10, čakanie cez Monitor, KRONIKA po súboroch, `session_digest.py`.
+- ✅ **P4c** prevzatie práce — karta priebehu, `rozpracovane.ps1`, G10 (zelené CI pred „hotovo“), čakanie na review podľa stavu Codexu, KRONIKA po súboroch, `session_digest.rb` — PR #486
 - **P5** hodnotenia po úlohách + karty modelov + router v0 + jedna tabuľka obsadenia (`OBSADENIE.md`, úprava modu usage-bar) · vyhodnotenie pilotu nočnej hliadky pred 5.11.2026.
 - **P6** uzáver bloku + smoke pravidiel · história a dátumy v ostatných skilloch (`codex-audit`, `codex-po-pr`, `predrecenzia`, `retro`, `usage`) + G2 na všetky skilly (hliadka P-2026-10-23-3).
 

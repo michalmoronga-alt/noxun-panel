@@ -254,6 +254,12 @@ try {
   ok(M.decide(input(MERGE12), opts).reason.includes('SYSTEM/archiv/KRONIKA.md, SYSTEM/STAV.md'), 'G7: obidva subory v dovode');
   state.diff = diff('SYSTEM/archiv/DOGFOODING_vyriesene.md', [`+D-1 vyrieseny — ${PH}`]);
   deny('g7', MERGE12, 'Bash');
+  state.diff = diff('SYSTEM/zdroje/bloky/PRAVIDLA/kronika/P4c.md', [`+**P4c (27.10.2026, ${PH})** zaznam`]);
+  deny('g7', MERGE12, 'Bash');
+  ok(M.decide(input(MERGE12), opts).reason.includes('SYSTEM/zdroje/bloky/PRAVIDLA/kronika/P4c.md'), 'G7: zaznam davky bloku v dovode');
+  state.diff = diff('SYSTEM/zdroje/bloky/PRAVIDLA/kronika/dalsi/P4c.md', [`+zaznam ${PH}`]) + diff('SYSTEM/zdroje/bloky/PRAVIDLA/kronika/P4c.txt', [`+zaznam ${PH}`]) +
+    diff('SYSTEM/zdroje/bloky/PRAVIDLA/priebeh/P4c.md', [`+karta ${PH}`]);
+  allow(MERGE12, 'Bash', WT, 'G7: `*` je jeden usek cesty (vnoreny priecinok, ina pripona, karta priebehu = bez kontroly)');
   state.diff = diff('SYSTEM/PLAN.md', [` kontext s ${PH}`, '+riadok s cislom PR #484']);                // PR # ? len v kontexte
   allow(MERGE12, 'Bash', WT, 'G7: zastupne cislo len v kontexte (nepridany riadok)');
   state.diff = diff('SYSTEM/PLAN.md', [`-stary riadok ${PH}`, '+novy riadok PR #484']);                   // odstránený riadok
@@ -379,7 +385,7 @@ try {
   const head = fs.readFileSync(path.join(ROOT, 'scripts', 'otvor_pr.ps1'), 'utf8').replace(/\r/g, '');
   const m5 = /#\s+5\.[\s\S]*?(?=\n#\s+6\.)/.exec(head);
   ok(m5, 'otvor_pr.ps1: hlavicka ma krok 5');
-  const listed = (m5[0].match(/SYSTEM\/[A-Za-z_\/]+\.md/g) || []).sort();
+  const listed = (m5[0].match(/SYSTEM\/[A-Za-z_\/*]+\.md/g) || []).sort();
   eq(listed, M.G7_FILES.slice().sort(), 'zoznam suborov G7 je zhodny so zoznamom v hlavicke otvor_pr.ps1');
 
   // --- tvar výstupu a skript ako proces ---------------------------------------------------------------------------

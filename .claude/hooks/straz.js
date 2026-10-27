@@ -53,8 +53,11 @@ const GH_TIMEOUT_MS = 8000;
 const GIT_TIMEOUT_MS = 3000;
 const STDIN_GUARD_MS = 13000;                    // poistka pod timeoutom hooku v settings.json (15 s)
 const PROTECTED_BRANCH = 'main';
-// Súbory, v ktorých scripts\otvor_pr.ps1 dopĺňa číslo PR (zhodu s hlavičkou skriptu stráži test).
-const G7_FILES = ['SYSTEM/PLAN.md', 'SYSTEM/STAV.md', 'SYSTEM/archiv/KRONIKA.md', 'SYSTEM/archiv/DOGFOODING_vyriesene.md'];
+// Súbory, v ktorých scripts\otvor_pr.ps1 dopĺňa číslo PR (zhodu s hlavičkou skriptu stráži test). `*` = jeden úsek cesty
+// (záznam dávky bloku je samostatný súbor kronika/<DAVKA>.md).
+const G7_FILES = ['SYSTEM/PLAN.md', 'SYSTEM/STAV.md', 'SYSTEM/archiv/KRONIKA.md', 'SYSTEM/archiv/DOGFOODING_vyriesene.md',
+  'SYSTEM/zdroje/bloky/*/kronika/*.md'];
+const G7_PATTERNS = G7_FILES.map((f) => new RegExp('^' + f.split('*').map((s) => s.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('[^/]+') + '$'));
 const PLACEHOLDER = 'PR #?';
 const RUNNER = 'run_su_tests.ps1';
 const WRAPPERS = new Set(['env', 'time', 'command', 'builtin', 'exec', 'nohup', 'sudo', 'nice', '!', '{', '}', 'then', 'do', 'else', 'elif',
@@ -72,7 +75,7 @@ const REASONS = {
   push: () => 'Push do main je zakázaný (AGENTS.md, Zákazy: do main vedie len PR a merge orchestrátora po bránach). Pushni vetvu práce ' +
     '(git push origin HEAD, keď nie si na main) a zmenu pošli cez PR. Opis stráže: docs/HOOKY.md.',
   pin: () => 'gh pr merge bez --match-head-commit je zakázaný: merge musí pripnúť presne tú hlavu, ktorá prešla bránami (ochrana pred ' +
-    'pretekom s cudzím pushom). Postup: sha=$(git rev-parse HEAD) a potom gh pr merge <N> --merge --match-head-commit "$sha" ' +
+    'pretekom s cudzím pushom). Postup: sha=$(gh pr view <N> --json headRefOid -q .headRefOid) PRED overovaním brán a potom gh pr merge <N> --merge --match-head-commit "$sha" ' +
     '(skill codex-po-pr, krok merge). Opis stráže: docs/HOOKY.md.',
   g7: (d) => 'V PR #' + d.number + ' zostalo v pridaných riadkoch zástupné číslo PR (' + PLACEHOLDER + ') v súbore ' + d.files.join(', ') +
     '. Číslo dopĺňa scripts\\otvor_pr.ps1 samostatným commitom; ak PR vznikol ručne, nahraď zástupné číslo číslom PR, pushni, počkaj ' +
@@ -333,6 +336,8 @@ function branchOf(st, dir) {
   return st.cache.get(dir);
 }
 
+function isG7File(p) { return G7_PATTERNS.some((re) => re.test(p)); }
+
 // Pridané riadky s PLACEHOLDER v súboroch G7_FILES → zoznam súborov (unikátny, v poradí výskytu).
 function placeholderFiles(diffText) {
   const files = [];
@@ -340,7 +345,7 @@ function placeholderFiles(diffText) {
   for (const line of String(diffText).split('\n')) {
     const m = /^diff --git a\/.* b\/(.*?)\r?$/.exec(line);
     if (m) { cur = m[1].replace(/\\/g, '/'); continue; }
-    if (cur && G7_FILES.indexOf(cur) >= 0 && line[0] === '+' && !line.startsWith('+++') && line.indexOf(PLACEHOLDER) >= 0 && files.indexOf(cur) < 0) files.push(cur);
+    if (cur && isG7File(cur) && line[0] === '+' && !line.startsWith('+++') && line.indexOf(PLACEHOLDER) >= 0 && files.indexOf(cur) < 0) files.push(cur);
   }
   return files;
 }

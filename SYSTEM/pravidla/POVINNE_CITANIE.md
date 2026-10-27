@@ -21,7 +21,7 @@ Riadok = **Ideš robiť…** → **Pred prácou POVINNE prečítaj**:
   (`KOVANIE_*`, `GHOST_*`, `MR_*`…) a `SYSTEM/zdroje/ui20/`. Keď nevieš, ktorý dokument je autorita na čo: [SYSTEM/README.md](../README.md)
 - **bugfix · diagnostiku · „prečo to padá"** → mapa „Kam sa pozrieť" v [SYSTEM/STAV.md](../STAV.md) → odsek dotknutého modulu
   v `docs/architecture/` (cez rozcestník [docs/ARCHITEKTURA.md](../../docs/ARCHITEKTURA.md)) → pri otázke **„prečo je to takto?"** najprv
-  priečinok bloku (`SYSTEM/archiv/bloky/<BLOK>/`, `SYSTEM/archiv/<BLOK>_ZAVER_*`), potom [SYSTEM/archiv/KRONIKA.md](../archiv/KRONIKA.md)
+  priečinok bloku (`SYSTEM/archiv/bloky/<BLOK>/`, `SYSTEM/archiv/<BLOK>_ZAVER_*`), pri bežiacom bloku záznamy dávok `SYSTEM/zdroje/bloky/<BLOK>/kronika/`, potom [SYSTEM/archiv/KRONIKA.md](../archiv/KRONIKA.md)
   a [SYSTEM/archiv/DOGFOODING_vyriesene.md](../archiv/DOGFOODING_vyriesene.md) **len Grepom** podľa ID dávky alebo D-čísla (stovky kB,
   celé sa nečítajú)
 - **code review · audit návrhu** → dotknuté § [SYSTEM/STANDARD.md](../STANDARD.md) (kontrakt, proti ktorému sa posudzuje; Grep podľa
