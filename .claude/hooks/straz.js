@@ -6,8 +6,10 @@
 //      --abbrev-ref HEAD`, ale funguje aj pred prvým commitom a nevráti dvojznačné `heads/main`; odpojená hlava
 //      a iná vetva = povolené);
 //   2. push do main:  `git push` s cieľom main (`origin main`, `HEAD:main`, `x:main`, `x:refs/heads/main`, aj s `+` a
-//      `--force*`, aj `--dry-run`), a `git push` / `git push origin` bez refspecu, keď je aktuálna vetva main;
-//   3. `gh pr merge` bez `--match-head-commit` (aj tvar `--match-head-commit=<sha>`; obsah hodnoty sa nekontroluje);
+//      `--force*`, aj `--dry-run`), a `git push` / `git push origin` bez refspecu, keď je aktuálna vetva main; vždy aj
+//      `--all` / `--branches` / `--mirror` (posielajú aj lokálny main; `--tags` ostáva povolené);
+//   3. `gh pr merge` bez `--match-head-commit` (aj tvar `--match-head-commit=<sha>`; obsah hodnoty sa nekontroluje;
+//      `--disable-auto` je zrušenie auto-merge, nie merge → povolené);
 //   4. G7: pri `gh pr merge <N> … --match-head-commit …` zistí `gh pr diff <N>` a odmietne, keď PRIDANÉ riadky
 //      v súboroch, kde `scripts\otvor_pr.ps1` dopĺňa číslo PR (G7_FILES), ešte obsahujú zástupné číslo PR;
 //   5. spustenie `scripts\run_su_tests.ps1` bez `-CloseWhenDone` (s `-DryRun` povolené; abreviácie parametrov
@@ -228,7 +230,10 @@ function tokenize(cmd, shell) {
       sep('('); i++; continue;                                                 // podshell v bashi
     }
     if (c === ')') { sep(')'); i++; continue; }
-    if (!ps && c === '<' && s[i + 1] === '<' && s[i + 2] !== '<') {          // heredoc
+    if (!ps && c === '<' && s[i + 1] === '<' && s[i + 2] === '<') {          // here-string <<< slovo: samostatný operátor, nie heredoc
+      push(); out.push({ t: 'w', v: '<<<', q: false, subs: [] }); i += 3; continue;
+    }
+    if (!ps && c === '<' && s[i + 1] === '<') {                              // heredoc
       i += 2;
       const dash = s[i] === '-';
       if (dash) i++;
@@ -259,8 +264,8 @@ function stripRedirects(words) {
   const res = [];
   for (let k = 0; k < words.length; k++) {
     const w = words[k];
-    if (!w.q && /^(\d*|&)(>>?|<)/.test(w.v)) {
-      if (/^(\d*|&)(>>?|<)&?$/.test(w.v)) k++;   // samotný operátor: cieľ je ďalšie slovo
+    if (!w.q && /^(\d*|&)(>>?|<{1,3})/.test(w.v)) {
+      if (/^(\d*|&)(>>?|<{1,3})&?$/.test(w.v)) k++;   // samotný operátor: cieľ je ďalšie slovo
       continue;
     }
     res.push(w);
@@ -385,6 +390,9 @@ function gitSeg(words, st) {
   for (let k = 0; k < args.length; k++) {
     const v = args[k].v;
     if (v === '--') { for (k++; k < args.length; k++) pos.push(args[k]); break; }
+    // --all / --branches / --mirror posielajú aj lokálnu vetvu main: odmietnuté vždy, bez ohľadu na aktuálnu vetvu
+    // (v tomto repe lokálny main existuje vždy; zisťovať jeho existenciu by znamenalo ďalší proces a cieľ aj tak nie je jeden refspec)
+    if (v === '--all' || v === '--branches' || v === '--mirror') return deny('push');
     if (v === '--tags') tags = true;
     else if (v === '--follow-tags') follow = true;
     if (!args[k].q && v.length > 1 && v[0] === '-') { if (PUSH_VALUE_OPTS.has(v)) k++; continue; }
@@ -418,6 +426,7 @@ function ghSeg(words, st) {
   if (!(rest.length >= 2 && rest[0].v === 'pr' && rest[1].v === 'merge')) return null;
   const args = stripRedirects(rest.slice(2));
   if (args.some((a) => a.v === '--help' || a.v === '-h')) return null;
+  if (args.some((a) => a.v === '--disable-auto')) return null;     // zrušenie auto-merge, nie merge
   let pinned = false;
   let target = null;
   for (let k = 0; k < args.length; k++) {

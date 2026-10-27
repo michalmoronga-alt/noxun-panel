@@ -23,8 +23,8 @@ PreToolUse na nástroje Bash a PowerShell (`Bash|PowerShell`), v hlavnom okne **
 | Zákaz | Odmietne | Povolené zostáva |
 |---|---|---|
 | Commit do `main` | `git commit` (aj `git -C <dir> commit`, aj za `cd <dir> &&` / `;` / `Set-Location`), keď je v cieľovom priečinku vetva `main` | iná vetva, odpojená hlava, `git commit --help`, text v reťazci / heredoc |
-| Push do `main` | `git push` s cieľom `main` (`origin main`, `HEAD:main`, `x:refs/heads/main`, aj `+` / `--force*` / `--dry-run`); `git push` bez refspecu, keď je aktuálna vetva `main` | `git push origin feat/x`, `main:feat/x`, `--tags` |
-| Merge bez pripnutej hlavy | `gh pr merge` bez `--match-head-commit` (tvar `<sha>` aj `=<sha>`; hodnota sa neskúma) | `gh pr merge --help`, `gh pr view` |
+| Push do `main` | `git push` s cieľom `main` (`origin main`, `HEAD:main`, `x:refs/heads/main`, aj `+` / `--force*` / `--dry-run`); `git push` bez refspecu, keď je aktuálna vetva `main`; vždy aj `--all` / `--branches` / `--mirror` (posielajú aj lokálny `main`) | `git push origin feat/x`, `main:feat/x`, `--tags` |
+| Merge bez pripnutej hlavy | `gh pr merge` bez `--match-head-commit` (tvar `<sha>` aj `=<sha>`; hodnota sa neskúma) | `gh pr merge --help`, `gh pr merge <N> --disable-auto` (zrušenie auto-merge), `gh pr view` |
 | Zástupné číslo PR pri merge (G7) | `gh pr merge <N> … --match-head-commit …`, keď `gh pr diff <N>` obsahuje v **pridaných** riadkoch súborov `PLAN.md`, `STAV.md`, `KRONIKA.md`, `DOGFOODING_vyriesene.md` ešte zástupné číslo PR (to dopĺňa `scripts\otvor_pr.ps1`) | merge bez čísla PR sa nekontroluje; zástupné číslo v kontexte, v odstránenom riadku alebo v inom súbore nevadí |
 | Runner bez `-CloseWhenDone` | spustenie `scripts\run_su_tests.ps1` (aj `./`, `& …`, `powershell -File …`) bez `-CloseWhenDone` | s `-CloseWhenDone` alebo `-DryRun`, čítanie či `git add` toho súboru |
 

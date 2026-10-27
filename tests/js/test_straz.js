@@ -135,6 +135,17 @@ try {
   allow('git push origin feat/$(date +%s)', 'Bash', MAIN);
   allow('$h = @{a=1}; git commit -m "${x}"', 'PowerShell', WT);
 
+  // here-string <<< nie je heredoc: riadky za nim sa nezahodia
+  deny('pin', 'cat <<< "hello"\ngh pr merge 12 --merge', 'Bash', WT);
+  deny('commit', 'cat <<< "hello"\ngit commit -m x', 'Bash', MAIN);
+  deny('commit', 'git commit -m x <<< "y"', 'Bash', MAIN);
+  deny('push', 'grep a <<< "$x"; git push origin main', 'Bash', WT);
+  deny('pin', 'cat <<< "hello"\ngh pr merge 12 --merge', 'PowerShell', WT);                // v PowerShelli <<< nič nerozbije
+  allow('cat <<< "hello"\ngh pr merge 12 --merge --match-head-commit "$sha"', 'Bash', WT);
+  allow('git commit -m x <<< "y"', 'Bash', WT);
+  deny('commit', 'cat <<EOF\ntelo\nEOF\ncat <<< "a"\ngit commit -m x', 'Bash', MAIN);        // skutočný heredoc popri <<<
+  allow('cat <<EOF\ngit commit -m x\nEOF', 'Bash', MAIN);
+
   // --- 2. push do main --------------------------------------------------------------------------
   allow('git push origin feat/x', 'Bash', MAIN);
   allow('git push -u origin feat/x', 'Bash', WT);
@@ -183,6 +194,15 @@ try {
   allow('git fetch origin main', 'Bash', WT);
   allow('git log origin/main..HEAD', 'Bash', WT);
   allow('git push origin feat/x', 'PowerShell', MAIN);
+  // --all / --mirror posielajú aj lokálny main
+  deny('push', 'git push --all origin', 'Bash', WT);
+  deny('push', 'git push origin --all', 'Bash', WT);
+  deny('push', 'git push --mirror origin', 'Bash', WT);
+  deny('push', 'git push --branches origin', 'Bash', DET);
+  deny('push', 'git push --all origin', 'PowerShell', WT);
+  deny('push', 'git push --dry-run --mirror origin', 'Bash', UNK);
+  allow('git push --tags origin', 'Bash', WT);
+  allow('git push origin feat/x -- --all', 'Bash', WT, 'za -- je --all pozicny argument (refspec), nie prepinac');
 
   // --- 3. merge bez pripnutej hlavy -------------------------------------------------------------
   state.diff = '';
@@ -206,6 +226,10 @@ try {
   allow('gh pr merge 12 --merge --match-head-commit "$(git rev-parse HEAD)"', 'Bash', WT, 'substitucia v uvodzovkach');
   allow('gh pr merge 12 --merge --match-head-commit (git rev-parse HEAD)', 'PowerShell', WT, 'PowerShell: (…) ako hodnota');
   allow('gh pr merge 12 --merge --match-head-commit $(git rev-parse HEAD)', 'PowerShell', WT, 'PowerShell: $(…) ako hodnota');
+  allow('gh pr merge 12 --disable-auto', 'Bash', WT, 'zrusenie auto-merge nie je merge');
+  allow('gh pr merge --disable-auto 12', 'PowerShell', WT);
+  allow('gh pr merge 12 --disable-auto', 'Bash', WT, 'G7 sa pri --disable-auto nekontroluje');
+  deny('pin', 'gh pr merge 12 --auto --disable-auto-x', 'Bash');
   allow('gh pr merge --help', 'Bash');
   allow('gh pr merge 12 --help', 'Bash');
   allow('gh pr view 12', 'Bash');
@@ -249,6 +273,8 @@ try {
   state.diffCalls.length = 0;
   allow('gh pr merge --merge --match-head-commit abc', 'Bash', WT, 'G7: bez cisla PR sa nekontroluje');
   eq(state.diffCalls.length, 0, 'bez cisla PR sa gh pr diff nevola');
+  allow('gh pr merge 12 --disable-auto', 'Bash', WT, 'G7: --disable-auto s pridanym zastupnym cislom v diffe');
+  eq(state.diffCalls.length, 0, '--disable-auto nevola gh pr diff');
   allow('gh pr merge --merge --match-head-commit $sha 2>&1', 'PowerShell', WT, 'PowerShell: bez cisla PR a s 2>&1');
   eq(state.diffCalls.length, 0, 'PowerShell: 2>&1 nie je cislo PR (gh pr diff 1 sa nevola)');
   eq(code('gh pr merge 12 --merge', 'Bash'), 'pin', 'bez pripnutia je dovod pin, nie g7');
@@ -325,6 +351,9 @@ try {
   eq(words('a --m (git rev-parse HEAD) b', 'powershell'), ['a', '--m', '(git rev-parse HEAD)', 'b'], 'PowerShell: ( … ) je vyraz');
   eq(words('a --m $(git rev-parse HEAD) 2>&1', 'powershell'), ['a', '--m', '$(git rev-parse HEAD)', '2>&1'], 'PowerShell: $(…) a 2>&1');
   eq(words('git commit -F - <<\'EOF\'\nbody git push origin main\nEOF\ngit status'), ['git', 'commit', '-F', '-', '<\n>', 'git', 'status'], 'heredoc telo sa vynecha');
+  eq(words('cat <<< "a b"\nx'), ['cat', '<<<', 'a b', '<\n>', 'x'], 'here-string <<<');
+  eq(words('cat <<EOF\nx y\nEOF\nz'), ['cat', '<\n>', 'z'], 'heredoc ostava heredoc');
+  eq(M.stripRedirects(M.tokenize('a <<< "b c" d', 'bash').filter((t) => t.t === 'w')).map((t) => t.v), ['a', 'd'], 'stripRedirects: <<< aj s cielom');
   eq(words('echo a # komentar\nb'), ['echo', 'a', '<\n>', 'b'], 'komentar');
   eq(words('echo a#b'), ['echo', 'a#b'], '# uprostred slova nie je komentar');
   eq(words('git commit -m "a \\" b"'), ['git', 'commit', '-m', 'a " b'], 'bash: \\" v uvodzovkach');

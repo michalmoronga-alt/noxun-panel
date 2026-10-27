@@ -28,7 +28,7 @@
   (funguje aj pred prvým commitom). `po_merge.js` reaguje aj na nástroj PowerShell. Opis hooku v `docs/HOOKY.md`; v `AGENTS.md`, `ORCHESTRATOR.md`, `IMPLEMENTATOR.md`
   (dve zmienky o `-CloseWhenDone` zjednotené na jednu, 8118 B) a skille `codex-po-pr` len jedna veta s odkazom. `ORCHESTRATOR.md` 9997 B. Rozhodnutie Michala 27.10.2026:
   vlastný strop 10 kB pre `ORCHESTRATOR.md` zapísaný do `NAVRH_STRUKTURY.md` § 9 bod 11. **Testy:** nová JS sada `test_straz.js` (každý zákaz s povoleným párom, procesové testy,
-  skutočný dočasný repozitár, zápis v `settings.json`), `test_po_merge.js` doplnený o PowerShell; Ruby 5459/0/0, JS 165 sád PASS, encoding guard PASS; in-SU netreba. **Zostáva:** živý
+  skutočný dočasný repozitár, zápis v `settings.json`), `test_po_merge.js` doplnený o PowerShell; Ruby 5459/0/0, JS 165 sád PASS, encoding guard PASS; in-SU netreba. **GH kolo 1:** 3× P2 opravené (`git push --all` / `--mirror` / `--branches` sa odmieta vždy; `gh pr merge --disable-auto` je povolené; bash here-string `<<<` už nezahodí riadky za sebou). **Zostáva:** živý
   smoke po mergi (orchestrátor v hlavnom okne, `PACKAGE_P4b.md` § 4) a dávka P4c (prevzatie práce).
 
 - **P3b · POSTUPY: SKILLY `uzaver-bloku` A `smoke`, ORCHESTRATOR POD STROP, WORKFLOW AKO MAPA (26.10.2026, PR #484, blok 10 · PRAVIDLA, trieda S — len pravidlá,
