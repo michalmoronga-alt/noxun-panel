@@ -75,7 +75,7 @@ const REASONS = {
   push: () => 'Push do main je zakázaný (AGENTS.md, Zákazy: do main vedie len PR a merge orchestrátora po bránach). Pushni vetvu práce ' +
     '(git push origin HEAD, keď nie si na main) a zmenu pošli cez PR. Opis stráže: docs/HOOKY.md.',
   pin: () => 'gh pr merge bez --match-head-commit je zakázaný: merge musí pripnúť presne tú hlavu, ktorá prešla bránami (ochrana pred ' +
-    'pretekom s cudzím pushom). Postup: sha=$(gh pr view <N> --json headRefOid -q .headRefOid) a potom gh pr merge <N> --merge --match-head-commit "$sha" ' +
+    'pretekom s cudzím pushom). Postup: sha=$(gh pr view <N> --json headRefOid -q .headRefOid) PRED overovaním brán a potom gh pr merge <N> --merge --match-head-commit "$sha" ' +
     '(skill codex-po-pr, krok merge). Opis stráže: docs/HOOKY.md.',
   g7: (d) => 'V PR #' + d.number + ' zostalo v pridaných riadkoch zástupné číslo PR (' + PLACEHOLDER + ') v súbore ' + d.files.join(', ') +
     '. Číslo dopĺňa scripts\\otvor_pr.ps1 samostatným commitom; ak PR vznikol ručne, nahraď zástupné číslo číslom PR, pushni, počkaj ' +

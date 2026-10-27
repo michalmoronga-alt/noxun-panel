@@ -32,7 +32,7 @@ Hlavné okno je orchestrátor — hovorí s Michalom, deleguje; kód pluginu a t
 
 - **Delegovanie:** implementáciu dávok, predrecenziu, kontrolu opráv, overenia a široké hľadanie robí **subagent**; orchestrátor drží
   kontext bloku, rozhodnutia a merge (dôvod: kompresia kontextu).
-- **Merge robí orchestrátor** (`gh pr merge <N> --merge --match-head-commit <SHA>` — pripnutá presne tá hlava, ktorá prešla bránami) po
+- **Merge robí orchestrátor** (`gh pr merge <N> --merge --match-head-commit <SHA>` — pripnutá presne tá hlava, ktorá prešla bránami; SHA sa načíta raz pred overovaním brán, skill `codex-po-pr` krok 5) po
   splnení OBOCH brán **pre aktuálnu hlavu vetvy**: **CI zelené** + **review kolo uzavreté**. Nikdy nemergovať hneď po pushi opráv len
   preto, že CI zbehlo skôr než review. Po mergi **návrat na čerstvý `main`** (`git checkout main && git pull`), prípadne **inštalácia
   mainu** (nižšie); ďalšia dávka štartuje odtiaľ. Vetvy na GitHube maže repo automaticky. Postup: skill `codex-po-pr`. Stráži hook

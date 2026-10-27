@@ -69,14 +69,16 @@ GitHub Codex review (rola **review PR** v tabuľke Obsadenie rolí, `SYSTEM/WORK
    gh api repos/michalmoronga-alt/noxun-panel/pulls/<N>/comments/<databaseId>/replies -f body="Opravené v <hash> — <krátko čo a ako>."
    ```
    Ak nález vedome neopravuješ, odpovedz prečo.
-5. **Merge robí orchestrátor** — až keď AKTUÁLNA hlava vetvy prešla oboma bránami:
+5. **Merge robí orchestrátor** — až keď AKTUÁLNA hlava vetvy prešla oboma bránami. **Hlavu načítaj RAZ na začiatku overovania** —
+   `sha=$(gh pr view <N> --json headRefOid -q .headRefOid)` — a obe brány (CI: `gh run list --branch <vetva> --commit "$sha"`; review: `commit_sha` = `"$sha"`)
+   vzťahuj na túto uloženú hodnotu; merge použije tú istú premennú. Ak `gh pr view` pred mergom vráti iné SHA (medzitým prišiel push), brány over odznova:
    - **Review kolo uzavreté pre aktuálny head:** buď (a) head dostal 👍 / po dokončení **vyžiadaného kola** (`completed` v súhrnnom komentári) nepribudli nové thready a všetky existujúce majú reply (oprava s hashom / zdôvodnenie), alebo (b) predchádzajúce kolo malo LEN P2/P3 a fix delta prešla **internou verifikáciou** (pravidlo delta-verifikácie, krok 3; pri triede D bránu splní kontrola opravy orchestrátorom — odsek Trieda D nižšie) — pri audit-povinnej či výrobnej/cenovej dávke **len ak prešla predrecenziou**; bez predrecenzie sa tam vyžaduje nové plné GH kolo, **okrem** 3. kola podľa výnimky (a) pravidla 3 kôl nižšie a **okrem kvótovej náhradnej brány** (Codex pod prahom podľa skillu `usage`, krok 3: slepý recenzent s reprodukciami + interná delta-verifikácia — vtedy platí v každom kole a PR to prizná; pri audit-povinnej či výrobnej/cenovej dávke alebo oprave P0/P1 len s Michalovým súhlasom), alebo (c) draft otvorený pre kvótu (krok 0) prešiel náhradnou bránou (pri audit-povinnej či výrobnej/cenovej dávke alebo oprave P0/P1 len s Michalovým súhlasom). CI býva hotové skôr než review, takže „CI zelené po pushi opráv" samo osebe NIKDY nestačí na merge. **Brána „žiadne nové thready" platí LEN pre reálne vyžiadané kolo** — ticho po nevyžiadanom kole je ticho Codexu, nie súhlas.
    - **CI zelené** na aktuálnom head commite (`gh pr checks <N>`).
    - **Commit s číslom PR** (krok 1) orchestrátor skontroloval — mení len číslo PR a stav karty priebehu.
    **Draft otvorený pre kvótu** treba pred mergom prepnúť `gh pr ready` (GitHub draft nezmerguje) — **tým sa spustí kolo Codexu**. Ak je kvóta stále
    pod prahom (`-Gate codex` exit 3), **na výsledok kola sa nečaká** — náhradná brána už prebehla; neskorší nález z tohto kola rieši **nový fix PR**.
    Ak sa kvóta medzitým obnovila, na kolo sa čaká a vybaví sa podľa krokov 2–4.
-   Merge s pripnutou odrevidovanou hlavou (ochrana pred pretekom s cudzím pushom): `sha=$(gh pr view <N> --json headRefOid -q .headRefOid)` (hlava PR, ktorú si skontroloval; orchestrátor nemusí stáť v checkoute vetvy, preto nie `git rev-parse HEAD`) → `gh pr merge <N> --merge --match-head-commit "$sha"` (bez pripnutia hlavy a s nedoplneným číslom PR merge odmietne hook, `docs/HOOKY.md`; vetvu na GitHube maže repo automaticky). Potom **návrat na čerstvý main**: `git checkout main && git pull && git branch -d <vetva>` a — **keď PR menil plugin** (`noxun_engine/`, `noxun_engine.rb`) **alebo je v SketchUpe nasadené niečo iné než main** (runner, foto okien a export test nasadzujú vetvu; značka `%TEMP%\noxun_nasadene.txt`; oboje po `gh pr merge` konštatuje hook `po_merge.js`) — **inštalácia mainu do SketchUpu** (`INSTALL_noxun_engine.ps1` z čerstvého mainu — in-SU runner nechal nasadenú rozpracovanú vetvu a updater pri rovnakom čísle verzie nič neponúkne) — ďalšia dávka štartuje výhradne odtiaľto. Over `git log origin/main --oneline -3`, že merge commit v maine naozaj je.
+   Merge s pripnutou odrevidovanou hlavou (ochrana pred pretekom s cudzím pushom): `gh pr merge <N> --merge --match-head-commit "$sha"` (`sha` uložená na začiatku kroku 5, **nie nové načítanie tesne pred mergom** a nie `git rev-parse HEAD`: orchestrátor nemusí stáť v checkoute vetvy) (bez pripnutia hlavy a s nedoplneným číslom PR merge odmietne hook, `docs/HOOKY.md`; vetvu na GitHube maže repo automaticky). Potom **návrat na čerstvý main**: `git checkout main && git pull && git branch -d <vetva>` a — **keď PR menil plugin** (`noxun_engine/`, `noxun_engine.rb`) **alebo je v SketchUpe nasadené niečo iné než main** (runner, foto okien a export test nasadzujú vetvu; značka `%TEMP%\noxun_nasadene.txt`; oboje po `gh pr merge` konštatuje hook `po_merge.js`) — **inštalácia mainu do SketchUpu** (`INSTALL_noxun_engine.ps1` z čerstvého mainu — in-SU runner nechal nasadenú rozpracovanú vetvu a updater pri rovnakom čísle verzie nič neponúkne) — ďalšia dávka štartuje výhradne odtiaľto. Over `git log origin/main --oneline -3`, že merge commit v maine naozaj je.
 6. **Záznam do reportu** (nahrádza niekdajšie hlásenie „môžeš mergovať"): čo PR mení z pohľadu používateľa · stav testov · výsledok Codex review (počet nálezov + ako vyriešené). Report ide Michalovi vždy, keď autonómny beh skončí alebo sa zastaví (najneskôr večer), zrozumiteľný z mobilu bez čítania diffu.
 
 **Trieda D (drobnosť, `SYSTEM/pravidla/DEFINICIE.md` § D3) — len kolo 1:** kolo 1 je plné GH review ako pri každom PR. Nálezy **P2/P3** →
@@ -104,12 +106,16 @@ platí, a pošle jednu notifikáciu; nástroj Monitor je na prúd viacerých uda
 - **Podmienka nestojí len na `pulls/<N>/reviews` a 👍** — Codex pracuje aj bez nich. Codex vedie **súhrnný komentár** (issue comment) so
   značkou `codex-review-state:v1` a JSON-om `"code_review":{"commit_sha":"…","status":"running"}`. Čakaj na posledný komentár s touto
   značkou, v ktorom `commit_sha` je hlava, na ktorú čakáš, a `status` nie je `running` (`completed`). Kým značka chýba, review ešte nezačalo.
-- Tvar slučky (`sha` = aktuálna hlava PR zo GitHubu, nie z miestneho checkoutu; limit 40 × 30 s):
+- Tvar slučky (`sha` = aktuálna hlava PR zo GitHubu, nie z miestneho checkoutu; limit 40 × 30 s; skončí aj vtedy, keď bot odpovedal „create an environment“ a kolo nebeží):
   ```
+  api="repos/michalmoronga-alt/noxun-panel/issues/<N>/comments?per_page=100"
   for i in $(seq 1 40); do
     sha=$(gh pr view <N> --json headRefOid -q .headRefOid)
     s=$(gh api "repos/michalmoronga-alt/noxun-panel/issues/<N>/comments?per_page=100" --jq '[.[]|select(.body|contains("codex-review-state:v1"))]|last|(.body // "")|capture("v1 (?<j>[{].*?[}]) -->").j|fromjson|.code_review|"\(.commit_sha) \(.status)"' 2>/dev/null)
     [ -n "$sha" ] && [ -n "$s" ] && [ "${s%% *}" = "$sha" ] && [ "${s##* }" != running ] && { echo "review dobehlo: $s"; break; }
+    env_t=$(gh api "$api" --jq '[.[]|select(.user.login=="chatgpt-codex-connector[bot]" and (.body|contains("create an environment")))]|last|.created_at // empty' 2>/dev/null)
+    req_t=$(gh api "$api" --jq '[.[]|select(.user.type=="User" and (.body|contains("@codex review")))]|last|.created_at // empty' 2>/dev/null)
+    [ -n "$env_t" ] && [[ "$env_t" > "$req_t" ]] && { echo "kolo nebeží (bot: create an environment) — vyžiadaj @codex review"; break; }
     sleep 30
   done
   echo "koniec: ${s:-bez znacky}"
@@ -122,7 +128,7 @@ platí, a pošle jednu notifikáciu; nástroj Monitor je na prúd viacerých uda
 ## Pasce
 
 - **Fix push nespúšťa nové kolo** — bez `@codex review` komentára čakáš na niečo, čo nebeží. Prvé kolo po `gh pr create` je jediné automatické.
-- **Ani prvé kolo nie je isté:** keď bot namiesto 👀 odpovie „To use Codex here, create an environment for this repo" (stalo sa na PR #186), automatické kolo NEBEŽÍ — vyžiadaj ho tým istým komentárom `@codex review` a budík počítaj odtiaľ. Preto sa stav vždy OVERUJE, nikdy sa nepredpokladá.
+- **Ani prvé kolo nie je isté:** keď bot namiesto 👀 odpovie „To use Codex here, create an environment for this repo" (stalo sa na PR #186 aj #486; čakacia slučka to hlási), automatické kolo NEBEŽÍ — vyžiadaj ho tým istým komentárom `@codex review` a čakanie počítaj odtiaľ. Preto sa stav vždy OVERUJE, nikdy sa nepredpokladá.
 - MERGED v `gh pr list` ≠ obsah v maine — po mergi vždy `git fetch` + `git log origin/main`.
 - Stacked PR: ak base vetva nebola zmazaná, over `gh pr view <N> --json baseRefName` a prípadne `gh pr edit <N> --base main`. (Repo má „Delete branch on merge" zapnuté, takže pasca hrozí len pri ručne vytvorených reťaziach.)
 - Slovenský text do PR/replies vždy cez `--body-file` alebo `-f body=` (nie here-string v PowerShelli).

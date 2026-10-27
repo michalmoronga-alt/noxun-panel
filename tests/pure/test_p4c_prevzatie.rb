@@ -223,6 +223,11 @@ NxTest.test('p4c: pravidla odkazuju na kartu priebehu, G10 a zaznam davky po sub
   NxTest.refute(po.include?('sha=$(git rev-parse HEAD)'), 'codex-po-pr: sha hlavy PR sa nebera z miestneho checkoutu')
   NxTest.assert(po.scan('headRefOid').length >= 2, 'codex-po-pr: sha zo `gh pr view --json headRefOid` v slucke aj pri merge')
   NxTest.assert(po.include?('koniec: ${s:-bez znacky}'), 'codex-po-pr: slucka vypise stav po limite')
+  krok5 = po[/^5\. \*\*Merge robí orchestrátor\*\*.*?^6\. /m].to_s
+  NxTest.assert(krok5.include?('RAZ') && krok5.index('gh pr view <N> --json headRefOid') < krok5.index('--commit "$sha"') && krok5.index('--commit "$sha"') < krok5.index('--match-head-commit "$sha"'),
+                'codex-po-pr krok 5: sha nacitana raz pred overovanim branami, ta ista pri mergi')
+  NxTest.assert(krok5.scan('gh pr view <N> --json headRefOid').length == 1, 'codex-po-pr krok 5: sha sa nenacitava druhy raz tesne pred mergom')
+  NxTest.assert(po.include?('chatgpt-codex-connector[bot]') && po.include?('create an environment') && po.include?('kolo nebeží'), 'codex-po-pr: slucka rozpozna odpoved bota create an environment')
 end
 
 NxTest.test('p4c: Update-NxCardState — v commite s cislom PR sa karta dávky zmenená vetvou prepne na `v review`; ostatné karty a CRLF ostanú') do
