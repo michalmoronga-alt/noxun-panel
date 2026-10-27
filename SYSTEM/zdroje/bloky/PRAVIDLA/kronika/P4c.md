@@ -17,6 +17,21 @@
   typy agentov znova vygenerované. **Predrecenzia (hlava 9a187aff) opravená:** G10 s run-id, sha hlavy PR zo `gh pr view`, karta dávky mimo bloku, stav `v review`, zastarané tvrdenia o KRONIKE (README, WORKFLOW, POVINNE_CITANIE, `codex-po-pr`),
   stráž `session_digest.rb` voči repu (veľkosť písmen na Windows, worktree aj hlavný checkout) a `github_pat_…`, nový odsek v `.claude/rules/ui.md`, § 6 packageu. **Prvé použitie nového tvaru:** táto dávka má kartu `priebeh/P4c.md` a tento záznam ako súbor. **Testy:** nový `tests/pure/test_p4c_prevzatie.rb` (polia karty
   zhodné so `rozpracovane.ps1`, `rozpracovane.ps1` nad dočasným repom so stubom `gh` — PR, vetvy s kartou, bez karty, HANDOFF, bez `gh`, zlyhané `gh`, repo bez `origin/main`; číslo PR v súbore
-  `kronika/`; `session_digest.rb` nad fixtúrou), `test_straz.js` doplnený; Ruby 5471/0/0, JS 165 sád PASS, encoding guard PASS; in-SU netreba. **Živý smoke hooku P4b:** v bežiacej session
-  orchestrátora sa nové nastavenie hookov nenačítalo (2 pokusy po mergi, `git -C <main> commit --dry-run` prešiel), priame volanie `handle()` odmietlo správne → živý smoke v novej session (otvorené).
+  `kronika/`; `session_digest.rb` nad fixtúrou), `test_straz.js` doplnený; Ruby 5471/0/0, JS 165 sád PASS, encoding guard PASS; in-SU netreba. V bežiacej session orchestrátora
+  sa nové nastavenie hookov nenačítalo (2 pokusy po mergi), preto smoke v novej session. **Živý smoke P4b (27.10.2026): PASS 11/11** (nová session z `main` `a895edf0`, `PACKAGE_P4b.md` § 4 bod 2;
+  odmietnutie = zamietnutie nástroja s dôvodom po slovensky):
+
+  | Príkaz | Nástroj | Očakávané | Skutočné |
+  |---|---|---|---|
+  | `git -C "<hlavný checkout na main>" commit --allow-empty --dry-run -m smoke` | Bash · PowerShell | odmietnuté | odmietnuté · odmietnuté — PASS |
+  | `git push --dry-run origin HEAD:main` | Bash · PowerShell | odmietnuté | odmietnuté · odmietnuté — PASS |
+  | `gh pr merge 999999 --merge` | Bash · PowerShell | odmietnuté | odmietnuté · odmietnuté — PASS |
+  | `git push --dry-run origin HEAD:refs/heads/smoke-straz` | Bash | povolené | povolené (`* [new branch] HEAD -> smoke-straz`, dry-run) — PASS |
+  | `& .\scripts\run_su_tests.ps1 -DryRun` | PowerShell | povolené | povolené (vypísal cesty SketchUpu a modelu, nič nespustil) — PASS |
+  | `& .\scripts\run_su_tests.ps1 -NeexistujuciPrepinac` | PowerShell | odmietnuté | odmietnuté — PASS |
+  | subagent (`isolation: worktree`): `git commit --allow-empty --dry-run -m smoke` | Bash | povolené | povolené (vetva `worktree-agent-…`, git: „nothing to commit") — PASS |
+  | subagent: `git -C "<hlavný checkout na main>" commit --allow-empty --dry-run -m smoke` | Bash | odmietnuté | odmietnuté — PASS |
+
+  Hook teda beží v Bash aj PowerShelli, v subagentoch tiež a `cwd` vo vstupe je worktree subagenta. Doslovný dôvod (commit do `main`): „Commit do vetvy main je zakázaný
+  (AGENTS.md, Zákazy: žiadne priame commity do main). Zmena patrí do vlastnej vetvy a cez PR; vytvor ju napr. príkazom git switch -c feat/<popis> a commituj tam. Opis stráže: docs/HOOKY.md."
   **Zostáva:** smoke prevzatia a uzáver bloku (P6), hodnotenia a router (P5).

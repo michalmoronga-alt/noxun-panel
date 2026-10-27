@@ -33,7 +33,7 @@ ani nevyexportuje** (rohovú by sklopil na dolnú, úzku rozšíril na 200). **R
 P2 (karty všetkých rolí, typy agentov generované z kariet bez dedenia `CLAUDE.md`, nová rola analytik, PR #482; smoke typov PASS 26.10.)
 P3a (pravidlá oblastí v `.claude/rules/` s `paths:`, POVINNE_CITANIE je rozcestník, IMPLEMENTATOR ≤ 8 kB, PR #483; smoke oblastí PASS 26.10.)
 a P3b (postupy uzáveru bloku a smoke sú skilly, ORCHESTRATOR pod vlastný strop 10 kB, WORKFLOW ako mapa, blok OBMEDZENIE NÁSTROJOV v jednom súbore, PR #484)
-a P4b (hook pred príkazom odmietne commit a push do `main`, merge bez pripnutej hlavy, merge so zástupným číslom PR a runner bez `-CloseWhenDone`; živý smoke v novej session čaká, PR #485)
+a P4b (hook pred príkazom odmietne commit a push do `main`, merge bez pripnutej hlavy, merge so zástupným číslom PR a runner bez `-CloseWhenDone`; živý smoke PASS 27.10. v Bash, PowerShelli aj subagentoch, PR #485)
 a P4c (prevzatie práce: karta priebehu a `rozpracovane.ps1`, zelené CI pred „hotovo“, čakanie na review podľa stavu Codexu, záznamy dávok po súboroch, výťah zo sessions, PR #486); ďalej P5 (hodnotenia po úlohách a router). Popri ňom čaká **Michalov smoke bloku 9** (94 bodov v 5 skupinách) a aktualizácia pluginu na 0.18.1 na oboch PC.
 **Zásobník z bloku:** D-154 „Exportovať všetko" · D-151 · D-152 · D-153 (podmienený) · H18b-2 mimo scope. **Luciin PC:** nevieme, či má SketchUp 2026.2 (H11 Q3 bez odpovede).
 **Otázky bez odpovede, platí návrh:** vymenované v [záverečnom dokumente](archiv/HARDENING_ZAVER_2026-10-11.md) (Otvorené body) · pri prvej rohovej v dielni overiť záves Sensys ·
@@ -41,7 +41,7 @@ a P4c (prevzatie práce: karta priebehu a `rozpracovane.ps1`, zelené CI pred �
 
 ## Ďalší krok
 
-**Blok PRAVIDLA:** živý smoke hooku P4b v novej session orchestrátora (v bežiacej sa nové nastavenie hookov nenačítalo; neškodné príkazy podľa `PACKAGE_P4b.md` § 4), potom P5 — hodnotenia po úlohách (podľa [PLAN.md](PLAN.md)).
+**Blok PRAVIDLA:** P5 — hodnotenia po úlohách (podľa [PLAN.md](PLAN.md)); živý smoke hooku P4b PASS 11/11 (27.10., `kronika/P4c.md`).
 **Michal:** smoke bloku 9 podľa [HARDENING_ZAVER_2026-10-11.md](archiv/HARDENING_ZAVER_2026-10-11.md)** — skupiny A Exporty a čísla (28) · B Inspector (25) · C Štúdio (20) · D Ochrana dát a dve okná (10) ·
 E SketchUp a štart (11, vrátane Koniec SketchUpu na 2026.2). Pred ním aktualizovať plugin na oboch PC a zavrieť všetky okná SketchUpu. Nálezy zo smoke = opravy x.y.z (dočasná skupina
 v [DOGFOODING.md](DOGFOODING.md)). Potom nový blok podľa výberu Michala. **Test na reálnej zákazke po V1.**
