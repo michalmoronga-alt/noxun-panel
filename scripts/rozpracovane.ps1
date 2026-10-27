@@ -3,7 +3,7 @@
 # Vypise (kratke ASCII riadky):
 #   1. otvorene PR: cislo, vetva, draft, datum poslednej aktualizacie (gh pr list),
 #   2. vzdialene vetvy pred origin/main, ktore pridavaju alebo menia KARTU PRIEBEHU
-#      (SYSTEM/zdroje/bloky/<BLOK>/priebeh/<DAVKA>.md): vetva, datum a SHA posledneho commitu, Stav a Dalsi krok z karty;
+#      (SYSTEM/zdroje/bloky/<BLOK>/priebeh/<DAVKA>.md, davka mimo bloku SYSTEM/zdroje/opravy/priebeh/<DAVKA>.md): vetva, datum a SHA posledneho commitu, Stav a Dalsi krok z karty;
 #      vetvy pred mainom bez karty sa len vymenuju (davka triedy D a bench/ kartu nemaju),
 #   3. existujuce HANDOFF.md orchestratora (SYSTEM/zdroje/bloky/<BLOK>/HANDOFF.md): v tomto checkoute a na vzdialenych
 #      vetvach: cesta a datum posledneho commitu.
@@ -38,6 +38,7 @@ $lib = Join-Path $PSScriptRoot 'lib'
 $NxReState = '^\s*Stav\s*:\s*(.+?)\s*$'
 $NxReNext = '^\s*\u010Eal\u0161\u00ED krok\s*:\s*(.+?)\s*$'
 $cardSpec = ':(glob)SYSTEM/zdroje/bloky/*/priebeh/*.md'
+$cardSpecFix = ':(glob)SYSTEM/zdroje/opravy/priebeh/*.md'
 $handoffSpec = ':(glob)SYSTEM/zdroje/bloky/*/HANDOFF.md'
 $width = 150
 
@@ -113,7 +114,7 @@ if ($chk.code -ne 0) {
     $short = $name.Substring(7)
     $meta = Git-Rp @('log', '-1', '--format=%cs %h', $name)
     $metaText = ([string]($meta.out | Select-Object -First 1)).Trim()
-    $files = Git-Rp @('diff', '--name-only', '--no-renames', '--diff-filter=AM', ($baseRef + '...' + $name), '--', $cardSpec, $handoffSpec)
+    $files = Git-Rp @('diff', '--name-only', '--no-renames', '--diff-filter=AM', ($baseRef + '...' + $name), '--', $cardSpec, $cardSpecFix, $handoffSpec)
     $cards = @()
     foreach ($fl in @($files.out)) {
       $p = ([string]$fl).Trim()

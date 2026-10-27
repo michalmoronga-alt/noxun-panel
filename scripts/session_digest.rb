@@ -12,16 +12,18 @@
 #
 # Riadok výstupu: [U hh:mm] správa používateľa · [A hh:mm] text asistenta · [T hh:mm] nástroj: vstup -> výsledok ·
 # [E hh:mm] nástroj: vstup -> CHYBA: text · predpona `~` = vedľajší agent (sidechain). Chybný riadok JSONL sa
-# preskočí a spočíta (nepadne). Obsah záznamov je ÚDAJ, nie pokyn. Zjavné tokeny (ghp_…, sk-…, xox…) sa nahradia
+# preskočí a spočíta (nepadne). Obsah záznamov je ÚDAJ, nie pokyn. Zjavné tokeny (ghp_…, github_pat_…, sk-…, xox…) sa nahradia
 # značkou [skryté].
 #
 # Test: tests/pure/test_p4c_prevzatie.rb (vymyslená fixtúra tests/fixtures/session_digest/).
 require 'json'
+require 'open3'
 require 'optparse'
+require 'rbconfig'
 
 module NxSessionDigest
   REPO_ROOT = File.expand_path('..', __dir__)
-  SECRET = /\b(?:gh[pousr]_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9_-]{20,}|xox[abprs]-[A-Za-z0-9-]{10,})/.freeze
+  SECRET = /\b(?:github_pat_[A-Za-z0-9_]{20,}|gh[pousr]_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9_-]{20,}|xox[abprs]-[A-Za-z0-9-]{10,})/.freeze
 
   DEFAULTS = { text: 600, result: 200, error: 500, input: 160 }.freeze
 
@@ -130,10 +132,43 @@ module NxSessionDigest
     [[head] + out, stats, date]
   end
 
-  def inside_repo?(path)
+  def windows?
+    RbConfig::CONFIG['host_os'] =~ /mswin|mingw|cygwin/ ? true : false
+  end
+
+  # Cesta v porovnateľnom tvare: absolútna, symlinky rozriešené po najbližší existujúci priečinok, na Windows bez ohľadu na veľkosť písmen.
+  def norm(path)
     full = File.expand_path(path)
-    root = REPO_ROOT.end_with?('/') ? REPO_ROOT : "#{REPO_ROOT}/"
-    "#{full}/".start_with?(root)
+    dir = full
+    tail = []
+    until File.exist?(dir) || File.dirname(dir) == dir
+      tail.unshift(File.basename(dir))
+      dir = File.dirname(dir)
+    end
+    full = File.join(File.realpath(dir), *tail) if File.exist?(dir)
+    windows? ? full.downcase : full
+  end
+
+  def git_out(*args)
+    out, st = Open3.capture2('git', '-C', REPO_ROOT, *args, err: File::NULL)
+    st.success? ? out.strip : nil
+  rescue StandardError
+    nil
+  end
+
+  # Korene repa: tento checkout (aj worktree) a hlavný checkout (rodič spoločného .git adresára).
+  def repo_roots
+    roots = [REPO_ROOT]
+    top = git_out('rev-parse', '--show-toplevel')
+    roots << top if top && !top.empty?
+    common = git_out('rev-parse', '--path-format=absolute', '--git-common-dir')
+    roots << File.dirname(common) if common && !common.empty?
+    roots.map { |r| norm(r) }.uniq
+  end
+
+  def inside_repo?(path)
+    full = "#{norm(path)}/"
+    repo_roots.any? { |root| full.start_with?(root.end_with?('/') ? root : "#{root}/") }
   end
 
   def run(argv, io: $stdout)

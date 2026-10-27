@@ -241,15 +241,15 @@ súbory nezapisuj.
   dokumentačnom PR, určuje hlavička „Údržba" v [STAV.md](../../STAV.md).
 - **Checklist uzáveru kódovej dávky:** bump VERSION (2×) + každý `?v=` v `ui/*.html` (pravidlo: `.claude/rules/ui.md`) → testy zelené →
   **odsek dotknutého modulu v `docs/architecture/<súbor>.md` aktualizovaný na mieste** → **Grepom prehľadaj tvrdenia o zoznamoch,
-  ktoré dávka mení** (typy, ikony, schémy, sekcie — napr. `TYPES`, inventár ikon v UI_DIZAJN §4, história `SCHEMA`, zoznam sekcií
-  Štúdia) a oprav každý výskyt → vyriešené D-čísla do `SYSTEM/archiv/DOGFOODING_vyriesene.md` (**plný text + PR do sekcie
+  ktoré dávka mení** (typy, ikony, schémy, sekcie; príklady v
+  `.claude/rules/kod.md`) a oprav každý výskyt → vyriešené D-čísla do `SYSTEM/archiv/DOGFOODING_vyriesene.md` (**plný text + PR do sekcie
   „Vyriešené (plné texty)" a jeden riadok navrch INDEXU v tom istom súbore**; `SYSTEM/DOGFOODING.md` drží **len otvorené**) → **prepíš `SYSTEM/STAV.md`
   (okrem triedy D) + záznam dávky: dávka bloku = súbor `SYSTEM/zdroje/bloky/<BLOK>/kronika/<DAVKA>.md`, oprava mimo bloku = odsek navrch
   „Záznamy dávok" v `SYSTEM/archiv/KRONIKA.md`** → v `SYSTEM/PLAN.md` ostáva riadok dávky
   v bloku **s ✅ a číslom PR** (presúva sa až s uzáverom bloku).
 - **Checklist dokumentačného PR:** záznam dávky (súbor alebo odsek KRONIKY) **áno**; STAV podľa hlavičky „Údržba"; VERSION ani `?v=` **nie**.
-- **Číslo PR** (PLAN, KRONIKA, STAV, `DOGFOODING_vyriesene`): pred `gh pr create` sa píše `PR #?`; číslo doplní `scripts\otvor_pr.ps1`
-  (PR aj samostatný commit s číslom; `-CoAuthor` povinný).
+- **Číslo PR** (PLAN, KRONIKA aj záznam `kronika/`, STAV, `DOGFOODING_vyriesene`): pred `gh pr create` sa píše `PR #?`; číslo doplní `scripts\otvor_pr.ps1`
+  (PR aj samostatný commit s číslom; `-CoAuthor` povinný; záloha a draft pri nízkej kvóte: hlavička skriptu).
 
 > **Vložená sekcia `testovanie` zo súboru `SYSTEM/pravidla/roly/IMPLEMENTATOR.md`** (odkazy v nej sú relatívne k tomu súboru).
 

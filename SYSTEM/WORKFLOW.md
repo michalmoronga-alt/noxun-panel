@@ -277,7 +277,7 @@ ORCHESTRATOR.md, Autonómne bloky · **in-SU na finálnej hlave** — [DEFINICIE
 (Testovanie) · **kvóta Codexu** (`-Gate codex`) pred auditom návrhu aj pred otvorením PR — skill `usage` · **PR otvára implementátor**,
 pri povinnej predrecenzii až na pokyn orchestrátora — IMPLEMENTATOR.md (Postup) · **číslo PR** (`PR #?`, potom samostatný commit skriptom
 `scripts\otvor_pr.ps1`, ktorý pred mergom skontroluje orchestrátor) — IMPLEMENTATOR.md (Verzia a uzáver dávky).
-**Dokumentačné PR** (bez kódu pluginu) idú skrátene: vetva `docs/…` → odsek v KRONIKE → headless testy (guardy dokumentácie) → kvóta →
+**Dokumentačné PR** (bez kódu pluginu) idú skrátene: vetva `docs/…` → záznam dávky (súbor `kronika/` bloku, mimo bloku odsek v KRONIKE) → headless testy (guardy dokumentácie) → kvóta →
 PR → číslo PR → review → merge; čo sa pri nich robí a nerobí (verzia, `?v=`, predrecenzia, STAV): IMPLEMENTATOR.md (Verzia a uzáver
 dávky), hlavička „Údržba" v [STAV.md](STAV.md) a [DEFINICIE § D4](pravidla/DEFINICIE.md#d4).
 

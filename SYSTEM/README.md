@@ -96,7 +96,7 @@ a [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md) — **len Gre
 - **Každý koncept v `zdroje/next_sessions/`** nesie riadok `> Stav: KONCEPT` ako **prvý
   obsahový riadok hneď pod H1** — nie kdekoľvek v súbore.
 - **STAV je krátky** (max 80 riadkov a 12 kB) a má stabilnú kostru piatich sekcií.
-  Nahradený text ide odsekom navrch „Záznamy dávok" v `archiv/KRONIKA.md`.
+  Nahradený text ide do záznamu dávky (súbor `zdroje/bloky/<BLOK>/kronika/`, oprava mimo bloku odsek navrch v `archiv/KRONIKA.md`).
 - **PLAN je krátky** (max 280 riadkov a 40 kB, od dávky H1 1.10.2026) — keď strop nestačí, v PLAN
   ostal hotový blok alebo zadanie dávky, ktoré patrí do priečinka bloku.
 - **Žiadny riadok nad 400 znakov** v živých docs — jeden odsek na jednom obrom riadku

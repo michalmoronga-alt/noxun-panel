@@ -18,5 +18,7 @@ paths:
 Architektúra sa udržiava priebežne: dávka, ktorá mení modul, prepíše JEHO odsek v `docs/architecture/` (nikdy nie text na koniec
 súboru); nový modul = nový odsek aj nový riadok v tabuľke rozcestníka (guard test to stráži).
 
+Tvrdenia o zoznamoch, ktoré dávka mení, prehľadaj Grepom (príklady: `TYPES`, inventár ikon v UI_DIZAJN §4, história `SCHEMA`, zoznam sekcií Štúdia).
+
 Uzáver kódovej dávky (VERSION, odsek modulu v `docs/architecture/`, STAV, KRONIKA):
 [IMPLEMENTATOR.md, Verzia a uzáver dávky](../../SYSTEM/pravidla/roly/IMPLEMENTATOR.md#verzia).

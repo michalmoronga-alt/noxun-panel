@@ -21,6 +21,8 @@ paths:
   [SYSTEM/zdroje/ui20/UI20_KONTRAKT.md](../../SYSTEM/zdroje/ui20/UI20_KONTRAKT.md) (Š2 stĺpce),
 - trvalé pravidlo **„vertikálny priestor panela je vzácny"** (autorita UI_DIZAJN §1).
 
+Nový JS modul = nový riadok v rozcestníku `docs/ARCHITEKTURA.md` a odsek v `docs/architecture/ui-lifecycle.md`, nikdy text na koniec súboru.
+
 **Cache-bust:** každý `?v=` v `ui/*.html` = presne VERSION (CEF cachuje css/js; stráži guard test).
 Zmena css/js ⇒ bump verzie ⇒ prepíš všetky `?v=`.
 

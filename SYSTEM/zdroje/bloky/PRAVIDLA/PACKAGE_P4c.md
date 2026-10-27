@@ -88,4 +88,12 @@ Sonda pri čakaní na review PR #485 (P4b, 27.10.2026, Claude Code 2.1.308):
 
 ## 6 · Výsledok (vyplní implementátor)
 
-- …
+- **Hotové podľa § 1:** šablóna `SYSTEM/pravidla/sablony/PRIEBEH.md` a pravidlo karty v `IMPLEMENTATOR.md` (karta dávky bloku v `SYSTEM/zdroje/bloky/<BLOK>/priebeh/`, dávky mimo
+  bloku v `SYSTEM/zdroje/opravy/priebeh/`; stav `aktívna` / `odložená` / `v review`, ktorý v commite s číslom PR nastaví `otvor_pr.ps1`) · G10 (postup v `.claude/rules/testy.md`) ·
+  `scripts/rozpracovane.ps1` (PR, vetvy s kartou, vetvy bez karty, HANDOFF; volá ho `start_okna.ps1`, `To-SafeLine` v `scripts/lib/nx_text.ps1`) · KRONIKA po súboroch (`otvor_pr.ps1`,
+  `nx_pr.ps1`, `straz.js`, skill `uzaver-bloku`, hlavička KRONIKY) · čakanie na review v `codex-po-pr` podľa sondy § 5 · `scripts/session_digest.rb` s fixtúrou a vetou v `ANALYTIK.md`.
+- **Odchýlky:** výťah zo sessions je `.rb` (nie `.py`); sekcia „Architektúra na mieste“ z `IMPLEMENTATOR.md` presunutá do `.claude/rules/kod.md` a príklady zoznamov tiež (strop 8 kB drží);
+  `rozpracovane.ps1` vypisuje navyše vetvy bez karty a HANDOFF z vetiev; tvar čakacej slučky overený proti PR #485 (stav `completed`, jq výraz bez `\{`).
+- **Po predrecenzii doplnené:** G10 s run-id a `--exit-status`; sha hlavy PR z `gh pr view --json headRefOid` (slučka aj merge); karta dávky mimo bloku; stav `v review`; zastarané tvrdenia o
+  KRONIKE; stráž `session_digest.rb` voči repu na Windows (veľkosť písmen, worktree aj hlavný checkout) a `github_pat_…`.
+- **Veľkosti (B bez CR):** `IMPLEMENTATOR.md` ≤ 8192, `ORCHESTRATOR.md` ≤ 10240 (presné čísla v KRONIKE dávky).

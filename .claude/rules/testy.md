@@ -20,6 +20,8 @@ Brány testovania všeobecne: [IMPLEMENTATOR.md, sekcia Testovanie](../../SYSTEM
   vypíše `JS: N sad, M PASS, K FAIL`, exit 1 pri zlyhaní; `-FailFast` skončí po prvom pade.
   **Pasca:** `node tests/js/test_*.js` spustí len PRVÝ súbor, zvyšok sú preň argumenty; CI robí bash slučku
   `for f in tests/js/test_*.js; do node "$f" || exit 1; done`.
+- **CI pushnutej hlavy (G10):** `id=$(gh run list --branch <vetva> --commit <sha> --json databaseId -q '.[0].databaseId')` → `gh run watch $id --exit-status`.
+  Holé `gh run watch` mimo terminálu nefunguje (chce run-id) a bez `--exit-status` skončí 0 aj pri červenom CI; run nemusí hneď existovať — `gh run list` zopakuj.
 - STAV drží jeden riadok posledného behu; počty testov každého behu patria do PR a KRONIKY.
 
 **In-SU runner `scripts\run_su_tests.ps1`** (pravidlá — `-CloseWhenDone` vždy, brána mergu, paralelné behy — sú v IMPLEMENTATOR.md)

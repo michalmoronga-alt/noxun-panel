@@ -95,3 +95,32 @@ function Update-NxPrNumber([string]$Repo, [string]$BaseRef, [string]$Number, [sw
   }
   return $changed
 }
+
+# Karta priebehu (SYSTEM/pravidla/sablony/PRIEBEH.md) v commite s cislom PR: `Stav: v review (PR #N)` a
+# `Dalsi krok: review PR #N, merge robi orchestrator` (s diakritikou - znaky z kodov, subor je ASCII).
+# Menia sa LEN karty, ktore vetva pridala alebo zmenila voci $BaseRef; vracia pole ciest zmenenych (alebo by sa zmenili pri -DryRun) kariet.
+$NxCardSpecs = @(':(glob)SYSTEM/zdroje/bloky/*/priebeh/*.md', ':(glob)SYSTEM/zdroje/opravy/priebeh/*.md')
+
+function Update-NxCardState([string]$Repo, [string]$BaseRef, [string]$Number, [switch]$DryRun) {
+  $labelNext = ([string][char]0x010E) + 'al' + ([string][char]0x0161) + ([string][char]0x00ED) + ' krok'
+  $valueNext = 'review PR #' + $Number + ', merge rob' + ([string][char]0x00ED) + ' orchestr' + ([string][char]0x00E1) + 'tor'
+  $valueState = 'v review (PR #' + $Number + ')'
+  $r = Invoke-NxNative 'git' (@('-C', $Repo, 'diff', '--name-only', '--no-renames', '--diff-filter=AM', "$BaseRef...HEAD", '--') + $NxCardSpecs)
+  if ($r.code -ne 0) { throw "git diff zlyhal pre karty priebehu (exit $($r.code))" }
+  $utf8 = New-Object System.Text.UTF8Encoding($false)
+  $done = @()
+  foreach ($l in $r.out) {
+    $rel = ([string]$l).Trim()
+    if (-not $rel) { continue }
+    $path = Join-Path $Repo $rel
+    if (-not (Test-Path -LiteralPath $path)) { continue }
+    $text = [System.IO.File]::ReadAllText($path, $utf8)
+    $new = ([regex]'(?m)^(Stav[ \t]*:)[^\r\n]*').Replace($text, ('${1} ' + $valueState), 1)
+    $new = ([regex]('(?m)^(' + [regex]::Escape($labelNext) + '[ \t]*:)[^\r\n]*')).Replace($new, ('${1} ' + $valueNext), 1)
+    if ($new -ne $text) {
+      if (-not $DryRun) { [System.IO.File]::WriteAllText($path, $new, $utf8) }
+      $done += $rel
+    }
+  }
+  return $done
+}

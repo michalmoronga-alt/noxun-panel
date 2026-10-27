@@ -37,7 +37,8 @@ module NxP4c
   end
 
   def self.cards
-    Dir[File.join(ROOT, 'SYSTEM', 'zdroje', 'bloky', '*', 'priebeh', '*.md')].sort
+    (Dir[File.join(ROOT, 'SYSTEM', 'zdroje', 'bloky', '*', 'priebeh', '*.md')] +
+     Dir[File.join(ROOT, 'SYSTEM', 'zdroje', 'opravy', 'priebeh', '*.md')]).sort
   end
 end
 
@@ -76,7 +77,7 @@ NxTest.test('p4c: sablona karty priebehu obsahuje polia, ktore cita rozpracovane
     txt = NxP4c.read(path)
     rel = path.sub("#{NxTest::ROOT}/", '')
     st = NxP4c.field(txt, 'NxReState')
-    NxTest.assert(st && (st == 'aktívna' || st.start_with?('odložená')), "#{rel}: Stav je `aktívna` alebo `odložená — dôvod` (je: #{st.inspect})")
+    NxTest.assert(st && (st == 'aktívna' || st.start_with?('odložená') || st.start_with?('v review (PR #')), "#{rel}: Stav je `aktívna`, `odložená — dôvod` alebo `v review (PR #N)` (je: #{st.inspect})")
     NxTest.assert(!NxP4c.field(txt, 'NxReNext').to_s.strip.empty?, "#{rel}: chyba riadok `Ďalší krok:`")
   end
 end
@@ -106,6 +107,7 @@ def nx_p4c_repo(root)
     NxP4a.git(main, 'checkout', '-q', 'main')
   end
   mk.call('feat/karta', 'SYSTEM/zdroje/bloky/PRAVIDLA/priebeh/PX.md' => CARD_TEXT)
+  mk.call('feat/oprava', 'SYSTEM/zdroje/opravy/priebeh/FIX1.md' => CARD_TEXT.sub('Stav: odložená — čaká na limit', 'Stav: aktívna'))
   mk.call('feat/bez-karty', 'a.txt' => "a\n")
   mk.call('feat/handoff', 'SYSTEM/zdroje/bloky/DEF/HANDOFF.md' => "h\n")
   mk.call('feat/stara', {})
@@ -130,7 +132,8 @@ NxTest.test('p4c: rozpracovane.ps1 — PR, vetvy s kartou (Stav, Dalsi krok), ve
     NxTest.assert(out.include?('PR otvorene: 2'), "pocet PR (#{out})")
     NxTest.assert(out =~ %r{^ {2}#486 feat/karta DRAFT 2026-10-27 - docs: P4c .alsi$}, "PR 486 draft (#{out})")
     NxTest.assert(out =~ %r{^ {2}#487 feat/x 2026-10-26 - fix$}, "PR 487 nie draft (#{out})")
-    NxTest.assert(out.include?('Vetvy pred main s kartou priebehu: 1'), "jedna vetva s kartou (#{out})")
+    NxTest.assert(out.include?('Vetvy pred main s kartou priebehu: 2'), "dve vetvy s kartou (#{out})")
+    NxTest.assert(out =~ %r{^ {2}feat/oprava \[FIX1\] \d{4}-\d{2}-\d{2} [0-9a-f]+ \| Stav: aktivna \| Dalsi krok: }, "karta davky mimo bloku (#{out})")
     NxTest.assert(out =~ %r{^ {2}feat/karta \[PX\] \d{4}-\d{2}-\d{2} [0-9a-f]+ \| Stav: odlozena - caka na limit \| Dalsi krok: dokoncit test .?\[31m cerveny$}, "riadok karty (#{out})")
     NxTest.assert(out =~ /bez karty[^:]*: .*feat\/bez-karty/ && out =~ /bez karty[^:]*: .*feat\/handoff/, "vetvy bez karty (#{out})")
     NxTest.refute(out.include?('feat/stara'), 'vetva zhodna s mainom sa nevypisuje')
@@ -146,7 +149,7 @@ NxTest.test('p4c: rozpracovane.ps1 — bez gh, zlyhane gh, prazdny zoznam PR, re
     repo = nx_p4c_repo(root)
     out, st = nx_p4c_rozp(repo, root, {}, gh: 'neexistujuci-gh-xyz')
     NxTest.assert(st.success? && out.include?('gh nie je dostupne'), "bez gh (#{out})")
-    NxTest.assert(out.include?('Vetvy pred main s kartou priebehu: 1'), 'vetvy sa vypisu aj bez gh')
+    NxTest.assert(out.include?('Vetvy pred main s kartou priebehu: 2'), 'vetvy sa vypisu aj bez gh')
     out, st = nx_p4c_rozp(repo, root, { 'NX_STUB_FAIL' => '1' })
     NxTest.assert(st.success? && out.include?('zoznam sa nepodarilo nacitat'), "gh zlyhalo (#{out})")
     out, st = nx_p4c_rozp(repo, root, { 'NX_STUB_JSON' => '[]' })
@@ -205,7 +208,9 @@ end
 NxTest.test('p4c: pravidla odkazuju na kartu priebehu, G10 a zaznam davky po suboroch') do
   impl = NxP4c.read(File.join(NxTest::ROOT, 'SYSTEM', 'pravidla', 'roly', 'IMPLEMENTATOR.md'))
   %w[sablony/PRIEBEH.md priebeh/ kronika/ CI].each { |k| NxTest.assert(impl.include?(k), "IMPLEMENTATOR.md zmienuje #{k}") }
-  NxTest.assert(impl.include?('gh run watch'), 'IMPLEMENTATOR.md: G10 (gh run watch)')
+  testy = NxP4c.read(File.join(NxTest::ROOT, '.claude', 'rules', 'testy.md'))
+  NxTest.assert(impl.include?('rules/testy.md') && impl.include?('opravy/priebeh'), 'IMPLEMENTATOR.md: G10 odkazuje na testy.md, karta mimo bloku')
+  NxTest.assert(testy.include?('gh run watch $id --exit-status') && testy.include?('--commit <sha>'), 'testy.md: G10 s run-id, --commit a --exit-status')
   kron = NxP4c.read(File.join(NxTest::ROOT, 'SYSTEM', 'archiv', 'KRONIKA.md'))
   NxTest.assert(kron[0, 1500].include?('kronika/'), 'hlavicka KRONIKY menuje zaznamy po suboroch')
   uz = NxP4c.read(File.join(NxTest::ROOT, '.claude', 'skills', 'uzaver-bloku', 'SKILL.md'))
@@ -215,6 +220,36 @@ NxTest.test('p4c: pravidla odkazuju na kartu priebehu, G10 a zaznam davky po sub
   po = NxP4c.read(File.join(NxTest::ROOT, '.claude', 'skills', 'codex-po-pr', 'SKILL.md'))
   NxTest.assert(po.include?('codex-review-state'), 'codex-po-pr: cakanie na znacku codex-review-state')
   NxTest.refute(po.include?('`sleep 600`'), 'codex-po-pr: budik sleep 600 naslepo nahradeny')
+  NxTest.refute(po.include?('sha=$(git rev-parse HEAD)'), 'codex-po-pr: sha hlavy PR sa nebera z miestneho checkoutu')
+  NxTest.assert(po.scan('headRefOid').length >= 2, 'codex-po-pr: sha zo `gh pr view --json headRefOid` v slucke aj pri merge')
+  NxTest.assert(po.include?('koniec: ${s:-bez znacky}'), 'codex-po-pr: slucka vypise stav po limite')
+end
+
+NxTest.test('p4c: Update-NxCardState — v commite s cislom PR sa karta dávky zmenená vetvou prepne na `v review`; ostatné karty a CRLF ostanú') do
+  NxP4a.need_pwsh!
+  lib = File.join(NxP4a::SCRIPTS, 'lib', 'nx_pr.ps1')
+  Dir.mktmpdir('p4c-card-') do |root|
+    stara = "Stav: aktívna\nĎalší krok: stará karta\n"
+    main = NxP4a.make_repo(root, 'SYSTEM/zdroje/bloky/PRAVIDLA/priebeh/STARA.md' => stara, 'README.md' => "# r\n")
+    NxP4a.git(main, 'checkout', '-q', '-b', 'feat/p4c-card')
+    NxP4a.write(main, 'SYSTEM/zdroje/bloky/PRAVIDLA/priebeh/NOVA.md', "# Priebeh\r\n\r\nStav: aktívna\r\nĎalší krok: dokončiť dávku\r\nRobil: x\r\n")
+    NxP4a.write(main, 'SYSTEM/zdroje/opravy/priebeh/FIX.md', "Stav: odložená — limit\nĎalší krok: pokračovať\n")
+    NxP4a.git(main, 'add', '-A')
+    NxP4a.git(main, 'commit', '-q', '-m', 'davka')
+    cmd = ". '#{lib}'; Update-NxCardState '#{main}' 'main' '486' -DryRun | ForEach-Object { Write-Output $_ }"
+    out, st = NxP4a.ps_cmd(cmd)
+    NxTest.assert(st.success? && out.split(/\r?\n/).map(&:strip).reject(&:empty?).sort == %w[SYSTEM/zdroje/bloky/PRAVIDLA/priebeh/NOVA.md SYSTEM/zdroje/opravy/priebeh/FIX.md], "dry-run hlási len karty vetvy (#{out})")
+    NxTest.assert(NxP4a.read(main, 'SYSTEM/zdroje/bloky/PRAVIDLA/priebeh/NOVA.md').include?("Stav: aktívna\r\n"), 'dry-run nič nezapísal')
+    out, st = NxP4a.ps_cmd(". '#{lib}'; Update-NxCardState '#{main}' 'main' '486' | Out-Null")
+    NxTest.assert(st.success?, "ps: #{out}")
+    nova = NxP4a.read(main, 'SYSTEM/zdroje/bloky/PRAVIDLA/priebeh/NOVA.md')
+    NxTest.assert(nova.include?("Stav: v review (PR #486)\r\nĎalší krok: review PR #486, merge robí orchestrátor\r\nRobil: x\r\n"), "stav aj ďalší krok, CRLF zachované (#{nova.inspect})")
+    fix = NxP4a.read(main, 'SYSTEM/zdroje/opravy/priebeh/FIX.md')
+    NxTest.assert(fix.start_with?("Stav: v review (PR #486)\nĎalší krok: review PR #486, merge robí orchestrátor\n"), "karta dávky mimo bloku (#{fix.inspect})")
+    NxTest.assert_equal(stara, NxP4a.read(main, 'SYSTEM/zdroje/bloky/PRAVIDLA/priebeh/STARA.md'), 'karta, ktorú vetva nemenila, ostáva')
+    # výsledný stav musí prejsť guardom stavov a prečítať ho rozpracovane.ps1
+    NxTest.assert_equal('v review (PR #486)', NxP4c.field(nova, 'NxReState'), 'rozpracovane.ps1 prečíta stav `v review`')
+  end
 end
 
 # --- session_digest.rb ---------------------------------------------------------------------------------------------
@@ -259,21 +294,28 @@ NxTest.test('session_digest: --since, --max-result, tokeny sa skryju, vystup v r
     NxTest.refute(txt.include?('Starsia vymyslena'), '--since vyradi starsiu session')
     NxTest.assert(txt.include?('[T 08:00] Read: /vymyslene/zadanie.md -> Prvy riadok zadania.…[+'), '--max-result orezava')
 
+    pat = "github_pat_#{'B' * 30}"
     token = "ghp_#{'A' * 36}"
     one = File.join(dir, 'tajna.jsonl')
     File.write(one, JSON.generate('type' => 'user', 'timestamp' => '2026-10-20T09:00:00.000Z',
-                                  'message' => { 'role' => 'user', 'content' => "Token #{token} a heslo" }) + "\n", encoding: 'UTF-8')
+                                  'message' => { 'role' => 'user', 'content' => "Token #{token} a #{pat} a heslo" }) + "\n", encoding: 'UTF-8')
     code, = nx_p4c_digest(['--in', one, '--out', out])
     NxTest.assert_equal(0, code, 'jeden subor .jsonl')
     txt = File.read(out, encoding: 'UTF-8')
-    NxTest.refute(txt.include?(token), 'token sa nevypisuje')
-    NxTest.assert(txt.include?('Token [skryté] a heslo'), 'token nahradeny znackou')
+    NxTest.refute(txt.include?(token) || txt.include?(pat), 'tokeny sa nevypisuju')
+    NxTest.assert(txt.include?('Token [skryté] a [skryté] a heslo'), 'tokeny nahradene znackou (aj github_pat_)')
 
     code, msg = nx_p4c_digest(['--in', SD_FIXTURE, '--out', File.join(NxTest::ROOT, 'digest_nesmie_vzniknut.txt')])
     NxTest.assert_equal(2, code, 'vystup v repe sa odmietne')
     NxTest.assert(msg.include?('MIMO repa') && !File.exist?(File.join(NxTest::ROOT, 'digest_nesmie_vzniknut.txt')), 'hlaska a nic sa nezapisalo')
     code, = nx_p4c_digest(['--in', SD_FIXTURE])
     NxTest.assert_equal(2, code, 'bez --out')
+    NxSessionDigest.repo_roots.each do |r|
+      NxTest.assert(NxSessionDigest.inside_repo?(File.join(r, 'vnutri', 'digest.txt')), "vystup pod korenom repa sa odmietne: #{r}")
+    end
+    NxTest.assert(NxSessionDigest.inside_repo?(File.join(NxTest::ROOT, 'nie', 'je', 'este', 'digest.txt')), 'este neexistujuca cesta v repe sa odmietne')
+    NxTest.assert(NxSessionDigest.inside_repo?(NxTest::ROOT.upcase + '/x.txt') || !NxSessionDigest.windows?, 'na Windows sa velkost pismen nerozlisuje')
+    NxTest.refute(NxSessionDigest.inside_repo?(File.join(dir, 'x.txt')), 'docasny priecinok mimo repa je v poriadku')
     prazdny = File.join(dir, 'prazdny')
     FileUtils.mkdir_p(prazdny)
     code, = nx_p4c_digest(['--in', prazdny, '--out', File.join(dir, 'x.txt')])
