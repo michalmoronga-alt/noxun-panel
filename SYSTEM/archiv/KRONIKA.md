@@ -1,6 +1,7 @@
 # Kronika dávok (append-only)
 
 > **Kanonická história práce.** Uzáver každej dávky/etapy = JEDEN nový odsek navrch sekcie „Záznamy dávok" — nič sa tu neprepisuje ani nemaže.
+> Záznam dávky **bloku** je samostatný súbor `SYSTEM/zdroje/bloky/<BLOK>/kronika/<DAVKA>.md` (rovnaký tvar ako odsek nižšie); pri uzávere bloku sa zlúči sem a priečinok `kronika/` ide s blokom do archívu. Odsek navrch píšu už len opravy mimo bloku.
 > Číta sa len pri otázke **„prečo je X takto?"**; na „kde sme teraz" slúži [../STAV.md](../STAV.md), na „čo sa ide robiť" [../PLAN.md](../PLAN.md).
 > Obsah je presunutý (nie skopírovaný) zo sekcií „Kde sme" a „Hotové etapy" zrušenej roadmapy `SYSTEM/04_ROADMAP.md` (11.8.2026) — prozaické texty sú pôvodné, upravené sú výhradne relatívne cesty odkazov.
 
@@ -16,6 +17,20 @@
 | [05_DILEMA_ui_architektura.md](05_DILEMA_ui_architektura.md) | uzavreté rozhodnutie: Inspector-first architektúra UI (+ zoznam funkcií Picker 2.0) |
 
 ## Záznamy dávok (najnovšie hore)
+
+- **P4b · STRÁŽE: HOOK PRED PRÍKAZOM (27.10.2026, PR #485, blok 10 · PRAVIDLA, trieda S — len hooky, ich testy, nastavenie Claude Code a dokumentácia; kód pluginu, VERSION ani `?v=` bez zmeny).**
+  Čo sa nesmie stať ani raz, zastaví stroj skôr, než príkaz zbehne. **Čo sa zmenilo:** nový hook `.claude/hooks/straz.js` (PreToolUse, matcher `Bash|PowerShell`,
+  hlavné okno aj subagenti) odmietne: commit do `main` (aj `git -C <dir> commit`, `cd <dir> &&`, `Set-Location`), push do `main` (`origin main`, `HEAD:main`, `x:refs/heads/main`,
+  aj s `+` / `--force*` / `--dry-run`, bare push na `main`), `gh pr merge` bez `--match-head-commit`, merge PR, ktorého pridané riadky v `PLAN.md`, `STAV.md`, `KRONIKA.md`
+  a `DOGFOODING_vyriesene.md` ešte nesú zástupné číslo PR (G7; zoznam súborov je jedna konštanta a test ju porovnáva s hlavičkou `otvor_pr.ps1`), a spustenie
+  `scripts\run_su_tests.ps1` bez `-CloseWhenDone` (s `-DryRun` povolené). **Návrh:** príkaz sa rozloží na jednoduché príkazy a posudzuje sa len prvé slovo každého
+  (text v úvodzovkách, heredoc a `$(cat <<'EOF' …)` s úvodzovkami v tele sa za príkaz nepovažuje); pri každej vlastnej chybe príkaz prejde (CI a ochrana vetvy sú posledná
+  brána). Formát odmietnutia: JSON `permissionDecision: "deny"` s dôvodom, exit 0 (dokumentácia hookov Claude Code). Vetva sa zisťuje cez `git symbolic-ref -q HEAD`
+  (funguje aj pred prvým commitom). `po_merge.js` reaguje aj na nástroj PowerShell. Opis hooku v `docs/HOOKY.md`; v `AGENTS.md`, `ORCHESTRATOR.md`, `IMPLEMENTATOR.md`
+  (dve zmienky o `-CloseWhenDone` zjednotené na jednu, 8118 B) a skille `codex-po-pr` len jedna veta s odkazom. `ORCHESTRATOR.md` 9997 B. Rozhodnutie Michala 27.10.2026:
+  vlastný strop 10 kB pre `ORCHESTRATOR.md` zapísaný do `NAVRH_STRUKTURY.md` § 9 bod 11. **Testy:** nová JS sada `test_straz.js` (každý zákaz s povoleným párom, procesové testy,
+  skutočný dočasný repozitár, zápis v `settings.json`), `test_po_merge.js` doplnený o PowerShell; Ruby 5459/0/0, JS 165 sád PASS, encoding guard PASS; in-SU netreba. **GH kolo 1:** 3× P2 opravené (`git push --all` / `--mirror` / `--branches` sa odmieta vždy; `gh pr merge --disable-auto` je povolené; bash here-string `<<<` už nezahodí riadky za sebou). **Zostáva:** živý
+  smoke po mergi (orchestrátor v hlavnom okne, `PACKAGE_P4b.md` § 4) a dávka P4c (prevzatie práce).
 
 - **P3b · POSTUPY: SKILLY `uzaver-bloku` A `smoke`, ORCHESTRATOR POD STROP, WORKFLOW AKO MAPA (26.10.2026, PR #484, blok 10 · PRAVIDLA, trieda S — len pravidlá,
   skilly, dokumentácia a testy; kód pluginu, VERSION ani `?v=` bez zmeny).** Postupy, ktoré zbytočne nafukovali rolu orchestrátora, sú v skilloch a

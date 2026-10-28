@@ -23,7 +23,7 @@ Pravidlá hovoria o **rolách**, nie o modeloch — model aj nástroj každej ro
 | **rešeršér** | outside-in rešerš (čo už SketchUp a CAD svet rieši), krížový audit bloku | nič — výstup triedi orchestrátor (reconcile) |
 | **analytik** | subagent len na čítanie: výťahy z veľkých súborov, prieskum sessions, vyhodnotenie retro | nič — zistenia s dôkazmi, najviac 3 návrhy |
 | **review PR** | review každého PR: 1. kolo samo, ďalšie na vyžiadanie | nič — nálezy P0–P3 v review threadoch |
-| **automaty** | CI (headless + všetky JS sady), runner testov v SketchUpe, hook po úprave súboru, hook po mergi, skripty `otvor_pr.ps1` a `run_js_tests.ps1`, updater pluginu | CI a in-SU test sú brány mergu |
+| **automaty** | CI (headless + všetky JS sady), runner testov v SketchUpe, hook po úprave súboru, hook po mergi, hook pred príkazom (stráž), skripty `otvor_pr.ps1` a `run_js_tests.ps1`, updater pluginu | CI a in-SU test sú brány mergu |
 
 **Nástroje a ich rola (N14):** Codex — audítor (audit návrhu), náhradný recenzent (delta), review PR a náhradný implementátor bežných dávok · Grok — rešerš
 a krížový audit bloku, skúšobne implementátor (shadow, nikdy sa nemerguje) ·
@@ -277,7 +277,7 @@ ORCHESTRATOR.md, Autonómne bloky · **in-SU na finálnej hlave** — [DEFINICIE
 (Testovanie) · **kvóta Codexu** (`-Gate codex`) pred auditom návrhu aj pred otvorením PR — skill `usage` · **PR otvára implementátor**,
 pri povinnej predrecenzii až na pokyn orchestrátora — IMPLEMENTATOR.md (Postup) · **číslo PR** (`PR #?`, potom samostatný commit skriptom
 `scripts\otvor_pr.ps1`, ktorý pred mergom skontroluje orchestrátor) — IMPLEMENTATOR.md (Verzia a uzáver dávky).
-**Dokumentačné PR** (bez kódu pluginu) idú skrátene: vetva `docs/…` → odsek v KRONIKE → headless testy (guardy dokumentácie) → kvóta →
+**Dokumentačné PR** (bez kódu pluginu) idú skrátene: vetva `docs/…` → záznam dávky (súbor `kronika/` bloku, mimo bloku odsek v KRONIKE) → headless testy (guardy dokumentácie) → kvóta →
 PR → číslo PR → review → merge; čo sa pri nich robí a nerobí (verzia, `?v=`, predrecenzia, STAV): IMPLEMENTATOR.md (Verzia a uzáver
 dávky), hlavička „Údržba" v [STAV.md](STAV.md) a [DEFINICIE § D4](pravidla/DEFINICIE.md#d4).
 
@@ -381,7 +381,7 @@ Všetko, čo musí platiť, aby práca pokračovala. „Kto" = kto bránu uzatv�
 | 1 | predrecenzia pri bežnej dávke | hranica riadkov kódu pluginu (D3), nový ovládací prvok v UI (D5), dávka náhradného implementátora (časť 2) | DEFINICIE § D4 · skill `predrecenzia` |
 | 2 | kvóta pred implementačným subagentom | prah Claude session, čakanie na reset a kedy smie bežná dávka na náhradného implementátora (časť 2) | skill `usage` (Prahy a reakcie) |
 | 3 | výrobná/cenová dávka | jediná definícia s hranicami a príkladmi | DEFINICIE § D1 |
-| 4 | `-CloseWhenDone` | agent ho používa vždy; bez neho len Michalovo ručné spustenie | IMPLEMENTATOR.md · Testovanie |
+| 4 | `-CloseWhenDone` | agent ho používa vždy; bez neho len Michalovo ručné spustenie | IMPLEMENTATOR.md · Testovanie; stráži hook `docs/HOOKY.md` |
 | 5 | report | vždy, keď autonómny beh skončí alebo sa zastaví, najneskôr večer | ORCHESTRATOR.md · Autonómne bloky |
 | 6 | kvóta a prvé kolo Codexu | kontrola pred `gh pr create`; pod prahom PR ako draft (Codex ho nerecenzuje), ďalej podľa triedy dávky | skill `usage` (Prahy a reakcie) · skill `codex-po-pr` |
 

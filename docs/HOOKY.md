@@ -15,13 +15,40 @@ nad celým repom; pravidlá sa menia len tam. Ručne: `ruby scripts/encoding_gua
 
 Hook je rýchla spätná väzba: edit už je zapísaný, takže pri hláške chybu hneď oprav. Vynucovanie ostáva na CI.
 
+## Stráž pred príkazom — `straz.js`
+
+PreToolUse na nástroje Bash a PowerShell (`Bash|PowerShell`), v hlavnom okne **aj u subagentov** (implementátor tiež nesmie commitnúť do
+`main`). Odmietne päť vecí, ktoré sa nesmú stať ani raz; odmietnutie nesie vecný dôvod po slovensky, čo je zakázané a čo urobiť namiesto toho:
+
+| Zákaz | Odmietne | Povolené zostáva |
+|---|---|---|
+| Commit do `main` | `git commit` (aj `git -C <dir> commit`, aj za `cd <dir> &&` / `;` / `Set-Location`), keď je v cieľovom priečinku vetva `main` | iná vetva, odpojená hlava, `git commit --help`, text v reťazci / heredoc |
+| Push do `main` | `git push` s cieľom `main` (`origin main`, `HEAD:main`, `x:refs/heads/main`, aj `+` / `--force*` / `--dry-run`); `git push` bez refspecu, keď je aktuálna vetva `main`; vždy aj `--all` / `--branches` / `--mirror` (posielajú aj lokálny `main`) | `git push origin feat/x`, `main:feat/x`, `--tags` |
+| Merge bez pripnutej hlavy | `gh pr merge` bez `--match-head-commit` (tvar `<sha>` aj `=<sha>`; hodnota sa neskúma) | `gh pr merge --help`, `gh pr merge <N> --disable-auto` (zrušenie auto-merge), `gh pr view` |
+| Zástupné číslo PR pri merge (G7) | `gh pr merge <N> … --match-head-commit …`, keď `gh pr diff <N>` obsahuje v **pridaných** riadkoch súborov `PLAN.md`, `STAV.md`, `KRONIKA.md`, `DOGFOODING_vyriesene.md` a záznamov dávok bloku `SYSTEM/zdroje/bloky/*/kronika/*.md` ešte zástupné číslo PR (to dopĺňa `scripts\otvor_pr.ps1`) | merge bez čísla PR sa nekontroluje; zástupné číslo v kontexte, v odstránenom riadku alebo v inom súbore nevadí |
+| Runner bez `-CloseWhenDone` | spustenie `scripts\run_su_tests.ps1` (aj `./`, `& …`, `powershell -File …`) bez `-CloseWhenDone` | s `-CloseWhenDone` alebo `-DryRun`, čítanie či `git add` toho súboru |
+
+**Kontrakt:** stráž je rýchla spätná väzba, **posledná brána je CI a ochrana vetvy na GitHube**. Pri akejkoľvek vlastnej chybe (zlý JSON,
+chýba `git` alebo `gh`, sieť, timeout, neznámy priečinok) príkaz **pustí** a mlčí; nesúvisiaci príkaz opustí hneď (lacný textový test, bez
+spúšťania procesov). Falošné odmietnutie je horšie než prepustenie, preto sa text v úvodzovkách a v telách heredoc / PowerShell here-string
+(správa commitu, `--body`, `echo`, `grep "git push origin main"`) za príkaz nepovažuje a posudzuje sa len prvé slovo každého jednoduchého
+príkazu; vnútro substitúcií `$( … )`, PowerShell `( … )`, podmienok a blokov `{ … }` sa posudzuje samostatne. Známe medze (prepustí sa): aliasy
+gitu, `eval` / `Invoke-Expression`, premenná ako priečinok, vetva po `git switch` / `checkout` v tom istom príkaze, príkaz vnorený hlbšie než
+dve úrovne, refspec zložený z textu a substitúcie (`feat/$(…)`), PowerShell `if($x){git push origin main}` / `if ($x){git push origin main}` (bez
+medzery pred alebo za zátvorkou), `$out = git push origin main 2>&1` (priradenie bez zátvoriek), `gh pr merge 12 --merge -b "--disable-auto"` /
+`--body --disable-auto` (`--disable-auto` sa hľadá v každom slove) a `<<<` vnútri `"$( … )"` v úvodzovkách (berie sa ako heredoc, takže pri novom riadku
+v takej substitúcii sa zvyšok príkazu neposúdi). Vetvu zisťuje v cieľovom priečinku príkazu, takže commit a push do `main` odmietne v ľubovoľnom repe (aj `git -C <iné repo>`). Stráž nie je neprekonateľná a nemusí byť: čo prejde, zastaví CI a ochrana vetvy. Michalovo ručné spustenie z terminálu stráž nevidí
+(zámer). Codex a Grok hook nemajú, pravidlá pre ne ostávajú v texte ([AGENTS.md](../AGENTS.md)). Formát odmietnutia: JSON
+`hookSpecificOutput.permissionDecision: "deny"` s `permissionDecisionReason` na stdout, exit 0 (dôvod výberu je v hlavičke hooku).
+Testy: `tests/js/test_straz.js`.
+
 ## Hooky hlavného okna (orchestrátor)
 
 Pravidlá, ktoré z nich plynú, sú v [ORCHESTRATOR.md](../SYSTEM/pravidla/roly/ORCHESTRATOR.md); tu je len opis hookov.
 
 ### Pripomienka po mergi — `po_merge.js`
 
-PostToolUse na Bash s filtrom `gh pr merge` (hook si príkaz filtruje sám; v settings je len matcher Bash, bez poľa `if`). Po `gh pr merge <N>`
+PostToolUse na Bash a PowerShell s filtrom `gh pr merge` (hook si príkaz filtruje sám; v settings je len matcher `Bash|PowerShell`, bez poľa `if`). Po `gh pr merge <N>`
 vloží hlavnému agentovi vecné konštatovanie v dvoch riadkoch: „PR #N menil plugin: áno/nie" (z `gh pr view`) a „Nasadený je <vetva> <sha>
 (<čas>) → inštalácia mainu je potrebná / nie je potrebná". Údaje berie zo značky nasadenia `%TEMP%\noxun_nasadene.txt` (vetva, SHA, či bol
 strom čistý, čas; zapisuje ju `INSTALL_noxun_engine.ps1`) a z porovnania kódu pluginu s `origin/main`; chýbajúca značka alebo neznámy stav

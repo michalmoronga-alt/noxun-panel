@@ -14,8 +14,11 @@
 #   3. `git push origin HEAD` (vetva musi byt na GitHube);
 #   4. `gh pr create` (--base, --title, --body-file, pri brane alebo -Draft aj --draft);
 #   5. v suboroch zmenenych vetvou voci base nahradi `PR #?` cislom PR - len v SYSTEM/PLAN.md,
-#      SYSTEM/STAV.md, SYSTEM/archiv/KRONIKA.md, SYSTEM/archiv/DOGFOODING_vyriesene.md a len
-#      na riadkoch, ktore vetva pridala (inde je `PR #?` text pravidla), samostatny commit
+#      SYSTEM/STAV.md, SYSTEM/archiv/KRONIKA.md, SYSTEM/archiv/DOGFOODING_vyriesene.md,
+#      SYSTEM/zdroje/bloky/*/kronika/*.md (zaznam davky bloku) a len
+#      na riadkoch, ktore vetva pridala (inde je `PR #?` text pravidla); v tom istom commite nastavi v karte
+#      priebehu davky (SYSTEM/zdroje/{bloky/<BLOK>,opravy}/priebeh/*.md, ak ju vetva menila) `Stav: v review (PR #N)`
+#      a `Dalsi krok: review PR #N, ...`; samostatny commit
 #      `docs: doplnit cislo PR #N` s trailerom Co-Authored-By: <CoAuthor>, push;
 #   6. vypise URL, cislo PR, ci je draft, SHA commitu s cislom.
 #
@@ -28,7 +31,7 @@
 # -UsageScript (iny skript brany).
 # Exit: 0 = hotovo (alebo -WhatIf), 1 = chyba (vypis hovori v akom stave ostal PR/vetva).
 # Rucny postup ostava ako zaloha: najprv usage.ps1 -Gate codex (exit 3, 2 alebo 4 = gh pr create --draft),
-# potom gh pr create a `PR #?` -> cislo samostatnym commitom.
+# potom gh pr create a `PR #?` -> cislo samostatnym commitom, v ktorom sa karta priebehu prepne na `Stav: v review (PR #N)`.
 # ASCII, bez ternary / ?? / ?. (PS 5.1 aj pwsh).
 [CmdletBinding(SupportsShouldProcess = $true)]
 param(
@@ -117,11 +120,13 @@ if ($Draft) { Write-Host 'DRAFT: vyziadany parametrom -Draft' }
 # --- WhatIf: plan a koniec --------------------------------------------------
 if ($WhatIfPreference) {
   $changed = @(Update-NxPrNumber $repo $baseRef 'N' -DryRun)
+  $cardsPlan = @(Update-NxCardState $repo $baseRef 'N' -DryRun)
   Write-Host "WHATIF: vetva '$branch' proti $baseRef"
   Write-Host ("WHATIF: git push origin HEAD; gh pr create --base $Base --head $branch --title `"$Title`" --body-file $BodyFile" + $(if ($isDraft) { ' --draft' } else { '' }))
-  if ($changed.Count -eq 0) { Write-Host 'WHATIF: v zmenenych suboroch nie je PR #? - commit s cislom by sa nerobil' }
+  if ($changed.Count -eq 0 -and $cardsPlan.Count -eq 0) { Write-Host 'WHATIF: v zmenenych suboroch nie je PR #? ani karta priebehu - commit s cislom by sa nerobil' }
+  foreach ($c in $cardsPlan) { Write-Host ("WHATIF: karta priebehu {0}: Stav -> v review" -f $c) }
   foreach ($c in $changed) { Write-Host ("WHATIF: nahradil by sa 'PR #?' v {0} ({1}x)" -f $c.file, $c.replaced) }
-  if ($changed.Count -gt 0) { Write-Host "WHATIF: commit 'docs: doplnit cislo PR #N' (Co-Authored-By: $CoAuthor) + git push origin HEAD" }
+  if ($changed.Count -gt 0 -or $cardsPlan.Count -gt 0) { Write-Host "WHATIF: commit 'docs: doplnit cislo PR #N' (Co-Authored-By: $CoAuthor) + git push origin HEAD" }
   Write-Host ('WHATIF: PR by bol ' + $(if ($isDraft) { 'DRAFT' } else { 'bezny (nie draft)' }))
   exit 0
 }
@@ -159,8 +164,10 @@ $number = ([regex]::Match($url, '/pull/(\d+)')).Groups[1].Value
 $commitSha = ''
 try {
   $changed = @(Update-NxPrNumber $repo $baseRef $number)
-  if ($changed.Count -gt 0) {
-    $files = @($changed | ForEach-Object { $_.file })
+  $cards = @()
+  try { $cards = @(Update-NxCardState $repo $baseRef $number) } catch { Write-Host ('POZOR: karta priebehu sa neprepla na `v review` (' + $_.Exception.Message + ') - commit s cislom PR pokracuje, kartu uprav rucne.') }
+  if ($changed.Count -gt 0 -or $cards.Count -gt 0) {
+    $files = @($changed | ForEach-Object { $_.file }) + $cards
     $r = Git-Nx (@('add', '--') + $files)
     if ($r.code -ne 0) { throw 'git add zlyhal' }
     $msgFile = [System.IO.Path]::GetTempFileName()
@@ -185,5 +192,5 @@ try {
 Write-Host ''
 Write-Host "PR: #$number  $url"
 Write-Host ('DRAFT: ' + $(if ($isDraft) { 'ano' } else { 'nie' }))
-if ($commitSha) { Write-Host "COMMIT s cislom: $commitSha" } else { Write-Host 'COMMIT s cislom: ziadny (v zmenenych suboroch nebolo PR #? na doplnenie)' }
+if ($commitSha) { Write-Host "COMMIT s cislom: $commitSha" } else { Write-Host 'COMMIT s cislom: ziadny (v zmenenych suboroch nebolo PR #? na doplnenie ani karta priebehu)' }
 exit 0
