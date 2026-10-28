@@ -1,5 +1,5 @@
 # Posledná hliadka výroby
-- Dátum: 2026-10-27 · oblasť: VEPO a exporty
-- Nálezov: 0 · podozrení: 0 nových (2 staré z 2026-10-20 platia)
-- Kód oblasti sa od 2026-10-20 nezmenil; run_all: 5442 passed, 0 failed.
-- Správa: hliadka/vyroba/2026-10-27_vepo_exporty.md
+- Dátum: 2026-10-28 · oblasť: ceny a rozpočet
+- Nálezov: 0 · podozrení: 0
+- Kód oblasti sa od 2026-10-21 nezmenil; run_all: 5449 passed, 1 failed (len časový limit NP-3 push 271 ms vs 250 ms, nie výrobné číslo).
+- Správa: hliadka/vyroba/2026-10-28_ceny_rozpocet.md
