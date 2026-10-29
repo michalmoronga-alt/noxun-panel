@@ -1,5 +1,5 @@
 # Posledná hliadka výroby
-- Dátum: 2026-10-28 · oblasť: ceny a rozpočet
+- Dátum: 2026-10-29 · oblasť: kovanie
 - Nálezov: 0 · podozrení: 0
-- Kód oblasti sa od 2026-10-21 nezmenil; run_all: 5449 passed, 1 failed (len časový limit NP-3 push 271 ms vs 250 ms, nie výrobné číslo).
-- Správa: hliadka/vyroba/2026-10-28_ceny_rozpocet.md
+- Nové od minula: nohy úzkej skrinky (< 200 mm → 2 nohy) a výklopy skontrolované, konzistentné so STANDARD §6.2; run_all: 5449 passed, 1 failed (len časový limit NP-3 264 ms vs 250 ms).
+- Správa: hliadka/vyroba/2026-10-29_kovanie.md
