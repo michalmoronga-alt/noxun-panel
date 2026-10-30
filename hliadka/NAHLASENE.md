@@ -12,3 +12,6 @@
 | 2026-10-27 | P-2026-10-27-2 | pravidlá | .claude/agents/*.md (vložené odkazy); reserser.md:21 | relatívne odkazy vo vložených rolách mŕtve z .claude/agents/ | nové |
 | 2026-10-27 | P-2026-10-27-3 | pravidlá | WORKFLOW.md, codex-po-pr:44,50,84 | história, dátumy a PR # v záväznom texte (K4) | nové |
 | 2026-10-27 | P-2026-10-27-4 | pravidlá | .claude/agents/implementator*.md, slepy-recenzent.md | typy agentov 22–23 kB (cieľ 8 kB), 3× rovnaký obsah | nové |
+| 2026-10-30 | P-2026-10-30-1 | pravidlá | codex-po-pr:20,26-27; IMPLEMENTATOR.md:74; WORKFLOW.md:218,224,278 | pravidlo Číslo PR / PR #? v 3+ verziách | nové |
+| 2026-10-30 | P-2026-10-30-2 | pravidlá | WORKFLOW.md (12), codex-po-pr (10), usage (6), codex-audit (6) | história, dátumy a PR # v záväznom texte (rast) | nové |
+| 2026-10-30 | P-2026-10-30-3 | pravidlá | codex-po-pr/SKILL.md:1-134 | skill 17,6 kB (+3,9 kB), viac tém v jednom | nové |

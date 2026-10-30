@@ -1,5 +1,5 @@
-Strážca pravidiel · 2026-10-27 · main 93cae30d
-Nálezov: 4 nové (1 rozpor, 1 mŕtve odkazy, 1 história, 1 veľkosť); staré z 20.10./23.10. štrukturálne preklenuté reštrukturalizáciou (CLAUDE.md je už most 307 B).
-Najškodlivejšie: WORKFLOW.md:34 „Aktuálne (26.9.2026)" odporuje riadkom s „od 7.10.2026" v tej istej tabuľke obsadenia.
-Rast veľkosti: typy agentov +19 kB každý (implementator* ≈23 kB, slepy-recenzent 22 kB, cieľ 8 kB); usage/SKILL.md +3,9 kB.
-Správa: hliadka/pravidla/2026-10-27.md
+Strážca pravidiel · 2026-10-30 · main 703499af
+Nálezov: 3 nové (1 duplicita, 1 história, 1 veľkosť); nálezy z 27.10. ostávajú otvorené (WORKFLOW.md:34, typy agentov 22–24 kB).
+Najškodlivejšie: pravidlo „Číslo PR / PR #?" žije v 3 verziách (codex-po-pr:20 a :26-27, IMPLEMENTATOR.md:74, WORKFLOW) so zoznamom súborov, ktorý sa môže rozísť so skriptom.
+Rast veľkosti: codex-po-pr/SKILL.md +3,9 kB (17,6 kB); typy agentov +120–250 B; mŕtve odkazy a chýbajúce skripty: žiadne.
+Správa: hliadka/pravidla/2026-10-30.md
