@@ -1,5 +1,4 @@
-Dátum: 2026-10-30
-Oblasť: materiály, ABS a hrany
-Nálezy: 0, podozrenia: 0
-Najdôležitejšie: bez nálezov; run_all 5450 passed, 0 failed.
-Správa: hliadka/vyroba/2026-10-30_materialy_abs.md
+Dátum: 2026-10-31 · oblasť: konštrukcia (So)
+Nálezy: 0 · podozrenia: 0
+Najdôležitejšie: bez nálezov, rohová zostava (CR, výstuha, zrkadlo) sedí so STANDARD §4.2.
+Správa: hliadka/vyroba/2026-10-31_konstrukcia.md
