@@ -1,5 +1,5 @@
-Strážca pravidiel · 2026-11-06 · main 703499af
-Nálezov: 0 nových (main sa nezmenil, v rozsahu žiadne nové commity).
-Najškodlivejšie ostáva z minula: pravidlo „Číslo PR / PR #?" v 3+ verziách (P-2026-10-30-1).
+Strážca pravidiel · 2026-11-10
+Nálezov: 0 nových (main nezmenený, 703499af).
+Najškodlivejší: bez nového; otvorené ostávajú P-2026-10-27-1..4 a P-2026-10-30-1..3.
 Rast veľkosti: žiadny.
-Správa: hliadka/pravidla/2026-11-06.md
+Správa: hliadka/pravidla/2026-11-10.md
