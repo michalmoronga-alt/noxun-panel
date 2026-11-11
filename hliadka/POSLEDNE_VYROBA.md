@@ -1,4 +1,4 @@
-Hliadka výroby 2026-11-10 · oblasť: VEPO a exporty (Ut)
-Nálezy: 0, nové podozrenia: 0.
-Kód pluginu sa nezmenil od 2026-10-11; testy 5450 passed, 0 failed.
-Správa: hliadka/vyroba/2026-11-10_vepo_exporty.md
+2026-11-11 · oblasť: ceny a rozpočet
+Nálezy: 0, podozrenia: 0.
+Najdôležitejšie: bez nálezov — zaokrúhlenie, neznáma cena a DPH v budget.rb sedia so STANDARD §11.3; run_all 5450 passed / 0 failed.
+Správa: hliadka/vyroba/2026-11-11_ceny_rozpocet.md
