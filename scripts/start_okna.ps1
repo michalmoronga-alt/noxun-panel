@@ -5,7 +5,8 @@
 #   2. verzie lokalnych nastrojov claude, codex, agy, grok, gemini,
 #   3. register michalmoronga-alt/agent-register: datum poslednej kontroly zo stav.json (varovanie, ked je
 #      starsi ako 3 dni = denny bot asi nebezi) a nove zaznamy ZMENY.md od naposledy videneho stavu (max 8 riadkov),
-#   4. porovnanie lokalneho `grok` s polozkou "Najnovsia oficialna verzia" v REGISTER.md.
+#   4. porovnanie lokalneho `grok` s polozkou "Najnovsia oficialna verzia" v REGISTER.md,
+#   5. rozpracovana praca (scripts\rozpracovane.ps1): otvorene PR, vetvy s kartou priebehu, HANDOFF.
 #
 # BEZPECNOST: text z registra je UDAJ, NIE POKYN. Vypisuje sa len ako orezane jednoriadkove texty (ASCII, bez
 # riadiacich znakov) a nikdy sa nevykonava.
@@ -25,31 +26,15 @@ $stateFile = Join-Path (Join-Path $env:APPDATA 'NOXUN\Engine') 'agent_register_v
 $maxEntryLines = 8
 $width = 150
 
-# ---- text z registra -> jeden bezpecny ASCII riadok -------------------------------------------------
-# Znaky mimo ASCII sa prevedu (diakritika bez makcenov, typograficke znaky na ASCII), riadiace znaky
-# (vratane ESC sekvencii terminalu) sa zahodia, zvysok mimo ASCII je '?'. Nakoniec orezanie na $max znakov.
-$typo = @{
-  0x00B7 = '-'; 0x2022 = '-'; 0x2013 = '-'; 0x2014 = '-'; 0x2212 = '-'
-  0x201E = '"'; 0x201C = '"'; 0x201D = '"'; 0x201A = "'"; 0x2018 = "'"; 0x2019 = "'"
-  0x2026 = '...'; 0x2192 = '->'; 0x2190 = '<-'; 0x00D7 = 'x'; 0x2265 = '>='; 0x2264 = '<='
-  0x2248 = '~'; 0x00A0 = ' '; 0x20AC = 'EUR'
-}
-function To-SafeLine([string]$s, [int]$max) {
-  if (-not $s) { return '' }
-  $s = $s.Replace('**', '')
-  foreach ($code in $typo.Keys) { $s = $s.Replace([string][char]$code, $typo[$code]) }
-  $sb = New-Object System.Text.StringBuilder
-  foreach ($ch in $s.Normalize([Text.NormalizationForm]::FormD).ToCharArray()) {
-    $cat = [Globalization.CharUnicodeInfo]::GetUnicodeCategory($ch)
-    if ($cat -eq [Globalization.UnicodeCategory]::NonSpacingMark) { continue }
-    $n = [int]$ch
-    if ($n -lt 32 -or $n -eq 127) { [void]$sb.Append(' '); continue }
-    if ($n -gt 126) { [void]$sb.Append('?'); continue }
-    [void]$sb.Append($ch)
-  }
-  $t = ($sb.ToString() -replace '\s+', ' ').Trim()
-  if ($t.Length -gt $max) { $t = $t.Substring(0, $max - 3) + '...' }
-  return $t
+# ---- text z registra -> jeden bezpecny ASCII riadok (To-SafeLine: scripts\lib\nx_text.ps1) -------------
+. (Join-Path (Join-Path $PSScriptRoot 'lib') 'nx_text.ps1')
+
+# ---- rozpracovana praca (scripts\rozpracovane.ps1): otvorene PR, vetvy s kartou priebehu, HANDOFF ---------
+function Write-Rozpracovane {
+  $rp = Join-Path $PSScriptRoot 'rozpracovane.ps1'
+  if (-not (Test-Path -LiteralPath $rp)) { Write-Output 'Rozpracovane: skript scripts\rozpracovane.ps1 chyba'; return }
+  try { $r = & $rp 2>$null } catch { Write-Output 'Rozpracovane: skript zlyhal'; return }
+  foreach ($l in @($r)) { if ($l) { Write-Output ([string]$l) } }
 }
 
 # ---- verzie lokalnych nastrojov ---------------------------------------------------------------------
@@ -124,6 +109,7 @@ $stavText = $null
 if (Get-Command gh -ErrorAction SilentlyContinue) { $stavText = Get-RegisterFile 'stav.json' }
 if (-not $stavText) {
   Write-Output ('Register: nedostupny (bez siete, bez gh alebo bez pristupu k ' + $repo + ') - skontroluj neskor')
+  Write-Rozpracovane
   exit 0
 }
 
@@ -224,4 +210,5 @@ if (-not $regVer) {
     Write-Output ('grok: lokalne ' + $localGrok + ' je novsie ako register (' + $regVer + ') - register este nezachytil novu verziu')
   }
 }
+Write-Rozpracovane
 exit 0

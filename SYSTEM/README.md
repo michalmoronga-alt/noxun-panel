@@ -38,8 +38,10 @@ a [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md) — **len Gre
 | [V1_VIZIA.md](V1_VIZIA.md) | definícia „V1 hotové" + nemenné princípy | plán (ten je v PLAN.md) |
 | [WORKFLOW.md](WORKFLOW.md) | mapa workflowu: roly a **obsadenie rolí** (mení Michal), diagramy blok · dávka · review, brány, hranice | záväzné znenie pravidiel (to je v ../AGENTS.md, pravidla/ a skilloch) |
 | [pravidla/DEFINICIE.md](pravidla/DEFINICIE.md) | **definície brán a tried** (jediné znenie): výrobná/cenová, audit-povinná, triedy D/Ľ/S/Ť, predrecenzia, nový prvok UI, in-SU — kópie stráži guard `test_definicie.rb` | postup (skilly), kvótové prahy (`usage`), review kolá (`codex-po-pr`) ani obsadenie rolí (WORKFLOW) |
-| [pravidla/roly/](pravidla/roly/) | pravidlá jednej roly: [ORCHESTRATOR.md](pravidla/roly/ORCHESTRATOR.md) (merge, review, kvóty, autonómne bloky, uzáver bloku) · [IMPLEMENTATOR.md](pravidla/roly/IMPLEMENTATOR.md) (verzia, checklist uzáveru dávky, testovanie); jadro pre všetkých je [../AGENTS.md](../AGENTS.md) | definície (DEFINICIE.md) ani postupy (skilly) |
-| [pravidla/POVINNE_CITANIE.md](pravidla/POVINNE_CITANIE.md) | povinné čítanie podľa typu práce + rozpočet čítania | pravidlá práce (jadro a roly) |
+| [pravidla/roly/](pravidla/roly/) | karty rolí — pravidlá jednej roly: ORCHESTRATOR (merge, review, kvóty, autonómne bloky, poistka uzáveru; postup: skilly `uzaver-bloku`, `smoke`) · IMPLEMENTATOR (postup, verzia, uzáver dávky, testovanie) · RECENZENT · AUDITOR · RESERSER · ANALYTIK; jadro pre všetkých je [../AGENTS.md](../AGENTS.md) | definície (DEFINICIE.md) ani postupy (skilly) |
+| [pravidla/typy/](pravidla/typy/) | zdroje Claude typov agentov (frontmatter, hlavička, zoznam vložených súborov); `.claude/agents/` z nich generuje `scripts/generuj_typy_agentov.rb` | pravidlá rolí (tie sú v kartách) |
+| [pravidla/POVINNE_CITANIE.md](pravidla/POVINNE_CITANIE.md) | rozcestník povinného čítania: riadky bez cesty + tabuľka pravidiel oblastí [`.claude/rules/`](../.claude/rules/) (načítajú sa samy pri práci so súbormi oblasti; `paths:` v hlavičke) + rozpočet čítania | pravidlá práce (jadro a roly) |
+| [pravidla/NASTROJE_TESTOV.md](pravidla/NASTROJE_TESTOV.md) | podrobnosti nástrojov testov: fotenie okien, export test, diagnostika MCP | kedy nástroj platí (IMPLEMENTATOR.md, Testovanie) |
 | [retro/](retro/README.md) | pokus retro (27.9.–11.10.2026): formát záznamov po behoch v [retro/README.md](retro/README.md); inbox `retro/inbox/` je **lokálny, git ho ignoruje** (pravidlá pokusu: WORKFLOW.md, časť 9) | záväzné pravidlo (retro len navrhuje, rozhoduje Michal) ani archív (spracované vyhodnotenia sú v `archiv/retro/`) |
 
 ## Vrstvy
@@ -78,7 +80,7 @@ a [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md) — **len Gre
   [UI_DIZAJN_dennik_do_v0.17.md](archiv/UI_DIZAJN_dennik_do_v0.17.md) (plné znenie `docs/UI_DIZAJN.md` s denníkom dávok do v0.17.4),
   staršie analýzy a vízie. V archíve sa
   **existujúce záznamy neprepisujú** — pribúdať však pribúda priebežne, presne ako káže
-  checklist uzáveru v pravidla/roly/IMPLEMENTATOR.md: záznam dávky navrch KRONIKY, vyriešené D-číslo navrch
+  checklist uzáveru v pravidla/roly/IMPLEMENTATOR.md: záznam dávky (súbor `kronika/` bloku, oprava mimo bloku navrch KRONIKY), vyriešené D-číslo navrch
   indexu v DOGFOODING_vyriesene.md, hotový blok plným textom do ROADMAP_hotove_etapy.md
   a pri uzávere bloku jeho celý priečinok (debata, mockup, zadania, briefy, smoke checklist) do `archiv/bloky/<BLOK>/`.
   [archiv/retro/](archiv/retro/) drží **spracované retro vyhodnotenia** (`VYHODNOTENIE_<dátum>.md` — postrehy, návrhy a rozhodnutia
@@ -100,7 +102,7 @@ a [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md) — **len Gre
 - **Každý koncept v `zdroje/next_sessions/`** nesie riadok `> Stav: KONCEPT` ako **prvý
   obsahový riadok hneď pod H1** — nie kdekoľvek v súbore.
 - **STAV je krátky** (max 80 riadkov a 12 kB) a má stabilnú kostru piatich sekcií.
-  Nahradený text ide odsekom navrch „Záznamy dávok" v `archiv/KRONIKA.md`.
+  Nahradený text ide do záznamu dávky (súbor `zdroje/bloky/<BLOK>/kronika/`, oprava mimo bloku odsek navrch v `archiv/KRONIKA.md`).
 - **PLAN je krátky** (max 280 riadkov a 40 kB, od dávky H1 1.10.2026) — keď strop nestačí, v PLAN
   ostal hotový blok alebo zadanie dávky, ktoré patrí do priečinka bloku.
 - **Žiadny riadok nad 400 znakov** v živých docs — jeden odsek na jednom obrom riadku

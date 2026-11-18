@@ -34,7 +34,8 @@ NX_PLAN_MAX_BYTES = 40 * 1024
 NX_SYSTEM_LINE_FILES = %w[
   STAV.md PLAN.md DOGFOODING.md README.md V1_VIZIA.md VEPO_KONTRAKT.md AUDIT_REGISTER.md
   STANDARD.md POJMY.md WORKFLOW.md pravidla/DEFINICIE.md pravidla/POVINNE_CITANIE.md
-  pravidla/roly/ORCHESTRATOR.md pravidla/roly/IMPLEMENTATOR.md
+  pravidla/roly/ORCHESTRATOR.md pravidla/roly/IMPLEMENTATOR.md pravidla/roly/RECENZENT.md
+  pravidla/roly/AUDITOR.md pravidla/roly/RESERSER.md pravidla/roly/ANALYTIK.md pravidla/NASTROJE_TESTOV.md
 ].freeze
 NX_SYSTEM_MAX_LINE = 400
 # Davka P1b (blok 10 · PRAVIDLA) presunula pravidla z CLAUDE.md do jadra AGENTS.md, suborov roli
@@ -553,8 +554,9 @@ NxTest.test('docs: relativne odkazy v navigacnych suboroch ukazuju na existujuce
   names = %w[CLAUDE.md AGENTS.md docs/ARCHITEKTURA.md SYSTEM/README.md SYSTEM/STAV.md SYSTEM/PLAN.md
              SYSTEM/DOGFOODING.md SYSTEM/V1_VIZIA.md SYSTEM/WORKFLOW.md SYSTEM/pravidla/DEFINICIE.md
              SYSTEM/pravidla/POVINNE_CITANIE.md SYSTEM/pravidla/roly/ORCHESTRATOR.md
-             SYSTEM/pravidla/roly/IMPLEMENTATOR.md docs/UI_DIZAJN.md] +
-          NX_ARCH_FILES.map { |n| "docs/architecture/#{n}" }
+             SYSTEM/pravidla/roly/IMPLEMENTATOR.md docs/UI_DIZAJN.md docs/HOOKY.md] +
+          NX_ARCH_FILES.map { |n| "docs/architecture/#{n}" } +
+          Dir[File.join(NxTest::ROOT, '.claude', 'rules', '*.md')].sort.map { |p| p.sub("#{NxTest::ROOT}/", '') }
   names.each do |name|
     path = File.join(NxTest::ROOT, name)
     NxTest.assert(File.exist?(path), "#{name} chyba")

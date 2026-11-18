@@ -1,5 +1,5 @@
 // Claude Code hook — PRIPOMIENKA PO MERGI (Noxun Engine, P4a, 23.10.2026).
-// PostToolUse na Bash: keď príkaz obsahuje `gh pr merge <N>`, hook zistí cez `gh pr view <N>`,
+// PostToolUse na Bash a PowerShell (P4b): keď príkaz obsahuje `gh pr merge <N>`, hook zistí cez `gh pr view <N>`,
 // či je PR naozaj zmergovaný a či menil plugin, prečíta značku nasadenia a vloží agentovi VECNÉ
 // konštatovanie (additionalContext) — nie rozkaz, napr.:
 //   „PR #478 zmergovaný, menil plugin: nie.
@@ -21,7 +21,7 @@
 // `gh pr view <N> --json files,mergedAt,state` (6 s) a pri PR bez zmeny pluginu s čistou značkou
 // `git fetch origin main` (4 s) + `git diff` (2 s). Subagent (vstup má agent_id) — ticho, merge robí
 // orchestrátor. Výstup je čisté ASCII (diakritika ako \uXXXX v JSON) — rovnaký formát ako context_meter.js.
-// Filter v .claude/settings.json je len matcher „Bash" (pole `if` sa nepoužíva — živo neoverené a môže
+// Filter v .claude/settings.json je len matcher „Bash|PowerShell“ (pole `if` sa nepoužíva — živo neoverené a môže
 // minúť zložený príkaz `sha=$(…) && gh pr merge …`); hook si príkaz filtruje sám.
 // Príkaz v .claude/settings.json: node -e "try{require(<projekt>/.claude/hooks/po_merge.js).run()}catch(e){}"
 // Testy: tests/js/test_po_merge.js
@@ -143,7 +143,7 @@ function messageFor(number, view, ctx) {
 function decide(input, opts) {
   const o = opts || {};
   if (!input || typeof input !== 'object' || input.agent_id) return null;
-  if (input.hook_event_name !== 'PostToolUse' || input.tool_name !== 'Bash') return null;
+  if (input.hook_event_name !== 'PostToolUse' || (input.tool_name !== 'Bash' && input.tool_name !== 'PowerShell')) return null;
   const command = input.tool_input && input.tool_input.command;
   const number = mergedNumber(command);
   if (!number) return null;

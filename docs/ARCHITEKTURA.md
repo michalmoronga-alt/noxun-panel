@@ -6,7 +6,7 @@
 > **Ako sa číta:** v tabuľkách nižšie nájdi modul, ktorého sa zásah týka, otvor jeho súbor v
 > `docs/architecture/` a prečítaj si **JEHO odsek** — každý modul má vlastný nadpis s menom súboru,
 > takže Grep podľa mena súboru (`edge_check`, `materials_abs`, `fronts`…) funguje ďalej.
-> Kedy je čítanie povinné, hovorí „Povinné čítanie podľa typu práce" v [../SYSTEM/pravidla/POVINNE_CITANIE.md](../SYSTEM/pravidla/POVINNE_CITANIE.md).
+> Kedy je čítanie povinné, hovorí [../SYSTEM/pravidla/POVINNE_CITANIE.md](../SYSTEM/pravidla/POVINNE_CITANIE.md) (riadky podľa typu práce + tabuľka oblastí) a súbory oblastí `.claude/rules/`.
 > **Údržba:** dávka, ktorá mení modul, upraví **JEHO odsek na mieste** v príslušnom súbore
 > `docs/architecture/` — **nikdy append na koniec**. Nový modul = nový odsek v správnom súbore
 > (a nový riadok v tabuľke nižšie).

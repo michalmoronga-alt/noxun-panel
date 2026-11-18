@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 # Guardy G1 "strop velkosti" a G2 "bez historie" pravidiel (blok 10 · PRAVIDLA, davka P1b).
-# Pravidla, ktore agenti citaju automaticky (AGENTS.md, most CLAUDE.md, SYSTEM/pravidla/**), nesmu znova
+# Pravidla, ktore agenti citaju automaticky (AGENTS.md, most CLAUDE.md, SYSTEM/pravidla/**, .claude/rules/**), nesmu znova
 # "pretiect": CLAUDE.md narastol na 35 kB a Codex oreze AGENTS.md na 32 KiB. Historia (datumy zavedenia,
 # revizie, cisla PR) patri do KRONIKY a archivu — v pravidle len platne znenie.
 # Zmena stropu = zmena konstanty nizsie (jedine miesto).
@@ -11,14 +11,27 @@ require_relative '../helper' unless defined?(NxTest)
 NX_PRAV_LIMITS = {
   'AGENTS.md' => [12 * 1024, 150],
   'CLAUDE.md' => [1 * 1024, nil],
-  # Docasne 14 kB: P3 (presun pravidiel oblasti do .claude/rules/) znizi na 8 kB.
-  'SYSTEM/pravidla/roly/*.md' => [14 * 1024, nil],
-  'SYSTEM/pravidla/POVINNE_CITANIE.md' => [8 * 1024, nil],
-  'SYSTEM/pravidla/DEFINICIE.md' => [10 * 1024, nil]
+  # Roly: spolocny strop 8 kB (pravidla oblasti ziju v .claude/rules/, postupy v skilloch). Subor s vlastnym riadkom nizsie
+  # sa meria len podla neho. ORCHESTRATOR.md ma vlastny strop 10 kB: jeho pravidla (merge a brany, predvolene reakcie,
+  # tok bloku, bezpecnost) sa uz nemaju kam presunut bez straty vyznamu.
+  'SYSTEM/pravidla/roly/*.md' => [8 * 1024, nil],
+  'SYSTEM/pravidla/roly/ORCHESTRATOR.md' => [10 * 1024, nil],
+  # Skilly: postup ma zostat citatelny na jedno otvorenie.
+  '.claude/skills/*/SKILL.md' => [nil, 500],
+  # POVINNE_CITANIE je rozcestnik: riadky bez cesty + tabulka oblasti; obsah oblasti je v .claude/rules/.
+  'SYSTEM/pravidla/POVINNE_CITANIE.md' => [6 * 1024, nil],
+  # Subory oblasti: nacitaju sa do kontextu agenta pri praci so subormi oblasti.
+  '.claude/rules/*.md' => [6 * 1024, nil],
+  'SYSTEM/pravidla/DEFINICIE.md' => [10 * 1024, nil],
+  # Davka P2: podrobnosti nastrojov testov (foto okien, export test, diagnostika MCP) vybrane z IMPLEMENTATOR.md.
+  'SYSTEM/pravidla/NASTROJE_TESTOV.md' => [8 * 1024, nil]
 }.freeze
 
 # G2 — subory bez historie a vzory historie.
-NX_PRAV_HISTORY_SCAN = %w[AGENTS.md CLAUDE.md SYSTEM/pravidla/**/*.md].freeze
+NX_PRAV_HISTORY_SCAN = %w[
+  AGENTS.md CLAUDE.md SYSTEM/pravidla/**/*.md .claude/rules/**/*.md
+  .claude/skills/uzaver-bloku/**/*.md .claude/skills/smoke/**/*.md .claude/skills/antigravity-outside-in/**/*.md
+].freeze
 NX_PRAV_HISTORY_PATTERNS = {
   'od <dátum>' => /\bod\s+\d{1,2}\.\s?\d{1,2}\./i,
   '(od <č>.<č>.20' => /\(od\s+\d{1,2}\.\s?\d{1,2}\.\s?20/i,
@@ -47,15 +60,17 @@ end
 
 NxTest.test('pravidla G1: AGENTS.md, CLAUDE.md, roly, POVINNE_CITANIE a DEFINICIE su pod stropom') do
   bad = []
+  own = NX_PRAV_LIMITS.keys.reject { |k| k.include?('*') }
   NX_PRAV_LIMITS.each do |pat, (max_bytes, max_lines)|
     files = nx_prav_files([pat])
     NxTest.assert(!files.empty?, "#{pat}: nenasiel som ziadny subor — guard by nic nestrazil")
     files.each do |path|
       rel = path.sub("#{NxTest::ROOT}/", '')
+      next if pat.include?('*') && own.include?(rel) # subor s vlastnym riadkom sa meria len podla neho
       # Bajty bez CR: strop nesmie zavisiet od toho, ci checkout na Windows zmenil konce riadkov na CRLF.
       size = File.binread(path).gsub("\r\n", "\n").bytesize
       lines = File.readlines(path, encoding: 'UTF-8').length
-      bad << "#{rel}: #{size} B (strop #{max_bytes} B)" if size > max_bytes
+      bad << "#{rel}: #{size} B (strop #{max_bytes} B)" if max_bytes && size > max_bytes
       bad << "#{rel}: #{lines} riadkov (strop #{max_lines})" if max_lines && lines > max_lines
     end
   end
@@ -64,8 +79,8 @@ NxTest.test('pravidla G1: AGENTS.md, CLAUDE.md, roly, POVINNE_CITANIE a DEFINICI
                 'Pravidlo patri na jedno miesto (rola, skill, .claude/rules/), historia do KRONIKY — nie dalsi text sem.')
 end
 
-NxTest.test('pravidla G1: roly su v SYSTEM/pravidla/roly/ (orchestrator aj implementator)') do
-  %w[ORCHESTRATOR.md IMPLEMENTATOR.md].each do |name|
+NxTest.test('pravidla G1: roly su v SYSTEM/pravidla/roly/ (vsetky karty roli)') do
+  %w[ORCHESTRATOR.md IMPLEMENTATOR.md RECENZENT.md AUDITOR.md RESERSER.md ANALYTIK.md].each do |name|
     path = File.join(NxTest::ROOT, 'SYSTEM', 'pravidla', 'roly', name)
     NxTest.assert(File.exist?(path), "SYSTEM/pravidla/roly/#{name} chyba")
   end

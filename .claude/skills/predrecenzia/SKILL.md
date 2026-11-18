@@ -32,7 +32,7 @@ povinné pre každý PR — predrecenzia je lacnejšie kolo navyše medzi hotov�
    a kľúčové rozhodnutia z briefu) a rozsah diffu — nie výsledky auditu, nie vlastné hodnotenie orchestrátora, nie zoznam „na čo si dať pozor".
    Medzitým orchestrátor pripravuje PR popis.
    **Druhý recenzent pri dávke Ť** (kedy: `SYSTEM/pravidla/DEFINICIE.md` § D4): **implementátor Claude** → druhým recenzentom je Codex, model roly
-   **bežný audit a delta** z tabuľky Obsadenie rolí, spustený cez companion `task --background --model <model>` (postup ako v bode 7) alebo subagent
+   Codexu z riadku **slepý recenzent** v tabuľke Náhradníci (`SYSTEM/WORKFLOW.md` § 2), spustený cez companion `task --background --model <model>` (postup ako v bode 7) alebo subagent
    `codex:codex-rescue` — model vždy výslovne; **rovnaké zadanie a rovnaký rozsah diffu** ako prvý recenzent, beží súbežne. **Implementátor iného
    providera** (napr. náhradník Codex) → iným providerom je už povinný Claude recenzent, druhý sa nepridáva. Pred druhým recenzentom Codex brána
    `-Gate codex`; reakcia na exit 3: skill `usage`, Prahy a reakcie (riadok Druhý recenzent pri Ť).
@@ -45,7 +45,7 @@ povinné pre každý PR — predrecenzia je lacnejšie kolo navyše medzi hotov�
    `--model` (na predvolený model z `~/.codex/config.toml` sa nespolieha, rozhodnutie N13). Najprv Codex brána
    `& ".claude\skills\usage\usage.ps1" -Label "predrecenzia <dávka>" -Phase before -Gate codex` (exit 3 = ani náhradu nespúšťaj — reakcia
    podľa skillu `usage`), potom cez **PowerShell tool** s tým istým promptom:
-   `$prompt = Get-Content -Raw '<prompt-file>'; node "<companion>" task --background --model <model roly bežný audit a delta> $prompt`.
+   `$prompt = Get-Content -Raw '<prompt-file>'; node "<companion>" task --background --model <model Codexu z riadku slepý recenzent v tabuľke Náhradníci> $prompt`.
    Nájdenie companionu, čakanie so stall guardom a vytiahnutie výsledku: skill `codex-audit`, kroky 1 a 4–5.
 
 **Závažnosť:** **P1** = chybné výrobné dáta alebo ceny, strata či poškodenie dát, pád, zápis do cudzieho dokumentu · **P2** = zlé správanie
@@ -62,8 +62,9 @@ SCOPE: `git diff main...HEAD` — only this diff and the code it calls or is cal
 INTENT OF THE CHANGE (from the brief):
 <2–6 sentences: what should change for the user, key decisions and constraints>
 
-READ FIRST: AGENTS.md (core rules), SYSTEM/pravidla/DEFINICIE.md, the matching row of
-SYSTEM/pravidla/POVINNE_CITANIE.md, sections "Verzia a uzáver dávky" and "Testovanie" of
+READ FIRST: AGENTS.md (core rules), SYSTEM/pravidla/DEFINICIE.md,
+SYSTEM/pravidla/roly/RECENZENT.md (reviewer role card), the matching row of
+SYSTEM/pravidla/POVINNE_CITANIE.md (plus the area file .claude/rules/<area>.md from its table), sections "Verzia a uzáver dávky" and "Testovanie" of
 SYSTEM/pravidla/roly/IMPLEMENTATOR.md (closing checklist, export test P == K, head of
 the in-SU run — the diff is checked against them), the docs/architecture sections of
 the touched modules (find them via docs/ARCHITEKTURA.md), relevant SYSTEM/STANDARD.md
