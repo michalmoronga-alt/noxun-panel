@@ -18,6 +18,13 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **DOCS · ODKAZ NA SÚKROMNÉ REPO EXTERNÝCH REŠERŠÍ (26.10.2026, PR #481, mimo bloku — len dokumentácia; kód pluginu, VERSION, `?v=` ani STAV
+  bez zmeny).** Michal založil súkromné repo `michalmoronga-alt/Engine-researchs` pre research zvonku a nápady na vylepšenie a pokračovanie
+  Noxun Engine, ktoré z neho vychádzajú (prvý obsah: outside-in rozbor cudzieho produktu po oblastiach so skóre nápadov a väzbou na PLAN).
+  Odkaz pribudol do rozcestníka `AGENTS.md` a do vrstiev mapy autorít `SYSTEM/README.md` s pravidlom: nezáväzné ako `zdroje/`, nečítať
+  automaticky, do PLAN ide len výber Michala. **Prečo samostatné repo:** podrobné rozbory so screenshotmi nepatria do verejného `noxun-panel`.
+  Typy agentov v `.claude/agents/` pregenerované (`scripts/generuj_typy_agentov.rb`), lebo vkladajú `AGENTS.md` doslova (guard G4).
+
 - **P4b · STRÁŽE: HOOK PRED PRÍKAZOM (27.10.2026, PR #485, blok 10 · PRAVIDLA, trieda S — len hooky, ich testy, nastavenie Claude Code a dokumentácia; kód pluginu, VERSION ani `?v=` bez zmeny).**
   Čo sa nesmie stať ani raz, zastaví stroj skôr, než príkaz zbehne. **Čo sa zmenilo:** nový hook `.claude/hooks/straz.js` (PreToolUse, matcher `Bash|PowerShell`,
   hlavné okno aj subagenti) odmietne: commit do `main` (aj `git -C <dir> commit`, `cd <dir> &&`, `Set-Location`), push do `main` (`origin main`, `HEAD:main`, `x:refs/heads/main`,
